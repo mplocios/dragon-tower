@@ -1,8 +1,23 @@
-import { ChevronDown as ChevronDownIcon, Maximize2 as Maximize2Icon, Menu as MenuIcon, Settings as SettingsIcon, Star as StarIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  Maximize2Icon,
+  MenuIcon,
+  SettingsIcon,
+  StarIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
 import { ScrollArea } from "../../components/ui/scroll-area";
-import { DragonTowerGame } from "../../components/DragonTowerGame";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 
 const navigationItems = [
   { icon: "🎰", label: "Casino", hasDropdown: true },
@@ -169,7 +184,137 @@ export const Dragon = (): JSX.Element => {
         </header>
 
         <div className="flex flex-col items-center gap-3 lg:gap-[15px] p-3 lg:p-[15px]">
-          <DragonTowerGame />
+          <div className="flex flex-col xl:flex-row items-center justify-center gap-3 lg:gap-[15px] p-3 lg:p-[15px] w-full bg-[#1a191d] rounded-[20px] border border-[#28272d]">
+            <div className="w-full xl:hidden">
+              <div className="w-full aspect-[4/3] min-h-[250px]">
+                <img
+                  className="w-full h-full object-cover rounded-lg"
+                  alt="Game"
+                  src="/game.svg"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 lg:gap-[15px] w-full xl:flex-1 xl:max-w-md">
+              <Tabs defaultValue="manual" className="w-full">
+                <TabsList className="w-full h-[44px] lg:h-[52px] bg-[#0f0e12] rounded-[48px] p-1.5">
+                  <TabsTrigger
+                    value="manual"
+                    className="flex-1 bg-[#282a2f] data-[state=active]:bg-[#282a2f] rounded-full [font-family:'Poppins',Helvetica] font-semibold text-white text-sm lg:text-base"
+                  >
+                    Manual
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="auto"
+                    className="flex-1 opacity-50 data-[state=active]:opacity-100 rounded-full [font-family:'Poppins',Helvetica] font-semibold text-white text-sm lg:text-base"
+                  >
+                    Auto
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              <ScrollArea className="max-h-none xl:max-h-[430px]">
+                <div className="flex flex-col gap-3 lg:gap-4 pr-2">
+                  <div className="flex flex-col">
+                    <div className="flex items-center justify-between pb-1">
+                      <Label className="[font-family:'Poppins',Helvetica] font-semibold text-[#b4b4b4] text-xs lg:text-sm">
+                        Total Bet
+                      </Label>
+                      <span className="[font-family:'Poppins',Helvetica] font-bold text-[#b4b4b4] text-xs lg:text-sm">
+                        $0.00
+                      </span>
+                    </div>
+
+                    <div className="flex items-stretch bg-[#ffffff01] rounded-lg shadow-[0px_1px_2px_#0000001f,0px_1px_3px_#00000033]">
+                      <div className="flex-1 relative">
+                        <Input
+                          defaultValue="0,00000000"
+                          className="bg-[#0f0e12] border-2 border-[#282a2f] rounded-l-lg [font-family:'Poppins',Helvetica] font-bold text-white text-sm lg:text-base h-auto py-2 lg:py-2.5 pr-12"
+                        />
+                        <img
+                          className="absolute top-1/2 -translate-y-1/2 right-3 w-4 h-4 lg:w-5 lg:h-5"
+                          alt="Container"
+                          src="/container-1.svg"
+                        />
+                      </div>
+
+                      <Button className="bg-[#282a2f] hover:bg-[#33333a] text-white [font-family:'Poppins',Helvetica] font-semibold rounded-none px-3 lg:px-4 text-sm lg:text-base">
+                        ½
+                      </Button>
+
+                      <Button className="bg-[#282a2f] hover:bg-[#33333a] text-white [font-family:'Poppins',Helvetica] font-semibold rounded-r-lg px-3 lg:px-4 border-l-2 border-[#0f0e12] text-sm lg:text-base">
+                        2×
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col">
+                      <Label className="pb-1 [font-family:'Poppins',Helvetica] font-semibold text-[#b4b4b4] text-xs lg:text-sm">
+                        Difficulty
+                      </Label>
+
+                      <div className="relative">
+                        <Select defaultValue="medium">
+                          <SelectTrigger className="bg-[#0f0e12] border-2 border-[#282a2f] rounded-lg [font-family:'Poppins',Helvetica] font-semibold text-white text-sm lg:text-base shadow-[0px_1px_2px_#0000001f,0px_1px_3px_#00000033]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="easy">Easy</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="hard">Hard</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button className="w-full bg-[#eaff00] hover:bg-[#d4e600] text-[#05080a] [font-family:'Poppins',Helvetica] font-semibold text-sm lg:text-base py-2 lg:py-2.5 rounded-lg shadow-[0px_2px_4px_-2px_#0000001a,0px_4px_6px_-1px_#0000001a]">
+                    Bet
+                  </Button>
+
+                  <Button
+                    disabled
+                    className="w-full bg-[#33333a] text-white [font-family:'Poppins',Helvetica] font-semibold text-sm lg:text-base py-2 lg:py-2.5 rounded-lg shadow-[0px_2px_4px_-2px_#0000001a,0px_4px_6px_-1px_#0000001a] opacity-50"
+                  >
+                    Random Pick
+                  </Button>
+
+                  <div className="flex flex-col">
+                    <div className="flex items-center justify-between pb-1">
+                      <Label className="[font-family:'Poppins',Helvetica] font-semibold text-[#b4b4b4] text-xs lg:text-sm">
+                        Total Profit (0.00×)
+                      </Label>
+                      <span className="[font-family:'Poppins',Helvetica] font-normal text-[#b4b4b4] text-xs lg:text-sm">
+                        $0.00
+                      </span>
+                    </div>
+
+                    <div className="relative">
+                      <Input
+                        defaultValue="0.00000000"
+                        disabled
+                        className="bg-[#33333a] border-2 border-transparent rounded-lg [font-family:'Poppins',Helvetica] font-normal text-white text-sm lg:text-base py-2 lg:py-2.5 pr-12 shadow-[0px_1px_2px_#0000001f,0px_1px_3px_#00000033]"
+                      />
+                      <img
+                        className="absolute top-1/2 -translate-y-1/2 right-3 w-4 h-4 lg:w-5 lg:h-5"
+                        alt="Container"
+                        src="/container-1.svg"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </ScrollArea>
+            </div>
+
+            <div className="hidden xl:block w-full xl:w-[790px] xl:h-[649px]">
+              <img
+                className="w-full h-full object-cover rounded-lg"
+                alt="Game"
+                src="/game.svg"
+              />
+            </div>
+          </div>
         </div>
       </main>
     </div>
