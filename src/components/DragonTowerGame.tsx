@@ -28,10 +28,16 @@ export const DragonTowerGame = (): JSX.Element => {
 
   const handleStartGame = () => {
     const bet = parseFloat(betAmount);
-    if (bet > balance || bet <= 0) return;
+    if (isNaN(bet) || bet > balance || bet <= 0) {
+      console.error('Invalid bet:', bet, 'Balance:', balance);
+      return;
+    }
 
+    console.log('Starting game with bet:', bet, 'Difficulty:', difficulty);
     setBalance(balance - bet);
-    setGameState(initializeGame(difficulty));
+    const newGameState = initializeGame(difficulty);
+    console.log('Initialized game:', newGameState);
+    setGameState(newGameState);
     setGameStarted(true);
     setTotalWinnings(0);
   };
@@ -67,8 +73,22 @@ export const DragonTowerGame = (): JSX.Element => {
   const hasLost = gameState && !gameState.gameActive && !gameState.tiles.find((t) => t.id === gameState.selectedTileId)?.isSafe;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 p-6 bg-[#1a191d] rounded-[20px]">
-      <div className="flex-1 lg:max-w-md">
+    <div className="flex flex-col gap-6 w-full bg-[#1a191d] rounded-[20px] p-6">
+      <div className="w-full flex-1">
+        {gameStarted && gameState ? (
+          <DragonTowerCanvas
+            gameState={gameState}
+            onTileSelect={handleTileSelect}
+            disabled={!gameState.gameActive}
+          />
+        ) : (
+          <div className="bg-[#0f0e12] rounded-lg h-[600px] flex items-center justify-center text-[#b4b4b4]">
+            <p>Set your bet and start the game to begin climbing the tower!</p>
+          </div>
+        )}
+      </div>
+
+      <div className="w-full">
         <div className="space-y-4">
           <div>
             <Label className="text-[#b4b4b4] text-sm mb-2 block">
@@ -89,10 +109,12 @@ export const DragonTowerGame = (): JSX.Element => {
                 value={betAmount}
                 onChange={(e) => setBetAmount(e.target.value)}
                 disabled={gameStarted}
+                min="0.01"
+                step="0.01"
                 className="bg-[#0f0e12] border-2 border-[#282a2f] text-white"
               />
               <Button
-                onClick={() => setBetAmount((parseFloat(betAmount) / 2).toFixed(2))}
+                onClick={() => setBetAmount((Math.max(0.01, parseFloat(betAmount) / 2)).toFixed(2))}
                 disabled={gameStarted}
                 className="bg-[#282a2f] hover:bg-[#33333a] text-white"
               >
@@ -117,11 +139,11 @@ export const DragonTowerGame = (): JSX.Element => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="easy">Easy</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="hard">Hard</SelectItem>
-                <SelectItem value="expert">Expert</SelectItem>
-                <SelectItem value="master">Master</SelectItem>
+                <SelectItem value="easy">Easy (5 safe tiles, 1.2x)</SelectItem>
+                <SelectItem value="medium">Medium (3 safe tiles, 1.5x)</SelectItem>
+                <SelectItem value="hard">Hard (2 safe tiles, 2.0x)</SelectItem>
+                <SelectItem value="expert">Expert (2 safe tiles, 2.5x)</SelectItem>
+                <SelectItem value="master">Master (1 safe tile, 3.0x)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -130,7 +152,7 @@ export const DragonTowerGame = (): JSX.Element => {
             <Button
               onClick={handleStartGame}
               disabled={parseFloat(betAmount) > balance || parseFloat(betAmount) <= 0}
-              className="w-full bg-[#eaff00] hover:bg-[#d4e600] text-[#05080a] font-semibold py-3 rounded-lg"
+              className="w-full bg-[#eaff00] hover:bg-[#d4e600] text-[#05080a] font-semibold py-3 rounded-lg text-base"
             >
               Start Game
             </Button>
@@ -149,30 +171,41 @@ export const DragonTowerGame = (): JSX.Element => {
                   onClick={handleContinue}
                   className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-white font-semibold py-3 rounded-lg"
                 >
-                  Continue
+                  Continue to Next Level
                 </Button>
               )}
               {hasLost && (
-                <div className="text-red-500 text-center py-3 font-semibold">
-                  Game Over! You lost!
+                <div>
+                  <div className="text-red-500 text-center py-3 font-semibold text-lg mb-2">
+                    Game Over! You lost!
+                  </div>
+                  <Button
+                    onClick={() => {
+                      setGameStarted(false);
+                      setGameState(null);
+                    }}
+                    className="w-full bg-[#eaff00] hover:bg-[#d4e600] text-[#05080a] font-semibold py-3 rounded-lg"
+                  >
+                    Play Again
+                  </Button>
                 </div>
               )}
             </div>
           )}
 
           {gameState && (
-            <div className="bg-[#0f0e12] rounded-lg p-4 space-y-2">
+            <div className="bg-[#0f0e12] rounded-lg p-4 space-y-3">
               <div className="flex justify-between text-white">
-                <span>Current Level:</span>
-                <span className="font-semibold">{gameState.currentLevel}</span>
+                <span className="text-[#b4b4b4]">Current Level:</span>
+                <span className="font-semibold text-lg">{gameState.currentLevel}</span>
               </div>
               <div className="flex justify-between text-white">
-                <span>Multiplier:</span>
-                <span className="font-semibold">{gameState.currentMultiplier.toFixed(2)}×</span>
+                <span className="text-[#b4b4b4]">Multiplier:</span>
+                <span className="font-semibold text-lg text-[#eaff00]">{gameState.currentMultiplier.toFixed(2)}×</span>
               </div>
               <div className="flex justify-between text-white">
-                <span>Potential Win:</span>
-                <span className="font-semibold text-[#22c55e]">
+                <span className="text-[#b4b4b4]">Potential Win:</span>
+                <span className="font-semibold text-lg text-[#22c55e]">
                   ${(parseFloat(betAmount) * gameState.currentMultiplier).toFixed(2)}
                 </span>
               </div>
@@ -180,27 +213,13 @@ export const DragonTowerGame = (): JSX.Element => {
           )}
 
           {totalWinnings > 0 && (
-            <div className="bg-[#22c55e]/20 rounded-lg p-4 text-center">
-              <div className="text-[#22c55e] font-semibold">
+            <div className="bg-[#22c55e]/20 rounded-lg p-4 text-center border border-[#22c55e]">
+              <div className="text-[#22c55e] font-semibold text-lg">
                 You Won: ${totalWinnings.toFixed(2)}
               </div>
             </div>
           )}
         </div>
-      </div>
-
-      <div className="flex-1">
-        {gameStarted && gameState ? (
-          <DragonTowerCanvas
-            gameState={gameState}
-            onTileSelect={handleTileSelect}
-            disabled={!gameState.gameActive}
-          />
-        ) : (
-          <div className="bg-[#0f0e12] rounded-lg h-[400px] flex items-center justify-center text-[#b4b4b4]">
-            <p>Set your bet and start the game to begin climbing the tower!</p>
-          </div>
-        )}
       </div>
     </div>
   );

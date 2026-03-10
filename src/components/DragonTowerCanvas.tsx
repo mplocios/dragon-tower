@@ -12,28 +12,43 @@ export const DragonTowerCanvas = ({ gameState, onTileSelect, disabled }: DragonT
   const canvasRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   const tileGraphicsRef = useRef<Map<string, PIXI.Container>>(new Map());
+  const [canvasSize, setCanvasSize] = useState({ width: 1000, height: 600 });
 
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    const width = canvasRef.current.clientWidth;
-    const height = canvasRef.current.clientHeight;
+    const updateSize = () => {
+      if (!canvasRef.current) return;
+      const rect = canvasRef.current.getBoundingClientRect();
+      setCanvasSize({ width: rect.width, height: rect.height });
+    };
+
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
+
+  useEffect(() => {
+    if (!canvasRef.current || appRef.current) return;
 
     const app = new PIXI.Application({
-      width,
-      height,
+      width: canvasSize.width,
+      height: canvasSize.height,
       backgroundColor: 0x0f0e12,
       antialias: true,
+      resolution: window.devicePixelRatio || 1,
     });
 
     canvasRef.current.appendChild(app.canvas);
     appRef.current = app;
 
     return () => {
+      if (canvasRef.current && app.canvas.parentNode === canvasRef.current) {
+        canvasRef.current.removeChild(app.canvas);
+      }
       app.destroy(true, true);
-      canvasRef.current?.removeChild(app.canvas);
     };
-  }, []);
+  }, [canvasSize.width, canvasSize.height]);
 
   useEffect(() => {
     if (!appRef.current) return;
@@ -45,9 +60,9 @@ export const DragonTowerCanvas = ({ gameState, onTileSelect, disabled }: DragonT
     tileGraphicsRef.current.clear();
 
     const padding = 40;
-    const tileSize = 70;
-    const tileGap = 15;
-    const rowGap = 30;
+    const tileSize = 90;
+    const tileGap = 20;
+    const rowGap = 50;
     const config = gameState.tiles;
 
     const totalWidth = config.length * tileSize + (config.length - 1) * tileGap;
@@ -67,7 +82,7 @@ export const DragonTowerCanvas = ({ gameState, onTileSelect, disabled }: DragonT
       container.cursor = !disabled && !tile.isRevealed ? 'pointer' : 'default';
 
       const background = new PIXI.Graphics();
-      background.roundRect(0, 0, tileSize, tileSize, 8);
+      background.roundRect(0, 0, tileSize, tileSize, 12);
 
       if (tile.isRevealed) {
         if (tile.isSafe) {
@@ -79,7 +94,7 @@ export const DragonTowerCanvas = ({ gameState, onTileSelect, disabled }: DragonT
         background.fill(0x282a2f);
       }
 
-      background.stroke({ color: 0x3d3d47, width: 2 });
+      background.stroke({ color: 0x3d3d47, width: 3 });
 
       container.addChild(background);
 
@@ -101,7 +116,7 @@ export const DragonTowerCanvas = ({ gameState, onTileSelect, disabled }: DragonT
       if (shouldShowIcon) {
         const icon = new PIXI.Text(iconText, {
           fontFamily: 'Arial',
-          fontSize: 40,
+          fontSize: 50,
           fill: 0xffffff,
         });
 
@@ -119,6 +134,24 @@ export const DragonTowerCanvas = ({ gameState, onTileSelect, disabled }: DragonT
         container.on('pointerdown', () => {
           onTileSelect(tile.id);
         });
+
+        container.on('pointerover', () => {
+          if (!disabled) {
+            const bg = container.getChildAt(0) as PIXI.Graphics;
+            bg.clear();
+            bg.roundRect(0, 0, tileSize, tileSize, 12);
+            bg.fill(0x3d3d47);
+            bg.stroke({ color: 0x3d3d47, width: 3 });
+          }
+        });
+
+        container.on('pointerout', () => {
+          const bg = container.getChildAt(0) as PIXI.Graphics;
+          bg.clear();
+          bg.roundRect(0, 0, tileSize, tileSize, 12);
+          bg.fill(0x282a2f);
+          bg.stroke({ color: 0x3d3d47, width: 3 });
+        });
       }
 
       stage.addChild(container);
@@ -126,8 +159,8 @@ export const DragonTowerCanvas = ({ gameState, onTileSelect, disabled }: DragonT
     });
 
     const levelText = new PIXI.Text(`Level ${gameState.currentLevel}`, {
-      fontFamily: 'Poppins, sans-serif',
-      fontSize: 28,
+      fontFamily: 'Poppins, Arial, sans-serif',
+      fontSize: 36,
       fontWeight: 'bold',
       fill: 0xffffff,
     });
@@ -136,13 +169,25 @@ export const DragonTowerCanvas = ({ gameState, onTileSelect, disabled }: DragonT
     levelText.y = 20;
     levelText.anchor.set(0.5, 0);
     stage.addChild(levelText);
+
+    const multiplierText = new PIXI.Text(`${gameState.currentMultiplier.toFixed(2)}×`, {
+      fontFamily: 'Poppins, Arial, sans-serif',
+      fontSize: 28,
+      fontWeight: 'bold',
+      fill: 0xeaff00,
+    });
+
+    multiplierText.x = app.screen.width / 2;
+    multiplierText.y = 65;
+    multiplierText.anchor.set(0.5, 0);
+    stage.addChild(multiplierText);
   }, [gameState, disabled, onTileSelect]);
 
   return (
     <div
       ref={canvasRef}
-      className="w-full rounded-lg overflow-hidden"
-      style={{ height: '400px', backgroundColor: '#0f0e12' }}
+      className="w-full rounded-lg overflow-hidden bg-[#0f0e12]"
+      style={{ height: '600px', minHeight: '400px' }}
     />
   );
 };
