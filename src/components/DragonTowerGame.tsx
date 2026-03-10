@@ -29,14 +29,11 @@ export const DragonTowerGame = (): JSX.Element => {
   const handleStartGame = () => {
     const bet = parseFloat(betAmount);
     if (isNaN(bet) || bet > balance || bet <= 0) {
-      console.error('Invalid bet:', bet, 'Balance:', balance);
       return;
     }
 
-    console.log('Starting game with bet:', bet, 'Difficulty:', difficulty);
     setBalance(balance - bet);
     const newGameState = initializeGame(difficulty);
-    console.log('Initialized game:', newGameState);
     setGameState(newGameState);
     setGameStarted(true);
     setTotalWinnings(0);
@@ -73,8 +70,8 @@ export const DragonTowerGame = (): JSX.Element => {
   const hasLost = gameState && !gameState.gameActive && !gameState.tiles.find((t) => t.id === gameState.selectedTileId)?.isSafe;
 
   return (
-    <div className="flex flex-col gap-6 w-full bg-[#1a191d] rounded-[20px] p-6">
-      <div className="w-full flex-1">
+    <div className="flex flex-col lg:flex-row gap-6 w-full bg-[#1a191d] rounded-[20px] p-3 lg:p-6">
+      <div className="w-full lg:flex-1 order-2 lg:order-1">
         {gameStarted && gameState ? (
           <DragonTowerCanvas
             gameState={gameState}
@@ -88,7 +85,7 @@ export const DragonTowerGame = (): JSX.Element => {
         )}
       </div>
 
-      <div className="w-full">
+      <div className="w-full lg:w-80 lg:flex-shrink-0 order-3 lg:order-2">
         <div className="space-y-4">
           <div>
             <Label className="text-[#b4b4b4] text-sm mb-2 block">
@@ -116,14 +113,14 @@ export const DragonTowerGame = (): JSX.Element => {
               <Button
                 onClick={() => setBetAmount((Math.max(0.01, parseFloat(betAmount) / 2)).toFixed(2))}
                 disabled={gameStarted}
-                className="bg-[#282a2f] hover:bg-[#33333a] text-white"
+                className="bg-[#282a2f] hover:bg-[#33333a] text-white flex-shrink-0"
               >
                 ½
               </Button>
               <Button
                 onClick={() => setBetAmount((parseFloat(betAmount) * 2).toFixed(2))}
                 disabled={gameStarted}
-                className="bg-[#282a2f] hover:bg-[#33333a] text-white"
+                className="bg-[#282a2f] hover:bg-[#33333a] text-white flex-shrink-0"
               >
                 2×
               </Button>
@@ -151,7 +148,7 @@ export const DragonTowerGame = (): JSX.Element => {
           {!gameStarted ? (
             <Button
               onClick={handleStartGame}
-              disabled={parseFloat(betAmount) > balance || parseFloat(betAmount) <= 0}
+              disabled={isNaN(parseFloat(betAmount)) || parseFloat(betAmount) > balance || parseFloat(betAmount) <= 0}
               className="w-full bg-[#eaff00] hover:bg-[#d4e600] text-[#05080a] font-semibold py-3 rounded-lg text-base"
             >
               Start Game

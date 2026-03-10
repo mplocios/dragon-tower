@@ -29,31 +29,51 @@ export const DragonTowerCanvas = ({ gameState, onTileSelect, disabled }: DragonT
   }, []);
 
   useEffect(() => {
-    if (!canvasRef.current || appRef.current) return;
+    if (!canvasRef.current) return;
 
-    const app = new PIXI.Application({
-      width: canvasSize.width,
-      height: canvasSize.height,
-      backgroundColor: 0x0f0e12,
-      antialias: true,
-      resolution: window.devicePixelRatio || 1,
-    });
+    const initApp = async () => {
+      if (appRef.current) return;
 
-    canvasRef.current.appendChild(app.canvas);
-    appRef.current = app;
+      try {
+        const app = new PIXI.Application({
+          width: canvasSize.width || 1000,
+          height: canvasSize.height || 600,
+          backgroundColor: 0x0f0e12,
+          antialias: true,
+          resolution: window.devicePixelRatio || 1,
+        });
+
+        if (canvasRef.current) {
+          canvasRef.current.appendChild(app.canvas);
+          appRef.current = app;
+        }
+      } catch (error) {
+        console.error('Failed to initialize PIXI app:', error);
+      }
+    };
+
+    initApp();
 
     return () => {
-      if (canvasRef.current && app.canvas.parentNode === canvasRef.current) {
-        canvasRef.current.removeChild(app.canvas);
+      if (appRef.current && canvasRef.current && appRef.current.canvas.parentNode === canvasRef.current) {
+        canvasRef.current.removeChild(appRef.current.canvas);
+        appRef.current.destroy(true, true);
+        appRef.current = null;
       }
-      app.destroy(true, true);
     };
-  }, [canvasSize.width, canvasSize.height]);
+  }, []);
 
   useEffect(() => {
-    if (!appRef.current) return;
+    if (!appRef.current) {
+      return;
+    }
 
     const app = appRef.current;
+
+    if (canvasSize.width > 0 && canvasSize.height > 0) {
+      app.renderer.resize(canvasSize.width, canvasSize.height);
+    }
+
     const stage = app.stage;
 
     stage.removeChildren();
