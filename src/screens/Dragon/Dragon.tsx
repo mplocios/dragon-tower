@@ -5,20 +5,22 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { DragonTowerGame } from "../../components/DragonTowerGame";
 
 const navigationItems = [
-  { icon: "🎰", label: "Casino", hasDropdown: true },
-  { icon: "⚽", label: "Sports", hasDropdown: true },
-  { icon: "🏟", label: "Sports Lobby" },
-  { icon: "▶", label: "In-Play" },
-  { icon: "📅", label: "Upcoming" },
-  { icon: "📊", label: "Outright" },
-  { icon: "🗺", label: "Roadmap" },
-  { icon: "🎁", label: "Promotions" },
-  { icon: "🤝", label: "Affiliate" },
-  { icon: "❓", label: "FAQ" },
+  { icon: "🎰", label: "Casino", hasDropdown: true, badge: null },
+  { icon: "⚽", label: "Sports", hasDropdown: true, badge: 4, children: [
+    { icon: "🏟", label: "Sports Lobby" },
+    { icon: "▶", label: "In-Play" },
+    { icon: "📅", label: "Upcoming" },
+    { icon: "📊", label: "Outrights" },
+  ]},
+  { icon: "🗺", label: "Roadmap", hasDropdown: false },
+  { icon: "🎁", label: "Promotions", hasDropdown: false },
+  { icon: "🤝", label: "Affiliate", hasDropdown: false },
+  { icon: "❓", label: "FAQ", hasDropdown: false },
 ];
 
 export const Dragon = (): JSX.Element => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expandedItems, setExpandedItems] = useState<string[]>(["Sports"]);
 
   return (
     <div className="bg-[#020401] w-full min-h-screen flex flex-col lg:flex-row">
@@ -28,19 +30,61 @@ export const Dragon = (): JSX.Element => {
         <div className="pt-[75px]">
           <ScrollArea className="h-[calc(100vh-75px)]">
             <nav className="flex flex-col">
-              {navigationItems.map((item, index) => (
-                <button
-                  key={index}
-                  className="flex items-center justify-between px-6 py-3 text-white hover:bg-[#1a191d] transition-colors [font-family:'Inter',Helvetica] text-sm"
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <div className="flex items-center gap-3">
-                    <span>{item.icon}</span>
-                    <span>{item.label}</span>
+              {navigationItems.map((item, index) => {
+                const isExpanded = expandedItems.includes(item.label);
+                const toggleExpand = () => {
+                  setExpandedItems(prev =>
+                    prev.includes(item.label)
+                      ? prev.filter(x => x !== item.label)
+                      : [...prev, item.label]
+                  );
+                };
+
+                return (
+                  <div key={index}>
+                    <button
+                      className="flex items-center justify-between w-full px-6 py-3 text-white hover:bg-[#1a191d] transition-colors [font-family:'Inter',Helvetica] text-sm"
+                      onClick={() => {
+                        if (item.hasDropdown) {
+                          toggleExpand();
+                        } else {
+                          setSidebarOpen(false);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span>{item.icon}</span>
+                        <span>{item.label}</span>
+                        {item.badge !== null && item.badge !== undefined && (
+                          <span className="ml-1 bg-[#eaff00] text-[#020401] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                      {item.hasDropdown && (
+                        <ChevronDownIcon
+                          className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                        />
+                      )}
+                    </button>
+
+                    {item.hasDropdown && isExpanded && item.children && (
+                      <div className="bg-[#0a0a0d] border-l border-[#1d1d1d]">
+                        {item.children.map((child, childIndex) => (
+                          <button
+                            key={childIndex}
+                            className="flex items-center gap-3 w-full px-6 py-3 pl-12 text-white hover:bg-[#1a191d] transition-colors [font-family:'Inter',Helvetica] text-sm"
+                            onClick={() => setSidebarOpen(false)}
+                          >
+                            <span>{child.icon}</span>
+                            <span>{child.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {item.hasDropdown && <ChevronDownIcon className="w-4 h-4" />}
-                </button>
-              ))}
+                );
+              })}
             </nav>
           </ScrollArea>
         </div>
