@@ -21,6 +21,7 @@ const navigationItems = [
 export const Dragon = (): JSX.Element => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>(["Sports"]);
+  const [isDemo, setIsDemo] = useState(true);
 
   return (
     <div className="bg-[#020401] w-full min-h-screen flex flex-col lg:flex-row">
@@ -196,11 +197,25 @@ export const Dragon = (): JSX.Element => {
             >
               <Maximize2Icon className="w-4 h-4 lg:w-5 lg:h-5" />
             </Button>
-            <span className="hidden md:inline text-white text-xs lg:text-sm [font-family:'Poppins',Helvetica]">
-              Demo
-            </span>
-            <div className="flex items-center gap-2 bg-[#1a191d] rounded-full px-2 lg:px-3 py-1">
-              <span className="text-white text-xs lg:text-sm">🟢</span>
+            <div className="hidden md:flex items-center gap-2 bg-[#1a191d] rounded-full px-3 lg:px-4 py-1 ml-2">
+              <span className={`text-xs lg:text-sm [font-family:'Poppins',Helvetica] font-medium ${isDemo ? 'text-white' : 'text-[#666]'}`}>
+                Demo
+              </span>
+              <button
+                onClick={() => setIsDemo(!isDemo)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  isDemo ? 'bg-[#eaff00]' : 'bg-[#333]'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-[#020401] transition-transform ${
+                    isDemo ? 'translate-x-0.5' : 'translate-x-5'
+                  }`}
+                />
+              </button>
+              <span className={`text-xs lg:text-sm [font-family:'Poppins',Helvetica] font-medium ${!isDemo ? 'text-white' : 'text-[#666]'}`}>
+                Real
+              </span>
             </div>
             <Button
               variant="ghost"
