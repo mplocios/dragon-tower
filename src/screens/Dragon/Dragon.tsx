@@ -2,7 +2,6 @@ import { ChevronDown as ChevronDownIcon, Maximize2 as Maximize2Icon, Menu as Men
 import { useState } from "react";
 import { Button } from "../../components/ui/button";
 import { ScrollArea } from "../../components/ui/scroll-area";
-import { DragonTowerGame } from "../../components/DragonTowerGame";
 
 const navigationItems = [
   { icon: "🎰", label: "Casino", hasDropdown: true, badge: null },
@@ -227,8 +226,8 @@ export const Dragon = (): JSX.Element => {
           </div>
         </header>
 
-        <div className="flex flex-col items-center gap-3 lg:gap-[15px] p-3 lg:p-[15px]">
-          <DragonTowerGame />
+        <div className="flex-1 flex items-center justify-center p-3 lg:p-[15px] bg-[#0a0a0d]">
+          {/* Component placeholder */}
         </div>
       </main>
     </div>
