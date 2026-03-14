@@ -226,8 +226,8 @@ export const Dragon = (): JSX.Element => {
           </div>
         </header>
 
-        <div className="flex-1 flex items-center justify-center p-3 lg:p-[15px] bg-[#0a0a0d]">
-          {/* Component placeholder */}
+        <div className="flex-1 flex items-center justify-center p-3 lg:p-[15px]">
+          <div className="w-full h-full border border-[#333] rounded-2xl bg-[#0a0a0d]"></div>
         </div>
       </main>
     </div>
