@@ -4,8 +4,8 @@ import { defineConfig } from "vite";
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: "./dragon-tower/",
   plugins: [react()],
+  base: "./",
   css: {
     postcss: {
       plugins: [tailwind()],
