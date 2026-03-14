@@ -20,7 +20,7 @@ html, body {
 #app {
   display: flex; width: 100%;
   height: calc(100vh - 24px);
-  overflow: hidden;
+  /* overflow: hidden; */
   border-radius: 20px;
   border: 1.5px solid #1e3048;
   box-shadow: 0 8px 60px rgba(0,0,0,.85);
@@ -43,8 +43,8 @@ html, body {
   flex-direction: row;
   align-items: center;
   justify-content: flex-end;
-  overflow: hidden;
-  height: 100%;
+  /* overflow: hidden; */
+  /* height: 100%; */
   border-radius: 0 18px 18px 0;
   background-image: url("/assets/dragon-background-2.png");
   background-size: cover;
@@ -377,20 +377,24 @@ input[type=number]::-webkit-inner-spin-button { opacity: 0; }
   #app {
     flex-direction: column;
     height: 100dvh;
-    overflow: hidden;
+    /* overflow: hidden; */
     border-radius: 0;
     border: none;
   }
-
-  #left-panel { display: none !important; }
+  #dr-container{
+ padding: 0px !important;
+  border-color: "none";
+}
+ 
+  #left-panel,#head-1,#sub-head-1 { display: none !important; }
 
   #game-panel {
     flex: 1 1 0;
-    min-height: 0;
+    /* min-height: 0; */
     flex-direction: column !important;
     align-items: stretch !important;
     justify-content: flex-start !important;
-    overflow: hidden;
+    /* overflow: hidden; */
     position: relative;
     display: flex !important;
     border-radius: 0 !important;
@@ -401,21 +405,22 @@ input[type=number]::-webkit-inner-spin-button { opacity: 0; }
   /* Canvas fills all space above the panel */
   #canvas-wrap {
     flex: 1 1 0 !important;
-    min-height: 0 !important;
-    width: 100% !important;
+    /* min-height: 0 !important; */
+    width: 90% !important;
     height: auto !important;
     padding: 4px !important;
-    overflow: hidden;
+    /* overflow: hidden; */
     display: flex;
     align-items: center;
     justify-content: center;
+    margin: 0 auto
   }
 
   #canvas-wrap canvas {
-    width: 100% !important;
-    height: auto !important;
-    max-height: 100% !important;
-    display: block;
+  
+    height: 90% !important;
+    width: 100%!important;
+    margin-top: -15%!important;
   }
 
   /* Panel takes only its content height — never overflows */
@@ -426,7 +431,7 @@ input[type=number]::-webkit-inner-spin-button { opacity: 0; }
     width: 100%;
     padding: 8px 12px 10px;
     gap: 7px;
-    overflow: hidden;
+    /* overflow: hidden; */
     z-index: 20;
     background: transparent;
     border-top: 1px solid rgba(255,255,255,0.07);
@@ -434,7 +439,30 @@ input[type=number]::-webkit-inner-spin-button { opacity: 0; }
     position: static;
     justify-content: flex-start;
     align-items: stretch;
+
   }
 
   #mob-panel > * { width: 100%; }
+  #mob-container{
+    margin-top: -20%;
+    scale:0.9
+  }
 }
+/* @media (max-width: 627px) {
+#canvas-wrap{
+  width: 85%!important
+}
+}
+@media (max-width: 582px) {
+#canvas-wrap{
+  width: 85%!important
+}
+} */
+#dr-container{
+  width: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+  border-color: #1A191D;
+  border-radius: 20px;
+}
+ 

@@ -83,9 +83,15 @@ const DragonTower: React.FC = () => {
   const autoIsInfiniteRef = useRef(false);
   const runNextAutoRoundRef = useRef<() => void>(() => {});
 
-  useEffect(() => { balanceRef.current = balance; }, [balance]);
-  useEffect(() => { betRef.current = bet; }, [bet]);
-  useEffect(() => { autoSettingsRef.current = auto; }, [auto]);
+  useEffect(() => {
+    balanceRef.current = balance;
+  }, [balance]);
+  useEffect(() => {
+    betRef.current = bet;
+  }, [bet]);
+  useEffect(() => {
+    autoSettingsRef.current = auto;
+  }, [auto]);
 
   const canvasWrapRef = useRef<HTMLDivElement>(null);
 
@@ -153,7 +159,8 @@ const DragonTower: React.FC = () => {
         }, 900);
       } else {
         pixiGame.spawnFX(r, c, "sparkle", st.diff);
-        const m = MULTS[st.diff][r] ?? MULTS[st.diff][MULTS[st.diff].length - 1];
+        const m =
+          MULTS[st.diff][r] ?? MULTS[st.diff][MULTS[st.diff].length - 1];
         const newMult = m;
         const newWin = parseFloat((betRef.current * m).toFixed(2));
         curMultRef.current = newMult;
@@ -209,8 +216,14 @@ const DragonTower: React.FC = () => {
       const currentBet = overrideBet ?? betRef.current;
       const currentDiff = overrideDiff ?? stateRef.current.diff;
 
-      if (currentBet <= 0) { showToast("Enter a valid bet!"); return; }
-      if (currentBet > balanceRef.current) { showToast("Insufficient balance!"); return; }
+      if (currentBet <= 0) {
+        showToast("Enter a valid bet!");
+        return;
+      }
+      if (currentBet > balanceRef.current) {
+        showToast("Insufficient balance!");
+        return;
+      }
 
       const newBal = balanceRef.current - currentBet;
       balanceRef.current = newBal;
@@ -222,7 +235,12 @@ const DragonTower: React.FC = () => {
       towerRef.current = tower;
 
       const revealed: Record<number, Record<number, TileContent>> = {};
-      stateRef.current = { gstate: "playing", curRow: 0, diff: currentDiff, revealed };
+      stateRef.current = {
+        gstate: "playing",
+        curRow: 0,
+        diff: currentDiff,
+        revealed,
+      };
       setGstate("playing");
       setCurRow(0);
       setCurMult(1);
@@ -291,7 +309,9 @@ const DragonTower: React.FC = () => {
     pixiGame.refreshGrid(stateRef.current.diff, "idle", 0, {});
   }, [pixiGame]);
 
-  useEffect(() => { resetGameRef.current = resetGame; }, [resetGame]);
+  useEffect(() => {
+    resetGameRef.current = resetGame;
+  }, [resetGame]);
 
   // ── Mobile play action ───────────────────────────────────────
   const mPlayAction = useCallback(() => {
@@ -346,12 +366,16 @@ const DragonTower: React.FC = () => {
         if (roundWon)
           newBet =
             settings.onWinMode === "increase" && settings.winInc > 0
-              ? parseFloat((settings.autoBet * (1 + settings.winInc / 100)).toFixed(2))
+              ? parseFloat(
+                  (settings.autoBet * (1 + settings.winInc / 100)).toFixed(2),
+                )
               : settings.autoBet;
         else
           newBet =
             settings.onLossMode === "increase" && settings.lossInc > 0
-              ? parseFloat((settings.autoBet * (1 + settings.lossInc / 100)).toFixed(2))
+              ? parseFloat(
+                  (settings.autoBet * (1 + settings.lossInc / 100)).toFixed(2),
+                )
               : settings.autoBet;
       }
 
@@ -385,10 +409,15 @@ const DragonTower: React.FC = () => {
         if (!(stateRef.current.revealed[stateRef.current.curRow] ?? {})[c])
           avail.push(c);
       }
-      if (!avail.length) { autoPlayRows(); return; }
+      if (!avail.length) {
+        autoPlayRows();
+        return;
+      }
       const col = avail[Math.floor(Math.random() * avail.length)];
       handleTileClick(stateRef.current.curRow, col);
-      autoTimeoutRef.current = setTimeout(() => { autoPlayRows(); }, 150);
+      autoTimeoutRef.current = setTimeout(() => {
+        autoPlayRows();
+      }, 150);
     }, delay);
   }, [cashOut, handleTileClick]);
 
@@ -402,12 +431,18 @@ const DragonTower: React.FC = () => {
       stopAutobet();
       return;
     }
-    if (settings.stopProfit > 0 && autoTotalProfitRef.current >= settings.stopProfit) {
+    if (
+      settings.stopProfit > 0 &&
+      autoTotalProfitRef.current >= settings.stopProfit
+    ) {
       showToast("Auto: Stop on Profit reached!");
       stopAutobet();
       return;
     }
-    if (settings.stopLoss > 0 && autoTotalProfitRef.current <= -settings.stopLoss) {
+    if (
+      settings.stopLoss > 0 &&
+      autoTotalProfitRef.current <= -settings.stopLoss
+    ) {
       showToast("Auto: Stop on Loss reached!");
       stopAutobet();
       return;
@@ -429,7 +464,9 @@ const DragonTower: React.FC = () => {
     autoPlayRows();
   }, [stopAutobet, showToast, startGame, autoPlayRows]);
 
-  useEffect(() => { runNextAutoRoundRef.current = runNextAutoRound; }, [runNextAutoRound]);
+  useEffect(() => {
+    runNextAutoRoundRef.current = runNextAutoRound;
+  }, [runNextAutoRound]);
 
   const startAutobet = useCallback(() => {
     autoRunningRef.current = true;
@@ -461,7 +498,9 @@ const DragonTower: React.FC = () => {
     return () => clearTimeout(tid);
   }, []); // eslint-disable-line
 
-  useEffect(() => { stateRef.current.diff = diff; }, [diff]);
+  useEffect(() => {
+    stateRef.current.diff = diff;
+  }, [diff]);
 
   // ── Render ──────────────────────────────────────────────────
   return (
@@ -473,7 +512,10 @@ const DragonTower: React.FC = () => {
         gstate={gstate}
         curMult={curMult}
         curWin={curWin}
-        onBetChange={(v) => { setBet(v); betRef.current = v; }}
+        onBetChange={(v) => {
+          setBet(v);
+          betRef.current = v;
+        }}
         onDiffChange={handleDiffChange}
         onStartGame={() => startGame()}
         onCashOut={cashOut}
@@ -484,24 +526,37 @@ const DragonTower: React.FC = () => {
         onAutoDiffChange={(v) => setAuto((prev) => ({ ...prev, autoDiff: v }))}
         onAutoSettingsChange={(s) => setAuto((prev) => ({ ...prev, ...s }))}
       />
+      <div
+        id="dr-container"
+        style={{
+          width: "100%",
+          padding: "8px",
+          boxSizing: "border-box",
+          backgroundColor: "#1A191D",
+          borderRadius: "20px",
+        }}
+      >
+        <div id="game-panel">
+          <div id="game-overlay"></div>
+          <div id="dragon-bg"></div>
+          <div id="canvas-wrap" ref={canvasWrapRef}></div>
 
-      <div id="game-panel">
-        <div id="game-overlay"></div>
-        <div id="dragon-bg"></div>
-        <div id="canvas-wrap" ref={canvasWrapRef}></div>
-
-        <MobilePanel
-          balance={balance}
-          bet={bet}
-          diff={diff}
-          gstate={gstate}
-          curMult={curMult}
-          curWin={curWin}
-          onBetChange={(v) => { setBet(v); betRef.current = v; }}
-          onDiffChange={handleDiffChange}
-          onPlayAction={mPlayAction}
-          onRandom={doRandom}
-        />
+          <MobilePanel
+            balance={balance}
+            bet={bet}
+            diff={diff}
+            gstate={gstate}
+            curMult={curMult}
+            curWin={curWin}
+            onBetChange={(v) => {
+              setBet(v);
+              betRef.current = v;
+            }}
+            onDiffChange={handleDiffChange}
+            onPlayAction={mPlayAction}
+            onRandom={doRandom}
+          />
+        </div>
       </div>
 
       <Toast message={toast} />

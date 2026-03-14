@@ -163,7 +163,7 @@ export function usePixiGame(
 
     if (TEX.wall) {
       const wt = new PIXI.Sprite(TEX.wall);
-      wt.width = fw + 35; wt.height = WALL_H + 15;
+      wt.width = fw + 35; wt.height = WALL_H + 25;
       wt.x = fx - 20; wt.y = wcy + 10; wt.alpha = 1;
       gridLayer.addChild(wt);
     }
@@ -171,7 +171,7 @@ export function usePixiGame(
     const dTex = TEX.dragon_normal ?? TEX.dragon_small;
     if (dTex) {
       const ds = new PIXI.Sprite(dTex);
-      const sc = Math.min(200 / ds.texture.width, 125 / ds.texture.height);
+      const sc = Math.min(200 / ds.texture.width, 130 / ds.texture.height);
       ds.scale.set(sc); ds.anchor.set(0.5, 1); ds.x = CW / 2; ds.y = wcy + 35;
       (ds as any).name = 'wallDragon';
       gridLayer.addChild(ds);
@@ -427,7 +427,7 @@ export function usePixiGame(
         (ch as PIXI.Sprite).texture = tex;
         const sc = win
           ? Math.min(300 / tex.width, 240 / tex.height)
-          : Math.min(200 / tex.width, 125 / tex.height);
+          : Math.min(200 / tex.width, 130 / tex.height);
         ch.scale.set(sc);
         break;
       }
@@ -446,7 +446,7 @@ export function usePixiGame(
   }, []);
 
   // ─── Scale Canvas ─────────────────────────────────────────────
-  const scaleCanvas = useCallback(() => {
+    const scaleCanvas = useCallback(() => {
     const app = appRef.current;
     const wrap = canvasWrapRef.current;
     if (!app || !wrap) return;
@@ -473,30 +473,40 @@ export function usePixiGame(
 
   // ─── Load Textures ───────────────────────────────────────────
   const loadTextures = useCallback(async (onLoaded?: () => void) => {
+    const BASE = '/dragon-tower'
     const TEX = texRef.current;
     const imgMap: Record<string, string> = {
-      dragon_small:  '/assets/dragon-small.png',
-      wall_bottom:   '/assets/wall.png',
-      dragon_normal: '/assets/dragon-normal.png',
-      dragon_fire:   '/assets/dragon-fire.png',
-      wall:          '/assets/wall.png',
-      tile_tex:      '/assets/tile-tex.png',
-      egg:           '/assets/dragon-egg-3.png',
-      dragon_icon:   '/assets/dragon-icon.png',
-      tile_dark:     '/assets/black-tile.png',
-      tile_green:    '/assets/green-tile.png',
-      result_bg:     '/assets/result_background.png',
+      dragon_small:  BASE+'/assets/dragon-small.png',
+      wall_bottom:   BASE+'/assets/wall.png',
+      dragon_normal: BASE+'/assets/dragon-normal.png',
+      dragon_fire:   BASE+'/assets/dragon-fire.png',
+      wall:          BASE+'/assets/wall.png',
+      tile_tex:      BASE+'/assets/tile-tex.png',
+      egg:           BASE+'/assets/dragon-egg-3.png',
+      dragon_icon:   BASE+'/assets/dragon-icon.png',
+      tile_dark:     BASE+'/assets/black-tile.png',
+      tile_green:    BASE+'/assets/green-tile.png',
+      result_bg:     BASE+'/assets/result_background.png',
+    };
+
+    // Works with both PIXI v7 (Texture.fromURL) and v8 (Assets.load)
+    const loadOne = async (key: string, path: string) => {
+      try {
+        if (PIXI.Assets && typeof PIXI.Assets.load === 'function') {
+          // PIXI v8
+          TEX[key] = await PIXI.Assets.load(path);
+        } else {
+          // PIXI v7
+          TEX[key] = await (PIXI.Texture as any).fromURL(path);
+        }
+        console.log('✅ Loaded:', key);
+      } catch (e: any) {
+        console.warn('❌ Failed to load:', key, path, e.message);
+      }
     };
 
     await Promise.all(
-      Object.entries(imgMap).map(async ([key, path]) => {
-        try {
-          TEX[key] = await PIXI.Texture.fromURL(path);
-          console.log('✅ Loaded:', key);
-        } catch (e: any) {
-          console.warn('❌ Failed to load:', key, path, e.message);
-        }
-      })
+      Object.entries(imgMap).map(([key, path]) => loadOne(key, path))
     );
 
     onLoaded?.();
@@ -515,7 +525,9 @@ export function usePixiGame(
       antialias: true,
     });
     appRef.current = app;
-    wrap.appendChild(app.view as HTMLCanvasElement);
+    // Support both PIXI v7 (app.view) and v8 (app.canvas)
+    const canvas = ((app as any).canvas ?? (app as any).view) as HTMLCanvasElement;
+    wrap.appendChild(canvas);
 
     const bgLayer = new PIXI.Container();
     const gridLayer = new PIXI.Container();

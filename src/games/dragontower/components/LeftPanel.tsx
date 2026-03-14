@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Difficulty, GameState } from "../types";
 
 interface LeftPanelProps {
@@ -57,7 +57,7 @@ const DIFF_OPTIONS: { value: Difficulty; label: string }[] = [
 
 // ── Color tokens matching screenshot ──
 const C = {
-  bg: "#0d1117", // panel background — near black
+  bg: "#1A191D", // panel background — near black
   surface: "#161b22", // input / card background
   border: "rgba(255,255,255,0.07)",
   borderFocus: "rgba(255,255,255,0.18)",
@@ -68,7 +68,7 @@ const C = {
   valueColor: "#8a9ab0",
   textPrimary: "#e2e8f0",
   textDim: "#8a9ab0",
-  accent: "#c8d800", // lime/yellow — bet button
+  accent: "#eaff00", // lime/yellow — bet button
   accentDark: "#111200",
   btcOrange: "#f0a020",
   red: "#e84040",
@@ -84,7 +84,7 @@ const S = {
     background: C.bg,
     flexDirection: "column" as const,
     borderRadius: "18px 0 0 18px",
-    borderRight: `1px solid ${C.border}`,
+    // borderRight: `1px solid ${C.border}`,
     fontFamily: "'Rajdhani', sans-serif",
     color: C.textPrimary,
     padding: "14px 14px 20px",
@@ -341,9 +341,23 @@ const LeftPanel: React.FC<LeftPanelFullProps> = ({
   onAutoSettingsChange,
 }) => {
   const [activeTab, setActiveTab] = useState<"manual" | "auto">("manual");
+  const [cooldown, setCooldown] = useState(false);
+
   const playing = gstate === "playing";
   const canCash = playing && curMult > 1;
   const isInfinite = auto.autoCount === 0;
+
+  useEffect(() => {
+    if (gstate !== "playing") {
+      setCooldown(true);
+
+      const timer = setTimeout(() => {
+        setCooldown(false);
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [gstate]);
 
   return (
     <div id="left-panel" style={S.panel}>
@@ -438,7 +452,11 @@ const LeftPanel: React.FC<LeftPanelFullProps> = ({
               Pick a tile...
             </button>
           ) : (
-            <button style={S.betBtn} onClick={onStartGame}>
+            <button
+              style={cooldown ? S.disabledBtn : S.betBtn}
+              onClick={onStartGame}
+              disabled={cooldown}
+            >
               Bet
             </button>
           )}
