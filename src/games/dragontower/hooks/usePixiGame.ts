@@ -42,6 +42,7 @@ export function usePixiGame(
   const particlesRef = useRef<PIXI.Graphics[]>([]);
   const texRef = useRef<Record<string, PIXI.Texture>>({});
   const resultOverlayRef = useRef<PIXI.Container | null>(null);
+  const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onTileClickRef = useRef(options.onTileClick);
   const onPlayAgainRef = useRef(options.onPlayAgain);
@@ -150,15 +151,15 @@ export function usePixiGame(
     const fw = CW - fx - (PAD - 13), fh = L.gridH + 26, wcy = fy - WALL_H;
     const g = new PIXI.Graphics();
 
-    g.beginFill(0x28251e); g.drawRoundedRect(fx, fy, fw, fh, 11); g.endFill();
-    g.lineStyle(1.5, 0x18160e, 0.85);
+    g.beginFill(0x4f4f51); g.drawRoundedRect(fx, fy, fw, fh, 0); g.endFill();
+    g.lineStyle(1.5, 0x4f4f51, 0.85);
     for (let y = fy + 20; y < fy + fh - 5; y += 20) { g.moveTo(fx + 6, y); g.lineTo(fx + fw - 6, y); }
     for (let r2 = 0; r2 * 20 < fh; r2++) {
       const yy = fy + r2 * 20, off = (r2 % 2) * 24;
       for (let x = fx + off; x < fx + fw; x += 48) { g.moveTo(x, yy); g.lineTo(x, Math.min(yy + 20, fy + fh)); }
     }
-    g.lineStyle(0); g.beginFill(0x060c18, 0.75); g.drawRoundedRect(fx + 9, fy + 9, fw - 18, fh - 18, 7); g.endFill();
-    g.lineStyle(1, 0x48402e, 0.25); g.drawRoundedRect(fx, fy, fw, fh, 11);
+    g.lineStyle(0); g.beginFill(0x060c18, 0.75); g.drawRoundedRect(fx + 9, fy + 9, fw - 18, fh - 18, 0); g.endFill();
+    g.lineStyle(1, 0x48402e, 0.25); g.drawRoundedRect(fx, fy, fw, fh, 0);
     gridLayer.addChild(g);
 
     if (TEX.wall) {
@@ -179,9 +180,9 @@ export function usePixiGame(
 
     if (TEX.wall_bottom) {
       const wb = new PIXI.Sprite(TEX.wall_bottom);
-      const wbH = 56;
+      const wbH = 76;
       wb.width = fw + 36; wb.height = wbH;
-      wb.x = fx - 18; wb.y = fy + fh - wbH / 2 + 10;
+      wb.x = fx - 18; wb.y = fy + fh - wbH / 2 + 20;
       wb.alpha = 1;
       gridLayer.addChild(wb);
     }
@@ -368,15 +369,27 @@ export function usePixiGame(
 
     uiLayer.addChild(container);
     resultOverlayRef.current = container;
-  }, []);
+
+    if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
+    resultTimerRef.current = setTimeout(() => {
+      resultTimerRef.current = null;
+      onPlayAgainRef.current();
+    }, 3000);
+    }, []);
+ 
 
   const hideResultOverlay = useCallback(() => {
-    const uiLayer = uiLayerRef.current;
-    if (!uiLayer || !resultOverlayRef.current) return;
-    uiLayer.removeChild(resultOverlayRef.current);
-    resultOverlayRef.current.destroy({ children: true });
-    resultOverlayRef.current = null;
-  }, []);
+  const uiLayer = uiLayerRef.current;
+  if (!uiLayer || !resultOverlayRef.current) return;
+  uiLayer.removeChild(resultOverlayRef.current);
+  resultOverlayRef.current.destroy({ children: true });
+  resultOverlayRef.current = null;
+
+  if (resultTimerRef.current) {
+    clearTimeout(resultTimerRef.current);
+    resultTimerRef.current = null;
+  }
+}, []);
 
   // ─── Particles ───────────────────────────────────────────────
   const spawnFX = useCallback((

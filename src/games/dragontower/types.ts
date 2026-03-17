@@ -1,5 +1,6 @@
 export type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Expert' | 'Master';
 export type GameState = 'idle' | 'playing' | 'ended';
+export type RealGameState = 'newgame' | 'playagain' | 'endgame';
 export type TileContent = 'egg' | 'dragon' | 'egg_dim' | null;
 export type TileState = 'idle' | 'active' | 'inactive' | 'hover' | 'egg' | 'egg_dim' | 'dragon';
 
@@ -12,6 +13,7 @@ export interface DiffConfig {
 
 export interface GameStateSnapshot {
   gstate: GameState;
+  rgstate: RealGameState;
   curRow: number;
   curMult: number;
   curWin: number;
