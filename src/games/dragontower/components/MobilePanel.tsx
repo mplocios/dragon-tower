@@ -71,9 +71,9 @@ const arrowBtn = (
 // ─── TWEAK THESE ─────────────────────────────────────────────
 const PLAY_SIZE = 110; // play button diameter (px)
 const PLAY_OFFSET_X = 0; // horizontal offset — negative = left, positive = right (px)
-const PLAY_OFFSET_Y = 18; // vertical offset   — negative = up,   positive = down  (px)
+const PLAY_OFFSET_Y = 20; // vertical offset   — negative = up,   positive = down  (px)
 const MID_CENTER_GAP = 25; // gap between Balance and Random Pick (px)
-const BOT_CENTER_GAP = 85; // gap between Bet and Total Profit (px)
+const BOT_CENTER_GAP = 90; // gap between Bet and Total Profit (px)
 const MID_H = 60; // Balance / Random Pick row height (px)
 const BOT_H = 70; // Bet / Total Profit row height (px)
 const ROW_GAP = 7; // vertical gap between row 1 and row 2 (px)
@@ -254,87 +254,108 @@ const MobilePanel: React.FC<MobilePanelProps> = ({
 
           {/* ── ROW 2: Bet | Total Profit ── */}
           <div style={{ display: "flex", alignItems: "stretch" }}>
-            {/* Bet card — BET label top-left, amount+coin+arrows on row below */}
+            {/* Bet card — BET label top-left, amount bottom-left, arrows right column */}
             <div
               style={cardStyle("bet-bg.png", {
                 flex: 1,
                 minWidth: 0,
                 display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                padding: "6px 8px 6px 12px",
+                flexDirection: "row", // left content | right arrows
+                alignItems: "stretch",
+                padding: 0,
                 height: BOT_H,
-                gap: 4,
+                overflow: "hidden",
               })}
             >
-              {/* BET label — top left */}
-              <span
+              {/* Left side: BET label top, amount+coin bottom */}
+              <div
                 style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: LBL,
-                  textTransform: "uppercase",
-                  letterSpacing: 1.8,
+                  flex: 1,
+                  minWidth: 0,
+                  flexShrink: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  padding: "8px 6px 8px 12px",
                 }}
               >
-                Bet
-              </span>
-              {/* amount + coin + arrows row */}
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <div className="m-bet-coin">$</div>
-                <input
-                  className="m-bet-inp"
-                  type="number"
-                  value={bet}
-                  min={0.01}
-                  step={0.01}
-                  disabled={playing}
-                  onChange={(e) => onBetChange(parseFloat(e.target.value) || 0)}
-                  style={{ flex: 1, minWidth: 0 }}
-                />
-                {/* Up / Down arrows stacked on right */}
-                <div
+                {/* BET label — top */}
+                <span
                   style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 3,
-                    flexShrink: 0,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: LBL,
+                    textTransform: "uppercase",
+                    letterSpacing: 1.8,
                   }}
                 >
-                  <button
-                    onMouseDown={() => setUpPressed(true)}
-                    onMouseUp={() => setUpPressed(false)}
-                    onMouseLeave={() => setUpPressed(false)}
-                    onTouchStart={() => setUpPressed(true)}
-                    onTouchEnd={() => setUpPressed(false)}
+                  Bet
+                </span>
+                {/* coin + amount — bottom */}
+                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <div className="m-bet-coin">$</div>
+                  <input
+                    className="m-bet-inp"
+                    type="number"
+                    value={bet}
+                    min={0.01}
+                    step={0.01}
                     disabled={playing}
-                    onClick={() =>
-                      onBetChange(
-                        Math.max(0.01, parseFloat((bet * 2).toFixed(2))),
-                      )
+                    onChange={(e) =>
+                      onBetChange(parseFloat(e.target.value) || 0)
                     }
-                    style={arrowBtn("bet-up-bg.png", upPressed, playing)}
-                  />
-                  <button
-                    onMouseDown={() => setDownPressed(true)}
-                    onMouseUp={() => setDownPressed(false)}
-                    onMouseLeave={() => setDownPressed(false)}
-                    onTouchStart={() => setDownPressed(true)}
-                    onTouchEnd={() => setDownPressed(false)}
-                    disabled={playing}
-                    onClick={() =>
-                      onBetChange(
-                        Math.max(0.01, parseFloat((bet * 0.5).toFixed(2))),
-                      )
-                    }
-                    style={arrowBtn("bet-down-bg.png", downPressed, playing)}
+                    style={{ flex: 1, minWidth: 0 }}
                   />
                 </div>
+              </div>
+
+              {/* Right side: arrows stacked, aligned to top of card */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  gap: 3,
+                  padding: "6px 20px 6px 0px",
+                  flexShrink: 0,
+                }}
+              >
+                <button
+                  onMouseDown={() => setUpPressed(true)}
+                  onMouseUp={() => setUpPressed(false)}
+                  onMouseLeave={() => setUpPressed(false)}
+                  onTouchStart={() => setUpPressed(true)}
+                  onTouchEnd={() => setUpPressed(false)}
+                  disabled={playing}
+                  onClick={() =>
+                    onBetChange(
+                      Math.max(0.01, parseFloat((bet * 2).toFixed(2))),
+                    )
+                  }
+                  style={arrowBtn("bet-up-bg.png", upPressed, playing)}
+                />
+                <button
+                  onMouseDown={() => setDownPressed(true)}
+                  onMouseUp={() => setDownPressed(false)}
+                  onMouseLeave={() => setDownPressed(false)}
+                  onTouchStart={() => setDownPressed(true)}
+                  onTouchEnd={() => setDownPressed(false)}
+                  disabled={playing}
+                  onClick={() =>
+                    onBetChange(
+                      Math.max(0.01, parseFloat((bet * 0.5).toFixed(2))),
+                    )
+                  }
+                  style={{
+                    ...arrowBtn("bet-down-bg.png", downPressed, playing),
+                    width: 38,
+                  }}
+                />
               </div>
             </div>
 
             {/* Gap spacer */}
-            <div style={{ width: BOT_CENTER_GAP, flexShrink: 0 }} />
+            <div style={{ width: BOT_CENTER_GAP - 15, flexShrink: 0 }} />
 
             {/* Total Profit card */}
             <div
@@ -344,11 +365,12 @@ const MobilePanel: React.FC<MobilePanelProps> = ({
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "center",
-                padding: "8px 10px 8px 14px",
+                // padding: "8px 10px 8px 24px",
+                marginLeft: 15,
                 height: BOT_H,
               })}
             >
-              <div style={{ marginLeft: 20 }}>
+              <div style={{ marginLeft: 35 }}>
                 {/* label row */}
                 <div
                   style={{
