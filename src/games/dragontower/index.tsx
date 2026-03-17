@@ -12,7 +12,10 @@ import {
   saveBalance,
   loadBalance,
   clearBalance,
+  saveHistoryEntry,
+  loadHistory,
 } from "../../utils/session";
+import { HistoryEntry } from "./types";
 import "./styles/dragontower.css";
 
 // ── Auto settings type ───────────────────────────────────────
@@ -119,6 +122,7 @@ const DragonTower: React.FC = () => {
     testModeRef.current = testMode;
   }, [testMode]);
 
+  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
   const canvasWrapRef = useRef<HTMLDivElement>(null);
 
   // ── Toast helper ────────────────────────────────────────────
@@ -195,9 +199,25 @@ const DragonTower: React.FC = () => {
           // 🔌 POST /api/game/result { gameId, result:"lose", bet, payout:0, row, difficulty }
         });
         setRgstate("endgame");
-        pixiGame.spawnFX(r, c, "fire", st.diff);
+        pixiGame.spawnLoseExplosion(r, c, st.diff);
+        pixiGame.screenShake();
         pixiGame.refreshGrid(st.diff, newState, st.curRow, st.revealed);
         pixiGame.swapDragonSprite(false);
+
+        // Save history entry
+        const loseEntry: HistoryEntry = {
+          id: gameIdRef.current,
+          timestamp: Date.now(),
+          difficulty: st.diff,
+          bet: betRef.current,
+          result: 'lose',
+          multiplier: 0,
+          payout: 0,
+          profit: -betRef.current,
+          rowsCleared: r,
+        };
+        saveHistoryEntry(loseEntry);
+        setHistory(loadHistory());
 
         setTimeout(() => {
           revealUnselectedEggs(st);
@@ -300,7 +320,24 @@ const DragonTower: React.FC = () => {
             });
 
             pixiGame.swapDragonSprite(true);
+            pixiGame.spawnWinCelebration(st.diff);
             pixiGame.refreshGrid(st.diff, "ended", nextRow, st.revealed);
+
+            // Save history entry
+            const winEntry: HistoryEntry = {
+              id: gameIdRef.current,
+              timestamp: Date.now(),
+              difficulty: st.diff,
+              bet: betRef.current,
+              result: 'win',
+              multiplier: newMult,
+              payout: newWin,
+              profit: parseFloat((newWin - betRef.current).toFixed(2)),
+              rowsCleared: nextRow,
+            };
+            saveHistoryEntry(winEntry);
+            setHistory(loadHistory());
+
             setTimeout(() => {
               revealUnselectedEggs(st);
               pixiGame.refreshGrid(st.diff, "ended", nextRow, st.revealed);
@@ -449,7 +486,24 @@ const DragonTower: React.FC = () => {
     setRgstate("endgame");
     clearSession();
     pixiGame.swapDragonSprite(true);
+    pixiGame.spawnWinCelebration(st.diff);
     pixiGame.refreshGrid(st.diff, "ended", st.curRow, st.revealed);
+
+    // Save history entry
+    const cashEntry: HistoryEntry = {
+      id: gameIdRef.current,
+      timestamp: Date.now(),
+      difficulty: st.diff,
+      bet: betRef.current,
+      result: 'win',
+      multiplier: mult,
+      payout: win,
+      profit: parseFloat((win - betRef.current).toFixed(2)),
+      rowsCleared: st.curRow,
+    };
+    saveHistoryEntry(cashEntry);
+    setHistory(loadHistory());
+
     setTimeout(() => {
       revealUnselectedEggs(st);
       pixiGame.refreshGrid(st.diff, "ended", st.curRow, st.revealed);
@@ -848,6 +902,27 @@ const DragonTower: React.FC = () => {
     stateRef.current.diff = diff;
   }, [diff]);
 
+  // ── Keyboard shortcuts ─────────────────────────────────────
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      const st = stateRef.current;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (st.gstate === 'playing' && curMultRef.current > 1) cashOut();
+        else if (st.gstate !== 'playing') startGame();
+      } else if (e.code === 'KeyR' && st.gstate === 'playing') {
+        e.preventDefault();
+        doRandom();
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [cashOut, startGame, doRandom]);
+
   // ── Render ──────────────────────────────────────────────────
   return (
     <div id="app">
@@ -858,6 +933,7 @@ const DragonTower: React.FC = () => {
         gstate={gstate}
         curMult={curMult}
         curWin={curWin}
+        history={history}
         onBetChange={(v) => {
           console.log("💵 [GAME:BET_CHANGE] Bet updated", {
             from: betRef.current,

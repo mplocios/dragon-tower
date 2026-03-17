@@ -22,5 +22,5 @@ export const MULTS: Record<Difficulty, number[]> = {
   Master: [3.92, 15.68, 62.72, 250.88, 1003.52, 4014.08, 16056.32, 64225.28, 256901.12]
 };
 
-export const INITIAL_BALANCE = 1000;
+export const INITIAL_BALANCE = 100000.23;
 export const INITIAL_BET = 5;

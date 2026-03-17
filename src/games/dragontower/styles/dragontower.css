@@ -27,12 +27,12 @@ html, body {
 }
 
 #left-panel {
-  width: 300px; min-width: 270px; flex-shrink: 0;
+  width: 310px; min-width: 290px; flex-shrink: 0;
   background: #1A191D;
   backdrop-filter: blur(10px);
   border-right: 1px solid rgba(26,48,72,0.6);
   display: flex; flex-direction: column;
-  overflow-y: auto;
+  overflow-y: auto; overflow-x: hidden;
   border-radius: 18px 0 0 18px;
 }
 
@@ -40,36 +40,34 @@ html, body {
   flex: 1;
   position: relative;
   display: flex;
-  flex-direction: row;
   align-items: center;
-  justify-content: flex-end;
-  /* overflow: hidden; */
-  /* height: 100%; */
+  justify-content: center;
+  overflow: hidden;
   border-radius: 0 18px 18px 0;
-  background-image: url("/assets/dragon-background-2.png");
+  background-image: url("/dragon-tower/assets/dragon-background-2.png");
   background-size: cover;
   background-position: center;
+  padding: 2% 0;
 }
 
 #canvas-wrap {
   position: relative;
   z-index: 1;
-  height: 85%;
-  width: auto;
-  flex: 0 0 auto;
+  height: 96%;
+  max-height: 96%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 200px 10px 0;
   background: transparent;
-  margin-top:-10%;
+  margin-left: 6%;
+  overflow: hidden;
 }
 
 #canvas-wrap canvas {
   display: block;
-  height: 100% !important;
-  width: auto !important;
-  max-height: 100%;
+  height: 100%;
+  width: auto;
+  object-fit: contain;
 }
 
 #dragon-bg {
@@ -360,83 +358,147 @@ html, body {
 .auto-cond-row { background: rgba(10,25,40,.5); border: 1px solid #1a3050; border-radius: 8px; padding: 10px; }
 
 select option { background: #0d1e30; color: #c8d8e8; }
+
+/* ── Glow animations ── */
+@keyframes tileGlow {
+  0%, 100% { box-shadow: 0 0 6px rgba(168, 200, 0, 0.2); }
+  50% { box-shadow: 0 0 18px rgba(168, 200, 0, 0.5); }
+}
+@keyframes fireGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 100, 0, 0.3); }
+  50% { box-shadow: 0 0 24px rgba(255, 100, 0, 0.6); }
+}
+@keyframes multPop {
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes eggBounce {
+  0% { transform: scale(0.4); opacity: 0; }
+  50% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes dragonShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px) rotate(-1deg); }
+  40% { transform: translateX(3px) rotate(1deg); }
+  60% { transform: translateX(-2px) rotate(-0.5deg); }
+  80% { transform: translateX(2px) rotate(0.5deg); }
+}
+@keyframes winGlow {
+  0% { box-shadow: 0 0 10px rgba(255, 200, 0, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(255, 200, 0, 0.7), 0 0 80px rgba(255, 150, 0, 0.3); }
+  100% { box-shadow: 0 0 10px rgba(255, 200, 0, 0.3); }
+}
+@keyframes loseShake {
+  0%, 100% { transform: translateX(0); }
+  10% { transform: translateX(-4px); }
+  20% { transform: translateX(4px); }
+  30% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  50% { transform: translateX(-2px); }
+  60% { transform: translateX(2px); }
+  70% { transform: translateX(-1px); }
+  80% { transform: translateX(1px); }
+}
 #left-panel::-webkit-scrollbar { width: 3px; }
 #left-panel::-webkit-scrollbar-thumb { background: #1a3050; border-radius: 2px; }
 input[type=number]::-webkit-inner-spin-button { opacity: 0; }
 
 /* ══════════════════════════════════════════
+   RESPONSIVE — TABLET
+   ══════════════════════════════════════════ */
+@media (max-width: 1024px) and (min-width: 768px) {
+  #left-panel {
+    width: 240px;
+    min-width: 220px;
+  }
+  #canvas-wrap {
+    margin-left: 3%;
+  }
+}
+
+/* ══════════════════════════════════════════
    RESPONSIVE — MOBILE
-   Only this block was changed from original
    ══════════════════════════════════════════ */
 @media (max-width: 767px) {
-
-  /* Remove desktop padding so height is accurate */
-  html, body { padding: 0; }
-
+  html, body { padding: 0; overflow: auto; }
   #root { height: 100dvh; }
 
   #app {
     flex-direction: column;
     height: 100dvh;
-    /* overflow: hidden; */
     border-radius: 0;
     border: none;
+    overflow: hidden;
   }
-  #dr-container{
- padding: 0px !important;
-  border-color: "none";
-}
- 
-  #left-panel,#head-1,#sub-head-1 { display: none !important; }
+  #dr-container {
+    padding: 0px !important;
+    border-color: transparent;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #left-panel, #head-1, #sub-head-1 { display: none !important; }
 
   #game-panel {
     flex: 1 1 0;
-    /* min-height: 0; */
+    min-height: 0;
     flex-direction: column !important;
     align-items: stretch !important;
     justify-content: flex-start !important;
-    /* overflow: hidden; */
     position: relative;
     display: flex !important;
     border-radius: 0 !important;
-  }
-  #game-panel {
-
-  background-image: url("/assets/dragontower-bg-2.png");
+    background-image: url("/dragon-tower/assets/dragontower-bg-2.png");
+    overflow: hidden;
+    padding: 0 !important;
   }
   #dragon-bg { background-position: center 30%; }
 
-  /* Canvas fills all space above the panel */
+  /* Canvas takes available space above mobile panel */
   #canvas-wrap {
     flex: 1 1 0 !important;
-    /* min-height: 0 !important; */
-    width: 90% !important;
+    min-height: 0 !important;
+    width: 100% !important;
     height: auto !important;
-    max-height: 770px!important;
+    max-height: none !important;
     padding: 4px !important;
-    /* overflow: hidden; */
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto
+    margin: 0 auto !important;
+    margin-left: 0 !important;
+    overflow: visible !important;
   }
 
   #canvas-wrap canvas {
-  
-    height: 90% !important;
-    width: 100%!important;
-    margin-top: -10%!important;
+    max-height: 100% !important;
+    max-width: 100% !important;
+    width: auto !important;
+    height: auto !important;
+    margin-top: 0 !important;
+    object-fit: contain;
   }
 
-  /* Panel takes only its content height — never overflows */
+  /* Mobile panel container — NO scale, NO negative margin */
+  #mob-container {
+    flex: 0 0 auto;
+    margin-top: 0;
+    padding: 0 8px 8px;
+    z-index: 10;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
   #mob-panel {
     display: flex !important;
     flex-direction: column !important;
     flex: 0 0 auto !important;
     width: 100%;
-    padding: 8px 12px 10px;
-    gap: 7px;
-    /* overflow: hidden; */
+    padding: 6px 4px 6px;
+    gap: 5px;
     z-index: 20;
     background: transparent;
     border-top: 1px solid rgba(255,255,255,0.07);
@@ -444,28 +506,33 @@ input[type=number]::-webkit-inner-spin-button { opacity: 0; }
     position: static;
     justify-content: flex-start;
     align-items: stretch;
-
   }
-
   #mob-panel > * { width: 100%; }
-  #mob-container{
-    margin-top: -15%;
-    scale:0.9;
-    padding: 0 0 20% 0;
-    z-index:10
+}
+
+/* Small mobile (< 400px) — tighten spacing */
+@media (max-width: 400px) {
+  #mob-container {
+    padding: 0 4px 4px;
+  }
+  #mob-panel {
+    padding: 4px 2px !important;
+    gap: 3px !important;
   }
 }
-/* @media (max-width: 627px) {
-#canvas-wrap{
-  width: 85%!important
+
+/* Landscape mobile */
+@media (max-width: 767px) and (max-height: 500px) {
+  #canvas-wrap {
+    flex: 1 1 0 !important;
+    min-height: 200px !important;
+  }
+  #mob-container {
+    padding: 0 4px 2px;
+  }
 }
-}
-@media (max-width: 582px) {
-#canvas-wrap{
-  width: 85%!important
-}
-} */
-#dr-container{
+
+#dr-container {
   width: 100%;
   padding: 8px;
   box-sizing: border-box;

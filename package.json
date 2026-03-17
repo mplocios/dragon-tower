@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "vite build",
     "predeploy": "npm run build",
-   "deploy": "gh-pages -d dist -r git@github.com:mplocios/dragon-tower.git"
+    "deploy": "gh-pages -d dist -r git@github.com:mplocios/dragon-tower.git"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.0",
@@ -17,6 +17,7 @@
     "@radix-ui/react-select": "^2.1.2",
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-tabs": "^1.1.1",
+    "@rollup/rollup-linux-x64-gnu": "^4.59.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "2.1.1",
     "lucide-react": "^0.453.0",

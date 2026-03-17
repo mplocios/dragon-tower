@@ -29,3 +29,15 @@ export interface ResultInfo {
   amount: number;
   mult: number;
 }
+
+export interface HistoryEntry {
+  id: string;
+  timestamp: number;
+  difficulty: Difficulty;
+  bet: number;
+  result: 'win' | 'lose';
+  multiplier: number;
+  payout: number;
+  profit: number;
+  rowsCleared: number;
+}

@@ -69,14 +69,14 @@ const arrowBtn = (
 });
 
 // ─── TWEAK THESE ─────────────────────────────────────────────
-const PLAY_SIZE = 110; // play button diameter (px)
-const PLAY_OFFSET_X = 0; // horizontal offset — negative = left, positive = right (px)
-const PLAY_OFFSET_Y = 20; // vertical offset   — negative = up,   positive = down  (px)
-const MID_CENTER_GAP = 25; // gap between Balance and Random Pick (px)
-const BOT_CENTER_GAP = 90; // gap between Bet and Total Profit (px)
-const MID_H = 60; // Balance / Random Pick row height (px)
-const BOT_H = 70; // Bet / Total Profit row height (px)
-const ROW_GAP = 7; // vertical gap between row 1 and row 2 (px)
+const PLAY_SIZE = 80; // play button diameter (px)
+const PLAY_OFFSET_X = 0;
+const PLAY_OFFSET_Y = 10;
+const MID_CENTER_GAP = 20; // gap between Balance and Random Pick (px)
+const BOT_CENTER_GAP = 70; // gap between Bet and Total Profit (px)
+const MID_H = 50; // Balance / Random Pick row height (px)
+const BOT_H = 58; // Bet / Total Profit row height (px)
+const ROW_GAP = 5; // vertical gap between row 1 and row 2 (px)
 // ─────────────────────────────────────────────────────────────
 
 const PLAY_TOP = MID_H + ROW_GAP / 2 - PLAY_SIZE / 2;
@@ -370,7 +370,7 @@ const MobilePanel: React.FC<MobilePanelProps> = ({
                 height: BOT_H,
               })}
             >
-              <div style={{ marginLeft: 35 }}>
+              <div style={{ marginLeft: 30 }}>
                 {/* label row */}
                 <div
                   style={{
