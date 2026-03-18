@@ -60,7 +60,7 @@ export const FRAME_INNER_ALPHA = 0.75;
 
 // ─── Wall / Dragon ──────────────────────────────────────────────────
 /** Wall sprite width overshoot beyond frame width */
-export const WALL_OVERSHOOT_W = 35;
+export const WALL_OVERSHOOT_W = 40;
 /** Wall sprite height overshoot beyond WALL_H */
 export const WALL_OVERSHOOT_H = 25;
 /** Wall sprite x-offset from frame x */
@@ -87,8 +87,14 @@ export const DRAGON_FIRE_MAX_H = 370;
 export const DRAGON_Y_OFFSET = 40;
 /** Dragon glow circle radii (outer to inner) */
 export const DRAGON_GLOW_RADII = [60, 40, 22] as const;
+/** Dragon glow x-offset from center (CW/2) */
+export const DRAGON_GLOW_X_OFFSET = 0;
 /** Dragon glow y-offset from wall center-y */
-export const DRAGON_GLOW_Y_OFFSET = 10;
+export const DRAGON_GLOW_Y_OFFSET = 0;
+/** Dragon glow colors [outer, middle, inner] */
+export const DRAGON_GLOW_COLORS = [0xff4400, 0xff6600, 0x000000] as const;
+/** Dragon glow alphas [outer, middle, inner] */
+export const DRAGON_GLOW_ALPHAS = [0.08, 0.12, 0.18] as const;
 
 // ─── Play Button ────────────────────────────────────────────────────
 /** Play button circle radius */

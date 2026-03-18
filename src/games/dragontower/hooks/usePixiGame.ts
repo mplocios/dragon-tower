@@ -5,7 +5,8 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_C
   GRID_TOP_RESERVE, TILE_ASPECT_RATIO, TILE_ASPECT_RATIO_MOBILE, GRID_BOTTOM_MARGIN, GRID_LAYER_Y,
   DRAGON_NORMAL_MAX_W, DRAGON_NORMAL_MAX_H, DRAGON_FIRE_MAX_W, DRAGON_FIRE_MAX_H,
   WALL_OVERSHOOT_W, WALL_OVERSHOOT_H, WALL_OFFSET_X, WALL_OFFSET_Y,
-  DRAGON_BREATH_AMPLITUDE, DRAGON_BREATH_FREQ,
+  DRAGON_BREATH_AMPLITUDE, DRAGON_BREATH_FREQ, DRAGON_Y_OFFSET,
+  DRAGON_GLOW_RADII, DRAGON_GLOW_X_OFFSET, DRAGON_GLOW_Y_OFFSET, DRAGON_GLOW_COLORS, DRAGON_GLOW_ALPHAS,
   EGG_SCALE_W, EGG_SCALE_H, EGG_Y_OFFSET, DRAGON_ICON_SCALE_W, DRAGON_ICON_SCALE_H,
   DRAGON_ICON_Y_OFFSET, DRAGON_ICON_FLOAT_SPEED, DRAGON_ICON_FLOAT_AMP, DRAGON_ICON_ALPHA, DRAGON_ICON_TINT,
   DRAGON_SHADOW_W, DRAGON_SHADOW_H, DRAGON_SHADOW_Y, DRAGON_SHADOW_ALPHA,
@@ -334,11 +335,23 @@ export function usePixiGame(
     if (dTex) {
       const ds = new PIXI.Sprite(dTex);
       const sc = Math.min(DRAGON_NORMAL_MAX_W / ds.texture.width, DRAGON_NORMAL_MAX_H / ds.texture.height);
-      ds.scale.set(sc); ds.anchor.set(0.5, 1); ds.x = CW / 2; ds.y = wcy + 40;
+      ds.scale.set(sc); ds.anchor.set(0.5, 1); ds.x = CW / 2; ds.y = wcy + DRAGON_Y_OFFSET;
       ds.label = 'wallDragon';
+      ds.zIndex = 20;
       dragonBaseScaleRef.current = sc;
       gridLayer.addChild(ds);
     }
+
+    // Dragon glow — IN FRONT of dragon, always visible in normal/lose
+    const dragonGlow = new PIXI.Graphics();
+    const glowX = CW / 2 + DRAGON_GLOW_X_OFFSET, glowY = wcy + DRAGON_GLOW_Y_OFFSET;
+    dragonGlow.circle(glowX, glowY, DRAGON_GLOW_RADII[0]).fill({ color: DRAGON_GLOW_COLORS[0], alpha: DRAGON_GLOW_ALPHAS[0] });
+    dragonGlow.circle(glowX, glowY, DRAGON_GLOW_RADII[1]).fill({ color: DRAGON_GLOW_COLORS[1], alpha: DRAGON_GLOW_ALPHAS[1] });
+    dragonGlow.circle(glowX, glowY, DRAGON_GLOW_RADII[2]).fill({ color: DRAGON_GLOW_COLORS[2], alpha: DRAGON_GLOW_ALPHAS[2] });
+    dragonGlow.label = 'dragonGlow';
+    dragonGlow.zIndex = 21;
+    gridLayer.addChild(dragonGlow);
+    dragonGlowRef.current = dragonGlow;
 
     if (TEX.wall_bottom) {
       const wb = new PIXI.Sprite(TEX.wall_bottom);
@@ -1026,6 +1039,9 @@ export function usePixiGame(
     if (topFlame) { topFlame.visible = show && !!winOnly; topFlame.alpha = (show && !!winOnly) ? 0.7 : 0; }
     if (gTop) { gTop.visible = show; gTop.alpha = show ? 0.8 : 0; }
     if (gBottom) { gBottom.visible = show; gBottom.alpha = show ? 0.8 : 0; }
+    // Dragon glow: hide on win (flame effects take over), show on normal/lose
+    const dGlow = dragonGlowRef.current;
+    if (dGlow) { dGlow.visible = !show; }
 
     // ── Sound effects ──
     const SOUND_BASE = '/dragon-tower/assets/dragontower/sounds';
@@ -1409,15 +1425,21 @@ export function usePixiGame(
           } 
         }
 
-        // ── Dragon breathing animation ────────────────────────────
+        // ── Dragon breathing animation + glow sync ────────────────
+        const breathVal = Math.sin(frameRef.current * DRAGON_BREATH_FREQ);
         for (let i = 0; i < gridLayer.children.length; i++) {
           const ch = gridLayer.children[i];
           if (ch.label === 'wallDragon') {
             const base = dragonBaseScaleRef.current;
-            const breath = base * (1 + DRAGON_BREATH_AMPLITUDE * Math.sin(frameRef.current * DRAGON_BREATH_FREQ));
-            ch.scale.set(breath);
+            ch.scale.set(base * (1 + DRAGON_BREATH_AMPLITUDE * breathVal));
             break;
           }
+        }
+        // Glow brightens when dragon inhales (scale up), dims on exhale
+        const dGlow = dragonGlowRef.current;
+        if (dGlow && dGlow.visible) {
+          const t = (breathVal + 1) / 2; // 0 = exhale, 1 = inhale
+          dGlow.alpha = 0.5 + 0.5 * t;
         }
 
         // ── Flame & glow pulse (slow) ─────────────────────────────
