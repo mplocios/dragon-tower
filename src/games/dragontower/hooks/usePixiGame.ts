@@ -4,6 +4,7 @@ import { Difficulty, GameState, TileContent, TileState } from '../types';
 import { CW, CH, CH_MOBILE, PANEL_H, PAD, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_COLS,
   GRID_TOP_RESERVE, TILE_ASPECT_RATIO, TILE_ASPECT_RATIO_MOBILE, GRID_BOTTOM_MARGIN, GRID_LAYER_Y,
   DRAGON_NORMAL_MAX_W, DRAGON_NORMAL_MAX_H, DRAGON_FIRE_MAX_W, DRAGON_FIRE_MAX_H,
+  WALL_OVERSHOOT_W, WALL_OVERSHOOT_H, WALL_OFFSET_X, WALL_OFFSET_Y,
   DRAGON_BREATH_AMPLITUDE, DRAGON_BREATH_FREQ,
   EGG_SCALE_W, EGG_SCALE_H, EGG_Y_OFFSET, DRAGON_ICON_SCALE_W, DRAGON_ICON_SCALE_H,
   DRAGON_ICON_Y_OFFSET, DRAGON_ICON_FLOAT_SPEED, DRAGON_ICON_FLOAT_AMP, DRAGON_ICON_ALPHA, DRAGON_ICON_TINT,
@@ -309,8 +310,8 @@ export function usePixiGame(
 
     if (TEX.wall) {
       const wt = new PIXI.Sprite(TEX.wall);
-      wt.width = fw + 35; wt.height = WALL_H + 25;
-      wt.x = fx - 20; wt.y = wcy + 10; wt.alpha = 1;
+      wt.width = fw + WALL_OVERSHOOT_W; wt.height = WALL_H + WALL_OVERSHOOT_H;
+      wt.x = fx - WALL_OFFSET_X; wt.y = wcy + WALL_OFFSET_Y; wt.alpha = 1;
       gridLayer.addChild(wt);
     }
 
