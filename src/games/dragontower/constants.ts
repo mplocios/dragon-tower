@@ -243,6 +243,10 @@ export const DRAGON_ICON_FLOAT_AMP = 2;
 export const DRAGON_ICON_ALPHA = 0.9;
 /** Dragon icon tint color (0xffffff = no tint, lower = darker) */
 export const DRAGON_ICON_TINT = 0xffffff;
+/** Dragon sprite frame count */
+export const DRAGON_SPRITE_FRAMES = 29;
+/** Dragon sprite animation speed */
+export const DRAGON_SPRITE_SPEED = 0.4;
 /** Dragon icon shadow width scale relative to tile width */
 export const DRAGON_SHADOW_W = 0.2;
 /** Dragon icon shadow height scale relative to tile height */

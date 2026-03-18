@@ -1,6 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
 import * as PIXI from 'pixi.js';
-import { AnimatedGIF } from '@pixi/gif';
 import { Difficulty, GameState, TileContent, TileState } from '../types';
 import { CW, CH, CH_MOBILE, PANEL_H, PAD, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_COLS,
   GRID_TOP_RESERVE, TILE_ASPECT_RATIO, TILE_ASPECT_RATIO_MOBILE, GRID_BOTTOM_MARGIN, GRID_LAYER_Y,
@@ -9,6 +8,7 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_C
   DRAGON_ICON_SCALE_W, DRAGON_ICON_SCALE_H,
   DRAGON_ICON_Y_OFFSET, DRAGON_ICON_FLOAT_SPEED, DRAGON_ICON_FLOAT_AMP, DRAGON_ICON_ALPHA, DRAGON_ICON_TINT,
   DRAGON_SHADOW_W, DRAGON_SHADOW_H, DRAGON_SHADOW_Y, DRAGON_SHADOW_ALPHA,
+  DRAGON_SPRITE_FRAMES, DRAGON_SPRITE_SPEED,
   TOP_FLAME_W_EXT, TOP_FLAME_H, TOP_FLAME_Y_ANCHOR,
   FLAME_BORDER_Y_OFFSET,
   MOBILE_BREAKPOINT, PANEL_PX, PANEL_PY, PANEL_DIFF_H, PANEL_MID_H, PANEL_BOT_H,
@@ -66,6 +66,7 @@ export function usePixiGame(
   const particlesRef = useRef<PIXI.Graphics[]>([]);
   const texRef = useRef<Record<string, PIXI.Texture>>({});
   const dragonGifBufRef = useRef<ArrayBuffer | null>(null);
+  const dragonFramesRef = useRef<PIXI.Texture[]>([]);
   const resultOverlayRef = useRef<PIXI.Container | null>(null);
   const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flameBorderLeftRef = useRef<PIXI.Sprite | null>(null);
@@ -220,9 +221,9 @@ export function usePixiGame(
       }
       tile.root.alpha = 0.5;
     } else if (type === 'dragon') {
-      const gifBuf = dragonGifBufRef.current;
-      if (gifBuf) {
-        // Shadow ellipse (added first so it renders behind the icon)
+      const frames = dragonFramesRef.current;
+      if (frames.length > 0) {
+        // Shadow ellipse (behind the icon)
         const shadow = new PIXI.Graphics();
         const shadowW = w * DRAGON_SHADOW_W;
         const shadowH = h * DRAGON_SHADOW_H;
@@ -234,18 +235,21 @@ export function usePixiGame(
         (shadow as any)._baseScaleY = shadow.scale.y;
         tile.icons.addChild(shadow);
 
-        // Animated GIF icon
-        const gif = AnimatedGIF.fromBuffer(gifBuf.slice(0), { loop: true, autoPlay: true });
+        // Animated sprite icon
+        const sp = new PIXI.AnimatedSprite(frames);
+        sp.animationSpeed = DRAGON_SPRITE_SPEED;
+        sp.loop = true;
+        sp.play();
         const targetW = w * DRAGON_ICON_SCALE_W;
         const targetH = h * DRAGON_ICON_SCALE_H;
-        const sc = Math.min(targetW / gif.width, targetH / gif.height);
-        gif.scale.set(sc); gif.anchor.set(0.5); gif.x = w / 2; gif.y = h / 2 + DRAGON_ICON_Y_OFFSET;
-        gif.alpha = DRAGON_ICON_ALPHA;
-        gif.tint = DRAGON_ICON_TINT;
-        gif.label = 'dragonIcon';
-        (gif as any)._baseY = gif.y;
-        (gif as any)._floatOffset = Math.random() * Math.PI * 2;
-        tile.icons.addChild(gif);
+        const sc = Math.min(targetW / frames[0].width, targetH / frames[0].height);
+        sp.scale.set(sc); sp.anchor.set(0.5); sp.x = w / 2; sp.y = h / 2 + DRAGON_ICON_Y_OFFSET;
+        sp.alpha = DRAGON_ICON_ALPHA;
+        sp.tint = DRAGON_ICON_TINT;
+        sp.label = 'dragonIcon';
+        (sp as any)._baseY = sp.y;
+        (sp as any)._floatOffset = Math.random() * Math.PI * 2;
+        tile.icons.addChild(sp);
       }
       tile.root.zIndex = 10;
       tile.root.alpha = 1;
@@ -1120,7 +1124,7 @@ export function usePixiGame(
       dragon_fire:   BASE+'/dragon-fire.png',
       wall:          BASE+'/wall.png',
       egg:           BASE+'/dragon-egg-3.png',
-      // dragon_icon loaded as GIF below
+      dragon_sprite: BASE+'/dragon-icon-2-sprite.png',
       tile_dark:     BASE+'/black-tile.png',
       tile_green:    BASE+'/green-tile.png',
       result_bg:     BASE+'/result_background.png',
@@ -1149,13 +1153,21 @@ export function usePixiGame(
       Object.entries(imgMap).map(([key, path]) => loadOne(key, path))
     );
 
-    // Load animated GIF for dragon icon
-    try {
-      const resp = await fetch(BASE + '/dragon-icon.gif');
-      dragonGifBufRef.current = await resp.arrayBuffer();
-      console.log('Loaded: dragon_icon (GIF)');
-    } catch (e: any) {
-      console.warn('Failed to load dragon-icon.gif:', e.message);
+    // Slice dragon spritesheet into frames
+    if (TEX.dragon_sprite) {
+      const baseTex = TEX.dragon_sprite as PIXI.Texture;
+      // Use source dimensions for the full spritesheet
+      const src = baseTex.source;
+      const srcW = src.pixelWidth;
+      const srcH = src.pixelHeight;
+      const frameW = Math.floor(srcW / DRAGON_SPRITE_FRAMES);
+      const frames: PIXI.Texture[] = [];
+      for (let i = 0; i < DRAGON_SPRITE_FRAMES; i++) {
+        const rect = new PIXI.Rectangle(i * frameW, 0, frameW, srcH);
+        frames.push(new PIXI.Texture({ source: src, frame: rect }));
+      }
+      dragonFramesRef.current = frames;
+      console.log(`Loaded: dragon_sprite (${DRAGON_SPRITE_FRAMES} frames, ${frameW}x${srcH}, src: ${srcW}x${srcH})`);
     }
 
     onLoaded?.();
@@ -1265,18 +1277,16 @@ export function usePixiGame(
               for (let k = 0; k < tile.icons.children.length; k++) {
                 const ch = tile.icons.children[k];
                 if (ch.label === 'dragonShadow') {
-                  // floatVal: -1 (icon highest) to +1 (icon lowest)
                   const t = (floatVal + 1) / 2; // 0 = up, 1 = down
-                  const shadowScale = 0.7 + 0.3 * t; // range 0.7 to 1.0
+                  const shadowScale = 0.7 + 0.3 * t;
                   const baseScX = (ch as any)._baseScaleX ?? 1;
                   const baseScY = (ch as any)._baseScaleY ?? 1;
                   ch.scale.set(baseScX * shadowScale, baseScY * shadowScale);
-                  ch.alpha = 0.15 + 0.2 * t; // range 0.15 to 0.35
-                  // Color: dark red when small (up) → orange when large (down)
-                  const r = Math.round(0x66 + (0xff - 0x66) * t); // 0x66 → 0xff
-                  const g = Math.round(0x08 + (0x88 - 0x08) * t); // 0x08 → 0x88
-                  const b = Math.round(0x08 + (0x22 - 0x08) * t); // 0x08 → 0x22
-                  (ch as PIXI.Graphics).tint = (r << 16) | (g << 8) | b;
+                  ch.alpha = 0.15 + 0.2 * t;
+                  const r = Math.round(0x66 + (0xff - 0x66) * t);
+                  const gg = Math.round(0x08 + (0x88 - 0x08) * t);
+                  const b = Math.round(0x08 + (0x22 - 0x08) * t);
+                  (ch as PIXI.Graphics).tint = (r << 16) | (gg << 8) | b;
                   break;
                 }
               }
