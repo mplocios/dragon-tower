@@ -1,12 +1,14 @@
 import { useEffect, useRef, useCallback } from 'react';
 import * as PIXI from 'pixi.js';
+import { AnimatedGIF } from '@pixi/gif';
 import { Difficulty, GameState, TileContent, TileState } from '../types';
 import { CW, CH, CH_MOBILE, PANEL_H, PAD, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_COLS,
   GRID_TOP_RESERVE, TILE_ASPECT_RATIO, TILE_ASPECT_RATIO_MOBILE, GRID_BOTTOM_MARGIN, GRID_LAYER_Y,
   DRAGON_NORMAL_MAX_W, DRAGON_NORMAL_MAX_H, DRAGON_FIRE_MAX_W, DRAGON_FIRE_MAX_H,
   DRAGON_BREATH_AMPLITUDE, DRAGON_BREATH_FREQ,
   DRAGON_ICON_SCALE_W, DRAGON_ICON_SCALE_H,
-  DRAGON_ICON_Y_OFFSET, DRAGON_ICON_FLOAT_SPEED, DRAGON_ICON_FLOAT_AMP,
+  DRAGON_ICON_Y_OFFSET, DRAGON_ICON_FLOAT_SPEED, DRAGON_ICON_FLOAT_AMP, DRAGON_ICON_ALPHA, DRAGON_ICON_TINT,
+  DRAGON_SHADOW_W, DRAGON_SHADOW_H, DRAGON_SHADOW_Y, DRAGON_SHADOW_ALPHA,
   TOP_FLAME_W_EXT, TOP_FLAME_H, TOP_FLAME_Y_ANCHOR,
   FLAME_BORDER_Y_OFFSET,
   MOBILE_BREAKPOINT, PANEL_PX, PANEL_PY, PANEL_DIFF_H, PANEL_MID_H, PANEL_BOT_H,
@@ -63,6 +65,7 @@ export function usePixiGame(
   const tileObjsRef = useRef<TileObjRow[]>([]);
   const particlesRef = useRef<PIXI.Graphics[]>([]);
   const texRef = useRef<Record<string, PIXI.Texture>>({});
+  const dragonGifBufRef = useRef<ArrayBuffer | null>(null);
   const resultOverlayRef = useRef<PIXI.Container | null>(null);
   const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flameBorderLeftRef = useRef<PIXI.Sprite | null>(null);
@@ -170,12 +173,25 @@ export function usePixiGame(
       }
     } else if (state === 'dragon') {
       setTileSprite(ts, null, w, h);
-      g.roundRect(-3, -3, w + 6, h + 6, R + 3).fill({ color: 0xff2200, alpha: 0.1 });
-      g.roundRect(1, 2, w, h, R).fill({ color: 0x000000, alpha: 0.5 });
-      g.roundRect(0, 0, w, h, R).fill({ color: 0x180303 });
-      g.roundRect(0, 0, w, h, R).fill({ color: 0x7a0606, alpha: 0.5 });
+      const DR = 2.56;
+      // Linear gradient 90deg: dark red edges → black center → dark red edges
+      const grad = new PIXI.FillGradient({
+        type: 'linear',
+        start: { x: 0, y: 0.5 },
+        end: { x: 1, y: 0.5 },
+        textureSpace: 'local',
+        colorStops: [
+          { offset: 0, color: '#4C0C0C' },
+          { offset: 0.35, color: '#1a0303' },
+          { offset: 0.5, color: '#000000' },
+          { offset: 0.65, color: '#1a0303' },
+          { offset: 1, color: '#4C0C0C' },
+        ],
+      });
+      g.roundRect(0, 0, w, h, DR).fill(grad);
       if (ttex) ttex.alpha = 0;
-      g.roundRect(0, 0, w, h, R).stroke({ width: 2, color: 0xcc1414, alpha: 0.95 });
+      // Stroke: #9F1616, inside, weight 0.85
+      g.roundRect(0.42, 0.42, w - 0.85, h - 0.85, DR).stroke({ width: 0.85, color: 0x9F1616 });
     }
   }, [setTileSprite]);
 
@@ -204,14 +220,32 @@ export function usePixiGame(
       }
       tile.root.alpha = 0.5;
     } else if (type === 'dragon') {
-      if (TEX.dragon_icon) {
-        const sp = new PIXI.Sprite(TEX.dragon_icon);
-        const sc = Math.min((w * DRAGON_ICON_SCALE_W) / sp.texture.width, (h * DRAGON_ICON_SCALE_H) / sp.texture.height);
-        sp.scale.set(sc); sp.anchor.set(0.5); sp.x = w / 2; sp.y = h / 2 + DRAGON_ICON_Y_OFFSET;
-        sp.label = 'dragonIcon';
-        (sp as any)._baseY = sp.y;
-        (sp as any)._floatOffset = Math.random() * Math.PI * 2;
-        tile.icons.addChild(sp);
+      const gifBuf = dragonGifBufRef.current;
+      if (gifBuf) {
+        // Shadow ellipse (added first so it renders behind the icon)
+        const shadow = new PIXI.Graphics();
+        const shadowW = w * DRAGON_SHADOW_W;
+        const shadowH = h * DRAGON_SHADOW_H;
+        shadow.ellipse(0, 0, shadowW, shadowH).fill({ color: 0xffffff, alpha: DRAGON_SHADOW_ALPHA });
+        shadow.x = w / 2; shadow.y = h / 2 + h * DRAGON_SHADOW_Y;
+        shadow.tint = 0x660808;
+        shadow.label = 'dragonShadow';
+        (shadow as any)._baseScaleX = shadow.scale.x;
+        (shadow as any)._baseScaleY = shadow.scale.y;
+        tile.icons.addChild(shadow);
+
+        // Animated GIF icon
+        const gif = AnimatedGIF.fromBuffer(gifBuf.slice(0), { loop: true, autoPlay: true });
+        const targetW = w * DRAGON_ICON_SCALE_W;
+        const targetH = h * DRAGON_ICON_SCALE_H;
+        const sc = Math.min(targetW / gif.width, targetH / gif.height);
+        gif.scale.set(sc); gif.anchor.set(0.5); gif.x = w / 2; gif.y = h / 2 + DRAGON_ICON_Y_OFFSET;
+        gif.alpha = DRAGON_ICON_ALPHA;
+        gif.tint = DRAGON_ICON_TINT;
+        gif.label = 'dragonIcon';
+        (gif as any)._baseY = gif.y;
+        (gif as any)._floatOffset = Math.random() * Math.PI * 2;
+        tile.icons.addChild(gif);
       }
       tile.root.zIndex = 10;
       tile.root.alpha = 1;
@@ -1086,7 +1120,7 @@ export function usePixiGame(
       dragon_fire:   BASE+'/dragon-fire.png',
       wall:          BASE+'/wall.png',
       egg:           BASE+'/dragon-egg-3.png',
-      dragon_icon:   BASE+'/dragon-icon-2.png',
+      // dragon_icon loaded as GIF below
       tile_dark:     BASE+'/black-tile.png',
       tile_green:    BASE+'/green-tile.png',
       result_bg:     BASE+'/result_background.png',
@@ -1114,6 +1148,15 @@ export function usePixiGame(
     await Promise.all(
       Object.entries(imgMap).map(([key, path]) => loadOne(key, path))
     );
+
+    // Load animated GIF for dragon icon
+    try {
+      const resp = await fetch(BASE + '/dragon-icon.gif');
+      dragonGifBufRef.current = await resp.arrayBuffer();
+      console.log('Loaded: dragon_icon (GIF)');
+    } catch (e: any) {
+      console.warn('Failed to load dragon-icon.gif:', e.message);
+    }
 
     onLoaded?.();
   }, []);
@@ -1196,19 +1239,46 @@ export function usePixiGame(
           }
         }
 
-        // ── Dragon icon floating animation ──────────────────────
+        // ── Dragon icon floating animation + shadow ──────────────
         const tiles = tileObjsRef.current;
         for (let ri = 0; ri < tiles.length; ri++) {
           const row = tiles[ri];
           for (let ci = 0; ci < row.length; ci++) {
             const tile = row[ci];
             if (!tile) continue;
+            // First pass: find icon and compute float value
+            let floatVal = 0;
+            let hasIcon = false;
             for (let k = 0; k < tile.icons.children.length; k++) {
               const ch = tile.icons.children[k];
               if (ch.label === 'dragonIcon') {
                 const baseY = (ch as any)._baseY ?? 0;
                 const offset = (ch as any)._floatOffset ?? 0;
-                ch.y = baseY + Math.sin(frameRef.current * DRAGON_ICON_FLOAT_SPEED + offset) * DRAGON_ICON_FLOAT_AMP;
+                floatVal = Math.sin(frameRef.current * DRAGON_ICON_FLOAT_SPEED + offset);
+                ch.y = baseY + floatVal * DRAGON_ICON_FLOAT_AMP;
+                hasIcon = true;
+                break;
+              }
+            }
+            // Second pass: apply float to shadow
+            if (hasIcon) {
+              for (let k = 0; k < tile.icons.children.length; k++) {
+                const ch = tile.icons.children[k];
+                if (ch.label === 'dragonShadow') {
+                  // floatVal: -1 (icon highest) to +1 (icon lowest)
+                  const t = (floatVal + 1) / 2; // 0 = up, 1 = down
+                  const shadowScale = 0.7 + 0.3 * t; // range 0.7 to 1.0
+                  const baseScX = (ch as any)._baseScaleX ?? 1;
+                  const baseScY = (ch as any)._baseScaleY ?? 1;
+                  ch.scale.set(baseScX * shadowScale, baseScY * shadowScale);
+                  ch.alpha = 0.15 + 0.2 * t; // range 0.15 to 0.35
+                  // Color: dark red when small (up) → orange when large (down)
+                  const r = Math.round(0x66 + (0xff - 0x66) * t); // 0x66 → 0xff
+                  const g = Math.round(0x08 + (0x88 - 0x08) * t); // 0x08 → 0x88
+                  const b = Math.round(0x08 + (0x22 - 0x08) * t); // 0x08 → 0x22
+                  (ch as PIXI.Graphics).tint = (r << 16) | (g << 8) | b;
+                  break;
+                }
               }
             }
           }

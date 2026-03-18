@@ -12,6 +12,7 @@
     "deploy": "gh-pages -d dist -r git@github.com:mplocios/dragon-tower.git"
   },
   "dependencies": {
+    "@pixi/gif": "^3.0.1",
     "@radix-ui/react-label": "^2.1.0",
     "@radix-ui/react-scroll-area": "^1.2.0",
     "@radix-ui/react-select": "^2.1.2",

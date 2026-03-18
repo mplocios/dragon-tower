@@ -230,15 +230,27 @@ export const EGG_SCALE_W = 0.87;
 /** Egg icon height scale relative to tile height */
 export const EGG_SCALE_H = 1.08;
 /** Dragon icon width scale relative to tile width */
-export const DRAGON_ICON_SCALE_W = 1.58;
+export const DRAGON_ICON_SCALE_W = 1.38;
 /** Dragon icon height scale relative to tile height */
-export const DRAGON_ICON_SCALE_H = 1.67;
+export const DRAGON_ICON_SCALE_H = 1.47;
 /** Dragon icon y-offset from tile center (negative = higher) */
 export const DRAGON_ICON_Y_OFFSET = -10;
 /** Dragon icon float animation speed (lower = slower) */
 export const DRAGON_ICON_FLOAT_SPEED = 0.02;
 /** Dragon icon float animation amplitude (pixels) */
 export const DRAGON_ICON_FLOAT_AMP = 2;
+/** Dragon icon opacity (0-1) */
+export const DRAGON_ICON_ALPHA = 0.9;
+/** Dragon icon tint color (0xffffff = no tint, lower = darker) */
+export const DRAGON_ICON_TINT = 0xffffff;
+/** Dragon icon shadow width scale relative to tile width */
+export const DRAGON_SHADOW_W = 0.2;
+/** Dragon icon shadow height scale relative to tile height */
+export const DRAGON_SHADOW_H = 0.12;
+/** Dragon icon shadow y position offset relative to tile height */
+export const DRAGON_SHADOW_Y = 0.30;
+/** Dragon icon shadow base alpha */
+export const DRAGON_SHADOW_ALPHA = 0.35;
 
 // ─── Animation ──────────────────────────────────────────────────────
 /** Frames between ambient ember spawns */
