@@ -41,3 +41,16 @@ export interface HistoryEntry {
   profit: number;
   rowsCleared: number;
 }
+
+export interface AutoSettings {
+  autoBet: number;
+  autoCount: number;
+  autoAdvanced: boolean;
+  onWinMode: "reset" | "increase";
+  onLossMode: "reset" | "increase";
+  winInc: number;
+  lossInc: number;
+  stopProfit: number;
+  stopLoss: number;
+  autoDiff: Difficulty;
+}

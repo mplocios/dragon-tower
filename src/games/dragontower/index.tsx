@@ -1,38 +1,20 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
-import { Difficulty, GameState, RealGameState, TileContent } from "./types";
-import { DIFF, MULTS, INITIAL_BALANCE, INITIAL_BET } from "./constants";
+import React, { useRef, useCallback, useEffect } from "react";
+import { Difficulty, GameState, TileContent, HistoryEntry } from "./types";
+import { DIFF, MULTS } from "./constants";
 import { usePixiGame } from "./hooks/usePixiGame";
 import LeftPanel from "./components/LeftPanel";
-import MobilePanel from "./components/MobilePanel";
 import { Toast } from "./components/ResultOverlay";
+import { useGameStore } from "./store/useGameStore";
 import {
   saveSession,
   loadSession,
   clearSession,
   saveBalance,
   loadBalance,
-  clearBalance,
   saveHistoryEntry,
   loadHistory,
-} from "../../utils/session";
-import { HistoryEntry } from "./types";
+} from "./utils/session";
 import "./styles/dragontower.css";
-
-// ── Auto settings type ───────────────────────────────────────
-interface AutoSettings {
-  autoBet: number;
-  autoCount: number;
-  autoAdvanced: boolean;
-  onWinMode: "reset" | "increase";
-  onLossMode: "reset" | "increase";
-  winInc: number;
-  lossInc: number;
-  stopProfit: number;
-  stopLoss: number;
-  autoRunning: boolean;
-  autoTotalProfit: number;
-  autoDiff: Difficulty;
-}
 
 // ── Utility ───────────────────────────────────────────────────
 function genRow(diff: Difficulty): TileContent[] {
@@ -48,372 +30,375 @@ function genRow(diff: Difficulty): TileContent[] {
   return arr;
 }
 
-// ── Shared game session ID (reset each game) ─────────────────
-let _sessionGameId = 0;
-const newGameId = () => `game_${Date.now()}_${++_sessionGameId}`;
+// ── Quick store accessor ─────────────────────────────────────
+const gs = () => useGameStore.getState();
 
 const DragonTower: React.FC = () => {
-  // ── Test State ──────────────────────────────────────────────
-  const [testMode, setTestMode] = useState(true);
-  const testModeRef = useRef(true);
+  // ── Store selectors (trigger React re-renders) ────────────
+  const balance = useGameStore((s) => s.balance);
+  const bet = useGameStore((s) => s.bet);
+  const diff = useGameStore((s) => s.diff);
+  const gstate = useGameStore((s) => s.gstate);
+  const curMult = useGameStore((s) => s.curMult);
+  const curWin = useGameStore((s) => s.curWin);
+  const toast = useGameStore((s) => s.toast);
+  const rgstate = useGameStore((s) => s.rgstate);
+
+  // ── Remaining refs (non-state, timers, callbacks) ─────────
   const mountedRef = useRef(false);
-  // ────────────────────────────────────────────────────────────
-
-  // ── React state ──────────────────────────────────────────────
-
-  const [balance, setBalance] = useState(INITIAL_BALANCE);
-  const [bet, setBet] = useState(INITIAL_BET);
-  const [diff, setDiff] = useState<Difficulty>("Medium");
-  const [gstate, setGstate] = useState<GameState>("idle");
-  const [rgstate, setRgstate] = useState<RealGameState>("newgame");
-  const [curRow, setCurRow] = useState(0);
-  const [curMult, setCurMult] = useState(1);
-  const [curWin, setCurWin] = useState(0);
-  const [toast, setToast] = useState<string | null>(null);
-  const [auto, setAuto] = useState<AutoSettings>({
-    autoBet: 5,
-    autoCount: 10,
-    autoAdvanced: false,
-    onWinMode: "reset",
-    onLossMode: "reset",
-    winInc: 0,
-    lossInc: 0,
-    stopProfit: 0,
-    stopLoss: 0,
-    autoRunning: false,
-    autoTotalProfit: 0,
-    autoDiff: "Medium",
-  });
-
-  // ── Mutable refs ─────────────────────────────────────────────
-  const stateRef = useRef({
-    gstate,
-    curRow,
-    diff,
-    revealed: {} as Record<number, Record<number, TileContent>>,
-  });
-  const towerRef = useRef<TileContent[][]>([]);
-  const balanceRef = useRef(balance);
-  const betRef = useRef(bet);
-  const curMultRef = useRef(1);
-  const curWinRef = useRef(0);
-  const gameIdRef = useRef<string>(""); // current round ID
-  const gameStartTimeRef = useRef<number>(0); // ms timestamp of game start
-  const autoLastRoundWonRef = useRef(false);
-  const autoRunningRef = useRef(false);
+  const pendingTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autoSettingsRef = useRef(auto);
-  const autoCountRef = useRef(auto.autoCount);
-  const autoTotalProfitRef = useRef(0);
-  const autoIsInfiniteRef = useRef(false);
   const runNextAutoRoundRef = useRef<() => void>(() => {});
-
-  useEffect(() => {
-    balanceRef.current = balance;
-    if (!testModeRef.current && mountedRef.current) saveBalance(balance);
-  }, [balance]);
-  useEffect(() => {
-    betRef.current = bet;
-  }, [bet]);
-  useEffect(() => {
-    autoSettingsRef.current = auto;
-  }, [auto]);
-  useEffect(() => {
-    testModeRef.current = testMode;
-  }, [testMode]);
-
-  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
+  const resetGameRef = useRef<() => void>(() => {});
+  const engageLockRef = useRef<(ms?: number) => void>(() => {});
+  const diffChangeCbRef = useRef<(v: Difficulty) => void>(() => {});
+  const playActionCbRef = useRef<() => void>(() => {});
+  const randomCbRef = useRef<() => void>(() => {});
   const canvasWrapRef = useRef<HTMLDivElement>(null);
 
-  // ── Toast helper ────────────────────────────────────────────
-  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ── Persist balance to localStorage on change ─────────────
+  useEffect(() => {
+    if (!gs().testMode && mountedRef.current) {
+      saveBalance(balance);
+      console.log("💳 [BALANCE:UPDATE] Balance changed", {
+        timestamp: new Date().toISOString(),
+        balance,
+        testMode: false,
+        // 🔌 API: POST /api/user/balance (or rely on game/result endpoint for server-side balance)
+        // Payload: { balance }
+        // NOTE: In production, balance is SERVER-AUTHORITATIVE — don't trust client balance.
+        //       This log is for debugging only. Real balance updates happen via game/start, game/result, game/cashout.
+      });
+    }
+  }, [balance]);
+
+  // ── Toast helper ──────────────────────────────────────────
   const showToast = useCallback((msg: string) => {
-    setToast(msg);
+    gs().setToast(msg);
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    toastTimeoutRef.current = setTimeout(() => setToast(null), 2200);
+    toastTimeoutRef.current = setTimeout(() => gs().setToast(null), 2200);
   }, []);
 
-  const getState = useCallback(() => stateRef.current, []);
-  const resetGameRef = useRef<() => void>(() => {});
+  const scheduleTimer = useCallback((fn: () => void, ms: number) => {
+    const id = setTimeout(() => {
+      pendingTimersRef.current = pendingTimersRef.current.filter(
+        (t) => t !== id,
+      );
+      fn();
+    }, ms);
+    pendingTimersRef.current.push(id);
+    return id;
+  }, []);
+
+  const clearPendingTimers = useCallback(() => {
+    pendingTimersRef.current.forEach((t) => clearTimeout(t));
+    pendingTimersRef.current = [];
+  }, []);
+
+  const getState = useCallback(
+    () => ({
+      gstate: gs().gstate,
+      curRow: gs().curRow,
+      diff: gs().diff,
+      revealed: gs().revealed,
+    }),
+    [],
+  );
+
   const handlePlayAgain = useCallback(() => resetGameRef.current(), []);
 
-  // ── Reveal unselected eggs across tower ─────────────────────
-  const revealUnselectedEggs = useCallback((st: typeof stateRef.current) => {
-    for (let ar = 0; ar < towerRef.current.length; ar++) {
-      if (!st.revealed[ar]) st.revealed[ar] = {};
+  // ── Reveal unselected eggs across tower ─────────────────
+  const revealUnselectedEggs = useCallback(() => {
+    const { tower, diff: d, revealed } = gs();
+    const newRevealed: Record<number, Record<number, TileContent>> = {};
+    for (const [k, v] of Object.entries(revealed)) {
+      newRevealed[Number(k)] = { ...v };
+    }
+    for (let ar = 0; ar < tower.length; ar++) {
+      if (!newRevealed[ar]) newRevealed[ar] = {};
       let eggsShown = 0;
-      const maxEggs = DIFF[st.diff].eggs;
-      for (let i = 0; i < towerRef.current[ar].length; i++) {
-        if (towerRef.current[ar][i] === "egg" && eggsShown < maxEggs) {
-          if (!st.revealed[ar][i]) st.revealed[ar][i] = "egg_dim";
+      const maxEggs = DIFF[d].eggs;
+      for (let i = 0; i < tower[ar].length; i++) {
+        if (tower[ar][i] === "egg" && eggsShown < maxEggs) {
+          if (!newRevealed[ar][i]) newRevealed[ar][i] = "egg_dim";
           eggsShown++;
         }
       }
     }
+    gs().setRevealed(newRevealed);
+    return newRevealed;
   }, []);
 
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
   // TILE CLICK
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
   const handleTileClick = useCallback(
     (r: number, c: number) => {
-      const st = stateRef.current;
-      if (st.gstate !== "playing" || r !== st.curRow) return;
-      if ((st.revealed[r] ?? {})[c]) return;
+      const s = gs();
+      if (s.gstate !== "playing" || r !== s.curRow) return;
+      if ((s.revealed[r] ?? {})[c]) return;
 
-      const type = towerRef.current[r]?.[c];
+      const type = s.tower[r]?.[c];
       if (!type) return;
 
-      if (!st.revealed[r]) st.revealed[r] = {};
-      st.revealed[r][c] = type;
+      gs().revealTile(r, c, type);
 
-      // ── HIT DRAGON ──────────────────────────────────────────
+      // ── HIT DRAGON ──────────────────────────────────────
       if (type === "dragon") {
-        const newState: GameState = "ended";
-        st.gstate = newState;
-        setGstate("ended");
+        engageLockRef.current(1500);
+        gs().setGstate("ended");
         clearSession();
-        autoLastRoundWonRef.current = false;
+        gs().setAutoLastRoundWon(false);
 
-        const elapsed = Date.now() - gameStartTimeRef.current;
+        const elapsed = Date.now() - s.gameStartTime;
         console.log("🐉 [GAME:LOSE] Dragon hit", {
-          // --- identifiers ---
-          gameId: gameIdRef.current,
+          gameId: s.gameId,
           timestamp: new Date().toISOString(),
           elapsedMs: elapsed,
-          // --- tile info ---
           row: r,
           col: c,
-          totalRows: DIFF[st.diff].rows,
-          rowsCleared: r, // how many rows made it through
-          // --- financials ---
-          bet: betRef.current,
+          totalRows: DIFF[s.diff].rows,
+          rowsCleared: r,
+          bet: s.bet,
           payout: 0,
-          profit: -betRef.current,
-          balanceBefore: balanceRef.current + betRef.current,
-          balanceAfter: balanceRef.current,
-          // --- game settings ---
-          difficulty: st.diff,
-          diffConfig: DIFF[st.diff],
-          // --- api hook ---
-          // 🔌 POST /api/game/result { gameId, result:"lose", bet, payout:0, row, difficulty }
+          profit: -s.bet,
+          balanceBefore: s.balance + s.bet,
+          balanceAfter: s.balance,
+          difficulty: s.diff,
+          diffConfig: DIFF[s.diff],
+          // 🔌 API: POST /api/game/result
+          // Payload: { gameId, result: "lose", row: r, col: c, bet, payout: 0, profit: -bet, balanceAfter }
+          // Response: { newBalance, serverSeed } — server reveals seed for verification
         });
-        setRgstate("endgame");
+
+        gs().setRgstate("endgame");
         pixiGame.stopNormalBgSound();
         pixiGame.playLoseSound();
-        pixiGame.spawnLoseExplosion(r, c, st.diff);
+        pixiGame.spawnLoseExplosion(r, c, s.diff);
         pixiGame.screenShake();
-        pixiGame.refreshGrid(st.diff, newState, st.curRow, st.revealed);
+
+        const revealed = gs().revealed;
+        pixiGame.refreshGrid(s.diff, "ended", s.curRow, revealed);
         pixiGame.swapDragonSprite(false);
 
         // Save history entry
         const loseEntry: HistoryEntry = {
-          id: gameIdRef.current,
+          id: s.gameId,
           timestamp: Date.now(),
-          difficulty: st.diff,
-          bet: betRef.current,
+          difficulty: s.diff,
+          bet: s.bet,
           result: "lose",
           multiplier: 0,
           payout: 0,
-          profit: -betRef.current,
+          profit: -s.bet,
           rowsCleared: r,
         };
-        saveHistoryEntry(loseEntry);
-        setHistory(loadHistory());
+        gs().addHistoryEntry(loseEntry);
+        console.log("📝 [HISTORY:SAVE] Game result saved", loseEntry);
+        // 🔌 API: History is saved server-side via POST /api/game/result above
 
-        setTimeout(() => {
-          revealUnselectedEggs(st);
-          pixiGame.refreshGrid(st.diff, newState, st.curRow, st.revealed);
+        scheduleTimer(() => {
+          const rev = revealUnselectedEggs();
+          pixiGame.refreshGrid(s.diff, "ended", s.curRow, rev);
         }, 500);
 
-        setTimeout(() => {
-          pixiGame.showResultOverlay("lose", 0, betRef.current);
+        scheduleTimer(() => {
+          pixiGame.showResultOverlay("lose", 0, s.bet);
         }, 900);
 
-        // ── HIT EGG ─────────────────────────────────────────────
+        // ── HIT EGG ─────────────────────────────────────────
       } else {
-        pixiGame.spawnFX(r, c, "sparkle", st.diff);
+        pixiGame.spawnFX(r, c, "sparkle", s.diff);
         pixiGame.playEggSound();
-        const m =
-          MULTS[st.diff][r] ?? MULTS[st.diff][MULTS[st.diff].length - 1];
+        const m = MULTS[s.diff][r] ?? MULTS[s.diff][MULTS[s.diff].length - 1];
         const newMult = m;
-        const newWin = parseFloat((betRef.current * m).toFixed(2));
-        curMultRef.current = newMult;
-        curWinRef.current = newWin;
-        setCurMult(newMult);
-        setCurWin(newWin);
-
-        // saveSession({
-        //   gstate: "playing",
-        //   diff: st.diff,
-        //   curRow: st.curRow,
-        //   bet: betRef.current,
-        //   tower: towerRef.current,
-        //   revealed: st.revealed,
-        //   curMult: newMult,
-        //   curWin: newWin,
-        // });
+        const newWin = parseFloat((s.bet * m).toFixed(2));
+        gs().setCurMult(newMult);
+        gs().setCurWin(newWin);
 
         console.log("🥚 [GAME:TILE] Egg selected", {
-          gameId: gameIdRef.current,
+          gameId: s.gameId,
           timestamp: new Date().toISOString(),
-          // --- tile info ---
           row: r,
           col: c,
-          rowsRemaining: DIFF[st.diff].rows - r - 1,
-          // --- multiplier ---
+          rowsRemaining: DIFF[s.diff].rows - r - 1,
           multiplier: newMult,
           potentialPayout: newWin,
-          potentialProfit: parseFloat((newWin - betRef.current).toFixed(2)),
-          bet: betRef.current,
-          difficulty: st.diff,
-          // --- api hook ---
-          // 🔌 POST /api/game/tile { gameId, row, col, multiplier, potentialPayout }
+          potentialProfit: parseFloat((newWin - s.bet).toFixed(2)),
+          bet: s.bet,
+          difficulty: s.diff,
+          // 🔌 API: POST /api/game/tile
+          // Payload: { gameId, row: r, col: c }
+          // Response: { tileContent: "egg"|"dragon", multiplier, nextRow }
+          // NOTE: In production, tile content comes from SERVER (not client genRow)
         });
 
-        const eggsFound = Object.values(st.revealed[r]).filter(
+        const revealed = gs().revealed;
+        const eggsFound = Object.values(revealed[r] ?? {}).filter(
           (v) => v === "egg",
         ).length;
 
         if (eggsFound >= 1) {
           const nextRow = r + 1;
-          st.curRow = nextRow;
-          setCurRow(nextRow);
+          gs().setCurRow(nextRow);
 
           saveSession({
             gstate: "playing",
-            diff: st.diff,
+            diff: s.diff,
             curRow: nextRow,
-            bet: betRef.current,
-            tower: towerRef.current,
-            revealed: st.revealed,
+            bet: s.bet,
+            tower: s.tower,
+            revealed: gs().revealed,
             curMult: newMult,
             curWin: newWin,
           });
 
-          // ── ALL ROWS CLEARED = WIN ───────────────────────────
-          if (nextRow >= DIFF[st.diff].rows) {
-            const newBal = balanceRef.current + newWin;
-            balanceRef.current = newBal;
-            setBalance(newBal);
-            st.gstate = "ended";
-            setGstate("ended");
-            setRgstate("endgame");
-            autoLastRoundWonRef.current = true;
+          // ── ALL ROWS CLEARED = WIN ──────────────────────
+          if (nextRow >= DIFF[s.diff].rows) {
+            engageLockRef.current(1500);
+            const newBal = s.balance + newWin;
+            gs().setBalance(newBal);
+            gs().setGstate("ended");
+            gs().setRgstate("endgame");
+            gs().setAutoLastRoundWon(true);
 
-            const elapsed = Date.now() - gameStartTimeRef.current;
+            const elapsed = Date.now() - s.gameStartTime;
             console.log("🏆 [GAME:WIN] All rows cleared", {
-              // --- identifiers ---
-              gameId: gameIdRef.current,
+              gameId: s.gameId,
               timestamp: new Date().toISOString(),
               elapsedMs: elapsed,
-              // --- financials ---
-              bet: betRef.current,
+              bet: s.bet,
               multiplier: newMult,
               payout: newWin,
-              profit: parseFloat((newWin - betRef.current).toFixed(2)),
-              balanceBefore: balanceRef.current - newWin,
+              profit: parseFloat((newWin - s.bet).toFixed(2)),
+              balanceBefore: s.balance,
               balanceAfter: newBal,
-              // --- game settings ---
-              difficulty: st.diff,
-              diffConfig: DIFF[st.diff],
+              difficulty: s.diff,
+              diffConfig: DIFF[s.diff],
               rowsCompleted: nextRow,
-              // --- api hook ---
-              // 🔌 POST /api/game/result { gameId, result:"win", bet, multiplier, payout, rowsCompleted, difficulty }
+              // 🔌 API: POST /api/game/result
+              // Payload: { gameId, result: "win", multiplier: newMult, payout: newWin, profit, balanceAfter: newBal, rowsCompleted }
+              // Response: { newBalance, serverSeed }
             });
 
             pixiGame.stopNormalBgSound();
             pixiGame.swapDragonSprite(true);
             pixiGame.showFlameEffects(true, true);
 
-            pixiGame.refreshGrid(st.diff, "ended", nextRow, st.revealed);
+            const rev = gs().revealed;
+            pixiGame.refreshGrid(s.diff, "ended", nextRow, rev);
 
             // Save history entry
             const winEntry: HistoryEntry = {
-              id: gameIdRef.current,
+              id: s.gameId,
               timestamp: Date.now(),
-              difficulty: st.diff,
-              bet: betRef.current,
+              difficulty: s.diff,
+              bet: s.bet,
               result: "win",
               multiplier: newMult,
               payout: newWin,
-              profit: parseFloat((newWin - betRef.current).toFixed(2)),
+              profit: parseFloat((newWin - s.bet).toFixed(2)),
               rowsCleared: nextRow,
             };
-            saveHistoryEntry(winEntry);
-            setHistory(loadHistory());
+            gs().addHistoryEntry(winEntry);
+            console.log("📝 [HISTORY:SAVE] Game result saved", winEntry);
+            // 🔌 API: History is saved server-side via POST /api/game/result above
 
-            setTimeout(() => {
-              revealUnselectedEggs(st);
-              pixiGame.refreshGrid(st.diff, "ended", nextRow, st.revealed);
+            scheduleTimer(() => {
+              const dimRev = revealUnselectedEggs();
+              pixiGame.refreshGrid(s.diff, "ended", nextRow, dimRev);
             }, 500);
-            setTimeout(() => {
+            scheduleTimer(() => {
               pixiGame.showResultOverlay("win", newMult, newWin);
             }, 500);
           } else {
-            pixiGame.refreshGrid(st.diff, st.gstate, nextRow, st.revealed);
+            pixiGame.refreshGrid(
+              s.diff,
+              gs().gstate,
+              nextRow,
+              gs().revealed,
+            );
           }
         } else {
-          pixiGame.refreshGrid(st.diff, st.gstate, st.curRow, st.revealed);
+          pixiGame.refreshGrid(s.diff, gs().gstate, s.curRow, gs().revealed);
         }
       }
     },
-    [revealUnselectedEggs],
+    [revealUnselectedEggs, scheduleTimer],
   ); // eslint-disable-line
+
+  const betChangeCb = useCallback((v: number) => {
+    const prev = gs().bet;
+    gs().setBet(v);
+    console.log("💵 [BET:CHANGE] Bet updated", {
+      timestamp: new Date().toISOString(),
+      from: prev,
+      to: v,
+      balance: gs().balance,
+      // 🔌 API: POST /api/user/settings { bet }
+    });
+  }, []);
+
+  const diffChangeCbRef2 = useRef<(v: Difficulty) => void>(() => {});
+  const playActionCbRef2 = useRef<() => void>(() => {});
+  const randomCbRef2 = useRef<() => void>(() => {});
 
   const pixiGame = usePixiGame(canvasWrapRef, {
     onTileClick: handleTileClick,
     onPlayAgain: handlePlayAgain,
     getState,
+    onBetChange: betChangeCb,
+    onDiffChange: (v) => diffChangeCbRef.current(v),
+    onPlayAction: () => playActionCbRef.current(),
+    onRandom: () => randomCbRef.current(),
   });
 
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
   // START GAME
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
   const startGame = useCallback(
     (overrideBet?: number, overrideDiff?: Difficulty) => {
-      const currentBet = overrideBet ?? betRef.current;
-      const currentDiff = overrideDiff ?? stateRef.current.diff;
+      const s = gs();
+      const currentBet = overrideBet ?? s.bet;
+      const currentDiff = overrideDiff ?? s.diff;
 
       if (currentBet <= 0) {
         showToast("Enter a valid bet!");
         return;
       }
-      if (currentBet > balanceRef.current) {
+      if (currentBet > s.balance) {
         showToast("Insufficient balance!");
         return;
       }
 
-      const newBal = balanceRef.current - currentBet;
-      balanceRef.current = newBal;
-      setBalance(newBal);
+      const newBal = s.balance - currentBet;
+      gs().setBalance(newBal);
 
       // Assign new game ID + start time
-      gameIdRef.current = newGameId();
-      gameStartTimeRef.current = Date.now();
+      gs().newGameId();
+      const gameId = gs().gameId;
 
       console.log("🎮 [GAME:START] New game begun", {
-        // --- identifiers ---
-        gameId: gameIdRef.current,
+        gameId,
         timestamp: new Date().toISOString(),
-        // --- settings ---
         difficulty: currentDiff,
         diffConfig: DIFF[currentDiff],
-        // --- financials ---
         bet: currentBet,
-        balanceBefore: balanceRef.current + currentBet,
+        balanceBefore: s.balance,
         balanceAfter: newBal,
-        // --- auto info ---
-        isAutobet: autoRunningRef.current,
-        autoRoundsLeft: autoRunningRef.current ? autoCountRef.current : null,
-        // --- api hook ---
-        // 🔌 POST /api/game/start { gameId, bet, difficulty, userId, isAutobet }
+        isAutobet: gs().autoRunning,
+        autoRoundsLeft: gs().autoRunning ? gs().autoCount : null,
+        // 🔌 API: POST /api/game/start
+        // Payload: { gameId, bet: currentBet, difficulty: currentDiff, balanceAfter: newBal, isAutobet }
+        // Response: { serverSeed, gameId } — server generates tower & returns hashed seed for provably fair
       });
-      setRgstate("newgame");
+
+      gs().setRgstate("newgame");
       const tower = Array.from({ length: DIFF[currentDiff].rows }, () =>
         genRow(currentDiff),
       );
-      towerRef.current = tower;
+      gs().setTower(tower);
 
       saveSession({
         gstate: "playing",
@@ -426,227 +411,279 @@ const DragonTower: React.FC = () => {
         curWin: 0,
       });
       console.log("✅ Session saved on start", loadSession());
-      const revealed: Record<number, Record<number, TileContent>> = {};
-      stateRef.current = {
-        gstate: "playing",
-        curRow: 0,
-        diff: currentDiff,
-        revealed,
-      };
-      setGstate("playing");
-      setCurRow(0);
-      setCurMult(1);
-      setCurWin(0);
-      curMultRef.current = 1;
-      curWinRef.current = 0;
-      autoLastRoundWonRef.current = false;
 
+      gs().setRevealed({});
+      gs().setGstate("playing");
+      gs().setCurRow(0);
+      gs().setCurMult(1);
+      gs().setCurWin(0);
+      gs().setDiff(currentDiff);
+      gs().setAutoLastRoundWon(false);
+
+      clearPendingTimers();
       pixiGame.hideResultOverlay();
       pixiGame.buildGrid(currentDiff);
       pixiGame.showFlameEffects(false);
       pixiGame.stopLoseSound();
       pixiGame.playNormalBgSound();
-      pixiGame.refreshGrid(currentDiff, "playing", 0, revealed);
+      pixiGame.refreshGrid(currentDiff, "playing", 0, {});
     },
-    [showToast, pixiGame],
+    [showToast, pixiGame, clearPendingTimers],
   );
 
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
   // CASH OUT
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
   const cashOut = useCallback(() => {
-    const st = stateRef.current;
-    if (st.gstate !== "playing" || st.curRow === 0) return;
-    const win = curWinRef.current;
-    const mult = curMultRef.current;
-    const newBal = balanceRef.current + win;
-    balanceRef.current = newBal;
-    setBalance(newBal);
-    st.gstate = "ended";
-    setGstate("ended");
+    const s = gs();
+    if (s.gstate !== "playing" || s.curRow === 0) return;
+    const win = s.curWin;
+    const mult = s.curMult;
+    const newBal = s.balance + win;
+    gs().setBalance(newBal);
+    gs().setGstate("ended");
     clearSession();
-    autoLastRoundWonRef.current = true;
+    gs().setAutoLastRoundWon(true);
 
-    const elapsed = Date.now() - gameStartTimeRef.current;
+    const elapsed = Date.now() - s.gameStartTime;
     console.log("💰 [GAME:CASHOUT] Manual cashout", {
-      // --- identifiers ---
-      gameId: gameIdRef.current,
+      gameId: s.gameId,
       timestamp: new Date().toISOString(),
       elapsedMs: elapsed,
-      // --- financials ---
-      bet: betRef.current,
+      bet: s.bet,
       multiplier: mult,
       payout: win,
-      profit: parseFloat((win - betRef.current).toFixed(2)),
-      balanceBefore: balanceRef.current - win,
+      profit: parseFloat((win - s.bet).toFixed(2)),
+      balanceBefore: s.balance,
       balanceAfter: newBal,
-      // --- game info ---
-      difficulty: st.diff,
-      rowsCompleted: st.curRow,
-      totalRows: DIFF[st.diff].rows,
-      rowsRemainingAtCashout: DIFF[st.diff].rows - st.curRow,
-      // --- auto info ---
-      isAutobet: autoRunningRef.current,
-      // --- api hook ---
-      // 🔌 POST /api/game/cashout { gameId, bet, multiplier, payout, rowsCompleted, difficulty }
+      difficulty: s.diff,
+      rowsCompleted: s.curRow,
+      totalRows: DIFF[s.diff].rows,
+      rowsRemainingAtCashout: DIFF[s.diff].rows - s.curRow,
+      isAutobet: gs().autoRunning,
+      // 🔌 API: POST /api/game/cashout
+      // Payload: { gameId, multiplier: mult, payout: win, profit, balanceAfter: newBal, rowsCompleted }
+      // Response: { newBalance, serverSeed }
     });
-    setRgstate("endgame");
-    clearSession();
+
+    gs().setRgstate("endgame");
     pixiGame.stopNormalBgSound();
     pixiGame.swapDragonSprite(true);
     pixiGame.showFlameEffects(true, true);
-    pixiGame.refreshGrid(st.diff, "ended", st.curRow, st.revealed);
+    pixiGame.refreshGrid(s.diff, "ended", s.curRow, s.revealed);
 
     // Save history entry
     const cashEntry: HistoryEntry = {
-      id: gameIdRef.current,
+      id: s.gameId,
       timestamp: Date.now(),
-      difficulty: st.diff,
-      bet: betRef.current,
+      difficulty: s.diff,
+      bet: s.bet,
       result: "win",
       multiplier: mult,
       payout: win,
-      profit: parseFloat((win - betRef.current).toFixed(2)),
-      rowsCleared: st.curRow,
+      profit: parseFloat((win - s.bet).toFixed(2)),
+      rowsCleared: s.curRow,
     };
-    saveHistoryEntry(cashEntry);
-    setHistory(loadHistory());
+    gs().addHistoryEntry(cashEntry);
+    console.log("📝 [HISTORY:SAVE] Game result saved", cashEntry);
+    // 🔌 API: History is saved server-side via POST /api/game/cashout above
 
-    setTimeout(() => {
-      revealUnselectedEggs(st);
-      pixiGame.refreshGrid(st.diff, "ended", st.curRow, st.revealed);
+    scheduleTimer(() => {
+      const rev = revealUnselectedEggs();
+      pixiGame.refreshGrid(s.diff, "ended", s.curRow, rev);
     }, 500);
     pixiGame.showResultOverlay("win", mult, win);
-  }, [pixiGame, revealUnselectedEggs]);
+  }, [pixiGame, revealUnselectedEggs, scheduleTimer]);
 
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
   // RANDOM PICK
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
   const doRandom = useCallback(() => {
-    const st = stateRef.current;
-    if (st.gstate !== "playing") return;
+    const s = gs();
+    if (s.gstate !== "playing") return;
     const avail: number[] = [];
-    for (let c = 0; c < DIFF[st.diff].cols; c++) {
-      if (!(st.revealed[st.curRow] ?? {})[c]) avail.push(c);
+    for (let c = 0; c < DIFF[s.diff].cols; c++) {
+      if (!(s.revealed[s.curRow] ?? {})[c]) avail.push(c);
     }
     if (!avail.length) return;
     const col = avail[Math.floor(Math.random() * avail.length)];
 
     console.log("🎲 [GAME:RANDOM] Auto-pick tile", {
-      gameId: gameIdRef.current,
+      gameId: s.gameId,
       timestamp: new Date().toISOString(),
-      row: st.curRow,
+      row: s.curRow,
       col,
       availableCols: avail,
-      difficulty: st.diff,
+      difficulty: s.diff,
     });
 
-    handleTileClick(st.curRow, col);
+    handleTileClick(s.curRow, col);
   }, [handleTileClick]);
 
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
   // RESET / PLAY AGAIN
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
   const resetGame = useCallback(() => {
+    clearPendingTimers();
     clearSession();
+    const s = gs();
     console.log("🔄 [GAME:RESET] Play again / reset", {
-      previousGameId: gameIdRef.current,
+      previousGameId: s.gameId,
       timestamp: new Date().toISOString(),
-      balance: balanceRef.current,
-      difficulty: stateRef.current.diff,
+      balance: s.balance,
+      difficulty: s.diff,
     });
-    setRgstate("playagain");
+    gs().setRgstate("playagain");
     pixiGame.hideResultOverlay();
     pixiGame.swapDragonSprite(false);
-    stateRef.current = {
-      gstate: "idle",
-      curRow: 0,
-      diff: stateRef.current.diff,
-      revealed: {},
-    };
-    towerRef.current = [];
-    setGstate("idle");
-    setCurRow(0);
-    setCurMult(1);
-    setCurWin(0);
-    pixiGame.buildGrid(stateRef.current.diff);
+
+    gs().resetRound();
+    gs().setGstate("idle");
+
+    const currentDiff = s.diff;
+    pixiGame.buildGrid(currentDiff);
     pixiGame.showFlameEffects(false);
     pixiGame.stopLoseSound();
     pixiGame.playNormalBgSound();
-    pixiGame.refreshGrid(stateRef.current.diff, "idle", 0, {});
-  }, [pixiGame]);
+    pixiGame.refreshGrid(currentDiff, "idle", 0, {});
+  }, [pixiGame, clearPendingTimers]);
 
   useEffect(() => {
     resetGameRef.current = resetGame;
   }, [resetGame]);
 
-  const mPlayAction = useCallback(() => {
-    const st = stateRef.current;
-    if (st.gstate === "playing" && st.curRow > 0) cashOut();
-    else if (st.gstate !== "playing") startGame();
-  }, [cashOut, startGame]);
-
-  // ─────────────────────────────────────────────────────────────
-  // DIFFICULTY CHANGE
-  // ─────────────────────────────────────────────────────────────
-  const handleDiffChange = useCallback(
-    (v: Difficulty) => {
-      if (stateRef.current.gstate !== "idle") return;
-
-      console.log("⚙️ [GAME:SETTINGS] Difficulty changed", {
-        timestamp: new Date().toISOString(),
-        from: stateRef.current.diff,
-        to: v,
-        newConfig: DIFF[v],
-        balance: balanceRef.current,
-      });
-
-      stateRef.current.diff = v;
-      setDiff(v);
-      pixiGame.buildGrid(v);
-      pixiGame.refreshGrid(v, "idle", 0, {});
+  const engageLock = useCallback(
+    (ms = 1000) => {
+      gs().setPlayLock(true);
+      pixiGame.panelCooldownRef.current = true;
+      setTimeout(() => {
+        gs().setPlayLock(false);
+        pixiGame.panelCooldownRef.current = false;
+        // Force panel redraw so button visually re-enables
+        const s = gs();
+        pixiGame.updateMobilePanel?.({
+          balance: s.balance,
+          bet: s.bet,
+          diff: s.diff,
+          gstate: s.gstate,
+          curMult: s.curMult,
+          curWin: s.curWin,
+        });
+      }, ms);
     },
     [pixiGame],
   );
+  useEffect(() => {
+    engageLockRef.current = engageLock;
+  }, [engageLock]);
 
-  // ─────────────────────────────────────────────────────────────
+  const mPlayAction = useCallback(() => {
+    if (gs().playLock) return;
+    const s = gs();
+    if (s.gstate === "playing" && s.curRow > 0) {
+      engageLock(1000);
+      cashOut();
+    } else if (s.gstate !== "playing") {
+      engageLock(1000);
+      // Reset first if coming from ended state
+      if (s.gstate === "ended") {
+        pixiGame.hideResultOverlay();
+        pixiGame.swapDragonSprite(false);
+        pixiGame.showFlameEffects(false);
+        pixiGame.stopLoseSound();
+      }
+      startGame();
+    }
+  }, [cashOut, startGame, pixiGame, engageLock]);
+
+  // ─────────────────────────────────────────────────────────
+  // DIFFICULTY CHANGE
+  // ─────────────────────────────────────────────────────────
+  const handleDiffChange = useCallback(
+    (v: Difficulty) => {
+      const s = gs();
+      // Block during active play, but allow during ended (win/lose) or idle
+      if (s.gstate === "playing") return;
+
+      // Reset to idle if in ended state
+      if (s.gstate === "ended") {
+        clearPendingTimers();
+        clearSession();
+        gs().resetRound();
+        gs().setGstate("idle");
+        gs().setRgstate("playagain");
+        pixiGame.hideResultOverlay();
+        pixiGame.swapDragonSprite(false);
+        pixiGame.showFlameEffects(false);
+        pixiGame.stopLoseSound();
+        pixiGame.playNormalBgSound();
+      }
+
+      console.log("⚙️ [GAME:SETTINGS] Difficulty changed", {
+        timestamp: new Date().toISOString(),
+        from: s.diff,
+        to: v,
+        newConfig: DIFF[v],
+        balance: s.balance,
+        // 🔌 API: POST /api/user/settings (optional — only if persisting preferences)
+        // Payload: { difficulty: v }
+      });
+
+      gs().setDiff(v);
+      pixiGame.buildGrid(v);
+      pixiGame.refreshGrid(v, "idle", 0, {});
+    },
+    [pixiGame, clearPendingTimers],
+  );
+
+  // Wire up panel callback refs
+  useEffect(() => {
+    diffChangeCbRef.current = handleDiffChange;
+  }, [handleDiffChange]);
+  useEffect(() => {
+    playActionCbRef.current = mPlayAction;
+  }, [mPlayAction]);
+  useEffect(() => {
+    randomCbRef.current = doRandom;
+  }, [doRandom]);
+
+  // ─────────────────────────────────────────────────────────
   // AUTOBET
-  // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────
   const stopAutobet = useCallback(() => {
+    const s = gs();
     console.log("⏹ [AUTO:STOP] Autobet stopped", {
       timestamp: new Date().toISOString(),
-      totalProfit: autoTotalProfitRef.current,
-      roundsCompleted: autoSettingsRef.current.autoCount,
-      balance: balanceRef.current,
+      totalProfit: s.autoTotalProfit,
+      roundsCompleted: s.auto.autoCount,
+      balance: s.balance,
       reason: "manual stop",
+      // 🔌 API: POST /api/autobet/stop
+      // Payload: { totalProfit, roundsCompleted, balance, reason: "manual" }
     });
 
-    autoRunningRef.current = false;
+    gs().setAutoRunning(false);
     if (autoTimeoutRef.current) clearTimeout(autoTimeoutRef.current);
     autoTimeoutRef.current = null;
-    setAuto((prev) => ({ ...prev, autoRunning: false }));
-    const st = stateRef.current;
-    if (st.gstate === "playing" && st.curRow > 0) cashOut();
-    else if (st.gstate === "playing") {
-      st.gstate = "ended";
-      setGstate("ended");
-      pixiGame.refreshGrid(st.diff, "ended", st.curRow, st.revealed);
+
+    if (s.gstate === "playing" && s.curRow > 0) cashOut();
+    else if (s.gstate === "playing") {
+      gs().setGstate("ended");
+      pixiGame.refreshGrid(s.diff, "ended", s.curRow, s.revealed);
     }
   }, [cashOut, pixiGame]);
 
   const autoPlayRows = useCallback(() => {
-    const st = stateRef.current;
+    const s = gs();
 
-    if (!autoRunningRef.current || st.gstate !== "playing") {
-      if (!autoRunningRef.current) return;
+    if (!s.autoRunning || s.gstate !== "playing") {
+      if (!s.autoRunning) return;
 
-      const settings = autoSettingsRef.current;
-      const roundWon = autoLastRoundWonRef.current;
-      const roundProfit = roundWon
-        ? curWinRef.current - settings.autoBet
-        : -settings.autoBet;
+      const settings = s.auto;
+      const roundWon = s.autoLastRoundWon;
+      const roundProfit = roundWon ? s.curWin - settings.autoBet : -settings.autoBet;
 
-      autoTotalProfitRef.current += roundProfit;
+      gs().setAutoTotalProfit(s.autoTotalProfit + roundProfit);
 
       let newBet = settings.autoBet;
       if (settings.autoAdvanced) {
@@ -666,29 +703,23 @@ const DragonTower: React.FC = () => {
               : settings.autoBet;
       }
 
-      console.log(`${roundWon ? "✅" : "❌"} [AUTO:ROUND_END] Round finished`, {
-        gameId: gameIdRef.current,
-        timestamp: new Date().toISOString(),
-        result: roundWon ? "win" : "lose",
-        roundProfit,
-        roundBet: settings.autoBet,
-        nextBet: newBet,
-        totalProfit: autoTotalProfitRef.current,
-        roundsLeft: autoCountRef.current,
-        balance: balanceRef.current,
-        difficulty: settings.autoDiff,
-      });
+      console.log(
+        `${roundWon ? "✅" : "❌"} [AUTO:ROUND_END] Round finished`,
+        {
+          gameId: s.gameId,
+          timestamp: new Date().toISOString(),
+          result: roundWon ? "win" : "lose",
+          roundProfit,
+          roundBet: settings.autoBet,
+          nextBet: newBet,
+          totalProfit: gs().autoTotalProfit,
+          roundsLeft: gs().autoCount,
+          balance: gs().balance,
+          difficulty: settings.autoDiff,
+        },
+      );
 
-      autoSettingsRef.current = {
-        ...autoSettingsRef.current,
-        autoBet: newBet,
-        autoTotalProfit: autoTotalProfitRef.current,
-      };
-      setAuto((prev) => ({
-        ...prev,
-        autoTotalProfit: autoTotalProfitRef.current,
-        autoBet: newBet,
-      }));
+      gs().setAuto({ autoBet: newBet });
 
       autoTimeoutRef.current = setTimeout(() => {
         runNextAutoRoundRef.current();
@@ -698,92 +729,84 @@ const DragonTower: React.FC = () => {
 
     const delay = 600 + Math.random() * 500;
     autoTimeoutRef.current = setTimeout(() => {
-      if (!autoRunningRef.current || stateRef.current.gstate !== "playing") {
+      const cur = gs();
+      if (!cur.autoRunning || cur.gstate !== "playing") {
         autoPlayRows();
         return;
       }
       const avail: number[] = [];
-      for (let c = 0; c < DIFF[stateRef.current.diff].cols; c++) {
-        if (!(stateRef.current.revealed[stateRef.current.curRow] ?? {})[c])
-          avail.push(c);
+      for (let c = 0; c < DIFF[cur.diff].cols; c++) {
+        if (!(cur.revealed[cur.curRow] ?? {})[c]) avail.push(c);
       }
       if (!avail.length) {
         autoPlayRows();
         return;
       }
       const col = avail[Math.floor(Math.random() * avail.length)];
-      handleTileClick(stateRef.current.curRow, col);
+      handleTileClick(cur.curRow, col);
       autoTimeoutRef.current = setTimeout(() => {
         autoPlayRows();
       }, 150);
     }, delay);
-  }, [cashOut, handleTileClick]);
+  }, [handleTileClick]);
 
   const runNextAutoRound = useCallback(() => {
-    if (!autoRunningRef.current) return;
+    const s = gs();
+    if (!s.autoRunning) return;
 
-    const settings = autoSettingsRef.current;
+    const settings = s.auto;
 
-    if (!autoIsInfiniteRef.current && autoCountRef.current <= 0) {
+    if (!s.autoIsInfinite && s.autoCount <= 0) {
       console.log("🏁 [AUTO:COMPLETE] All rounds done", {
         timestamp: new Date().toISOString(),
-        totalProfit: autoTotalProfitRef.current,
-        balance: balanceRef.current,
+        totalProfit: s.autoTotalProfit,
+        balance: s.balance,
         difficulty: settings.autoDiff,
       });
       showToast("Auto: All rounds complete!");
       stopAutobet();
       return;
     }
-    if (
-      settings.stopProfit > 0 &&
-      autoTotalProfitRef.current >= settings.stopProfit
-    ) {
+    if (settings.stopProfit > 0 && s.autoTotalProfit >= settings.stopProfit) {
       console.log("🎯 [AUTO:STOP_PROFIT] Stop profit target hit", {
         timestamp: new Date().toISOString(),
-        totalProfit: autoTotalProfitRef.current,
+        totalProfit: s.autoTotalProfit,
         stopProfitTarget: settings.stopProfit,
-        balance: balanceRef.current,
+        balance: s.balance,
       });
       showToast("Auto: Stop on Profit reached!");
       stopAutobet();
       return;
     }
-    if (
-      settings.stopLoss > 0 &&
-      autoTotalProfitRef.current <= -settings.stopLoss
-    ) {
+    if (settings.stopLoss > 0 && s.autoTotalProfit <= -settings.stopLoss) {
       console.log("🛑 [AUTO:STOP_LOSS] Stop loss limit hit", {
         timestamp: new Date().toISOString(),
-        totalProfit: autoTotalProfitRef.current,
+        totalProfit: s.autoTotalProfit,
         stopLossTarget: settings.stopLoss,
-        balance: balanceRef.current,
+        balance: s.balance,
       });
       showToast("Auto: Stop on Loss reached!");
       stopAutobet();
       return;
     }
-    if (settings.autoBet > balanceRef.current) {
+    if (settings.autoBet > s.balance) {
       console.log("💸 [AUTO:INSUFFICIENT] Not enough balance", {
         timestamp: new Date().toISOString(),
         requiredBet: settings.autoBet,
-        balance: balanceRef.current,
-        shortfall: parseFloat(
-          (settings.autoBet - balanceRef.current).toFixed(2),
-        ),
+        balance: s.balance,
+        shortfall: parseFloat((settings.autoBet - s.balance).toFixed(2)),
       });
       showToast("Auto: Insufficient balance!");
       stopAutobet();
       return;
     }
 
-    if (autoCountRef.current > 0) {
-      autoCountRef.current -= 1;
-      setAuto((prev) => ({ ...prev, autoCount: prev.autoCount - 1 }));
+    if (s.autoCount > 0) {
+      gs().setAutoCount(s.autoCount - 1);
+      gs().setAuto({ autoCount: s.auto.autoCount - 1 });
     }
 
-    betRef.current = settings.autoBet;
-    setBet(settings.autoBet);
+    gs().setBet(settings.autoBet);
     startGame(settings.autoBet, settings.autoDiff);
     autoPlayRows();
   }, [stopAutobet, showToast, startGame, autoPlayRows]);
@@ -793,7 +816,7 @@ const DragonTower: React.FC = () => {
   }, [runNextAutoRound]);
 
   const startAutobet = useCallback(() => {
-    const settings = autoSettingsRef.current;
+    const settings = gs().auto;
 
     console.log("▶ [AUTO:START] Autobet started", {
       timestamp: new Date().toISOString(),
@@ -807,82 +830,79 @@ const DragonTower: React.FC = () => {
       lossInc: settings.lossInc,
       stopProfit: settings.stopProfit || "none",
       stopLoss: settings.stopLoss || "none",
-      balanceAtStart: balanceRef.current,
-      // 🔌 POST /api/autobet/start { bet, difficulty, rounds, onWin, onLoss, stopProfit, stopLoss }
+      balanceAtStart: gs().balance,
+      // 🔌 API: POST /api/autobet/start
+      // Payload: { bet, difficulty, rounds, advanced, onWinMode, winInc, onLossMode, lossInc, stopProfit, stopLoss }
     });
 
-    autoRunningRef.current = true;
-    autoTotalProfitRef.current = 0;
-    autoCountRef.current = settings.autoCount;
-    autoIsInfiniteRef.current = settings.autoCount === 0;
-    setAuto((prev) => ({ ...prev, autoRunning: true, autoTotalProfit: 0 }));
+    gs().setAutoRunning(true);
+    gs().setAutoTotalProfit(0);
+    gs().setAutoCount(settings.autoCount);
+    gs().setAutoIsInfinite(settings.autoCount === 0);
     runNextAutoRound();
   }, [runNextAutoRound]);
 
   const toggleAutobet = useCallback(() => {
-    if (autoRunningRef.current) stopAutobet();
+    if (gs().autoRunning) stopAutobet();
     else startAutobet();
   }, [startAutobet, stopAutobet]);
 
-  // ── Init grid on mount ───────────────────────────────────────
+  // ── Init grid on mount ─────────────────────────────────
   useEffect(() => {
     console.log("🚀 [GAME:INIT] DragonTower mounted", {
       timestamp: new Date().toISOString(),
-      initialBalance: INITIAL_BALANCE,
-      initialBet: INITIAL_BET,
+      initialBalance: gs().balance,
+      initialBet: gs().bet,
       defaultDifficulty: "Medium",
+      testMode: gs().testMode,
+      // 🔌 API: GET /api/user/profile
+      // Response: { userId, balance, preferences: { difficulty, bet }, activeGame? }
+      // Use this to hydrate the store on mount instead of localStorage
     });
 
     const tid = setTimeout(async () => {
       await pixiGame.loadTextures();
       pixiGame.buildVignette();
+      pixiGame.buildMobilePanel();
 
       const session = loadSession();
       console.log("🔍 Session on mount:", session);
+
       const applyBalance = () => {
-        if (testModeRef.current) {
-          console.log(
-            "🧪 TEST_MODE on — resetting balance to default:",
-            INITIAL_BALANCE,
-          );
-          balanceRef.current = INITIAL_BALANCE;
-          setBalance(INITIAL_BALANCE);
+        if (gs().testMode) {
+          console.log("🧪 TEST_MODE on — resetting balance to default");
+          // balance already initialized in store
         } else {
           const savedBalance = loadBalance();
           if (savedBalance !== null) {
             console.log("💰 Restoring saved balance:", savedBalance);
-            balanceRef.current = savedBalance;
-            setBalance(savedBalance);
-          } else {
-            console.log(
-              "💰 No saved balance found — using default:",
-              INITIAL_BALANCE,
-            );
-            balanceRef.current = INITIAL_BALANCE;
-            setBalance(INITIAL_BALANCE);
+            gs().setBalance(savedBalance);
           }
         }
       };
 
       if (session && session.gstate === "playing") {
-        towerRef.current = session.tower;
-        betRef.current = session.bet;
-        curMultRef.current = session.curMult;
-        curWinRef.current = session.curWin;
+        console.log("🔄 [SESSION:RESTORE] Restoring in-progress game", {
+          timestamp: new Date().toISOString(),
+          sessionDiff: session.diff,
+          sessionRow: session.curRow,
+          sessionBet: session.bet,
+          sessionMult: session.curMult,
+          sessionWin: session.curWin,
+          // 🔌 API: GET /api/game/restore
+          // Payload: (none — server knows active game from auth token)
+          // Response: { gameId, tower (server-side), curRow, revealed, bet, curMult, curWin, balance }
+          // NOTE: In production, restore game state from SERVER, not localStorage
+        });
 
-        stateRef.current = {
-          gstate: "playing",
-          curRow: session.curRow,
-          diff: session.diff,
-          revealed: session.revealed,
-        };
-
-        setBet(session.bet);
-        setDiff(session.diff);
-        setGstate("playing");
-        setCurRow(session.curRow);
-        setCurMult(session.curMult);
-        setCurWin(session.curWin);
+        gs().setTower(session.tower);
+        gs().setBet(session.bet);
+        gs().setCurMult(session.curMult);
+        gs().setCurWin(session.curWin);
+        gs().setDiff(session.diff);
+        gs().setGstate("playing");
+        gs().setCurRow(session.curRow);
+        gs().setRevealed(session.revealed);
 
         applyBalance();
 
@@ -895,37 +915,39 @@ const DragonTower: React.FC = () => {
         );
       } else {
         applyBalance();
-
-        pixiGame.buildGrid(stateRef.current.diff);
-        pixiGame.refreshGrid(
-          stateRef.current.diff,
-          stateRef.current.gstate,
-          stateRef.current.curRow,
-          stateRef.current.revealed,
-        );
+        const s = gs();
+        pixiGame.buildGrid(s.diff);
+        pixiGame.refreshGrid(s.diff, s.gstate, s.curRow, s.revealed);
       }
       mountedRef.current = true;
     }, 100);
     return () => clearTimeout(tid);
   }, []); // eslint-disable-line
 
+  // ── Update PixiJS mobile panel on state changes ────────
   useEffect(() => {
-    stateRef.current.diff = diff;
-  }, [diff]);
+    pixiGame.updateMobilePanel?.({
+      balance,
+      bet,
+      diff,
+      gstate,
+      curMult,
+      curWin,
+    });
+  }, [balance, bet, diff, gstate, curMult, curWin, pixiGame]);
 
-  // ── Keyboard shortcuts ─────────────────────────────────────
+  // ── Keyboard shortcuts ─────────────────────────────────
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      // Don't trigger shortcuts when typing in inputs
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
-      const st = stateRef.current;
+      const s = gs();
       if (e.code === "Space") {
         e.preventDefault();
-        if (st.gstate === "playing" && curMultRef.current > 1) cashOut();
-        else if (st.gstate !== "playing") startGame();
-      } else if (e.code === "KeyR" && st.gstate === "playing") {
+        if (s.gstate === "playing" && s.curMult > 1) cashOut();
+        else if (s.gstate !== "playing") startGame();
+      } else if (e.code === "KeyR" && s.gstate === "playing") {
         e.preventDefault();
         doRandom();
       }
@@ -934,56 +956,20 @@ const DragonTower: React.FC = () => {
     return () => window.removeEventListener("keydown", handleKey);
   }, [cashOut, startGame, doRandom]);
 
-  // ── Render ──────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────
   return (
     <div id="app">
       <LeftPanel
-        balance={balance}
-        bet={bet}
-        diff={diff}
-        gstate={gstate}
-        curMult={curMult}
-        curWin={curWin}
-        history={history}
-        onBetChange={(v) => {
-          console.log("💵 [GAME:BET_CHANGE] Bet updated", {
-            from: betRef.current,
-            to: v,
-          });
-          setBet(v);
-          betRef.current = v;
-        }}
         onDiffChange={handleDiffChange}
         onStartGame={() => startGame()}
         onCashOut={cashOut}
         onRandom={doRandom}
-        auto={auto}
         onAutoToggle={toggleAutobet}
-        onAutoBetChange={(v) => setAuto((prev) => ({ ...prev, autoBet: v }))}
-        onAutoDiffChange={(v) => setAuto((prev) => ({ ...prev, autoDiff: v }))}
-        onAutoSettingsChange={(s) => setAuto((prev) => ({ ...prev, ...s }))}
       />
 
       <div id="game-panel">
         <div id="dragon-bg"></div>
         <div id="canvas-wrap" ref={canvasWrapRef}></div>
-
-        <MobilePanel
-          balance={balance}
-          bet={bet}
-          diff={diff}
-          gstate={gstate}
-          rgstate={rgstate}
-          curMult={curMult}
-          curWin={curWin}
-          onBetChange={(v) => {
-            setBet(v);
-            betRef.current = v;
-          }}
-          onDiffChange={handleDiffChange}
-          onPlayAction={mPlayAction}
-          onRandom={doRandom}
-        />
       </div>
 
       <Toast message={toast} />

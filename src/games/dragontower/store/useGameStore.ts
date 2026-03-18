@@ -1,0 +1,173 @@
+import { create } from "zustand";
+import {
+  Difficulty,
+  GameState,
+  RealGameState,
+  TileContent,
+  HistoryEntry,
+  AutoSettings,
+} from "../types";
+import { INITIAL_BALANCE, INITIAL_BET } from "../constants";
+import { loadHistory, saveHistoryEntry } from "../utils/session";
+
+// ── Session game-ID counter ──────────────────────────────────
+let _counter = 0;
+
+// ── Store shape ──────────────────────────────────────────────
+export interface GameStore {
+  // core game state
+  testMode: boolean;
+  balance: number;
+  bet: number;
+  diff: Difficulty;
+  gstate: GameState;
+  rgstate: RealGameState;
+  curRow: number;
+  curMult: number;
+  curWin: number;
+  toast: string | null;
+  tower: TileContent[][];
+  revealed: Record<number, Record<number, TileContent>>;
+  gameId: string;
+  gameStartTime: number;
+  history: HistoryEntry[];
+  playLock: boolean;
+
+  // auto-bet state
+  auto: AutoSettings;
+  autoRunning: boolean;
+  autoLastRoundWon: boolean;
+  autoTotalProfit: number;
+  autoCount: number;
+  autoIsInfinite: boolean;
+
+  // ── actions ────────────────────────────────────────────────
+  setTestMode: (v: boolean) => void;
+  setBalance: (v: number) => void;
+  setBet: (v: number) => void;
+  setDiff: (v: Difficulty) => void;
+  setGstate: (v: GameState) => void;
+  setRgstate: (v: RealGameState) => void;
+  setCurRow: (v: number) => void;
+  setCurMult: (v: number) => void;
+  setCurWin: (v: number) => void;
+  setToast: (msg: string | null) => void;
+  setTower: (tower: TileContent[][]) => void;
+  setRevealed: (revealed: Record<number, Record<number, TileContent>>) => void;
+  revealTile: (r: number, c: number, content: TileContent) => void;
+  newGameId: () => void;
+  setPlayLock: (v: boolean) => void;
+  setHistory: (entries: HistoryEntry[]) => void;
+  addHistoryEntry: (entry: HistoryEntry) => void;
+  setAuto: (partial: Partial<AutoSettings>) => void;
+  setAutoRunning: (v: boolean) => void;
+  setAutoLastRoundWon: (v: boolean) => void;
+  setAutoTotalProfit: (v: number) => void;
+  setAutoCount: (v: number) => void;
+  setAutoIsInfinite: (v: boolean) => void;
+  resetRound: () => void;
+}
+
+// ── Store creation ───────────────────────────────────────────
+export const useGameStore = create<GameStore>()((set) => ({
+  // ── initial state ──────────────────────────────────────────
+  testMode: true,
+  balance: INITIAL_BALANCE,
+  bet: INITIAL_BET,
+  diff: "Medium",
+  gstate: "idle",
+  rgstate: "newgame",
+  curRow: 0,
+  curMult: 1,
+  curWin: 0,
+  toast: null,
+  tower: [],
+  revealed: {},
+  gameId: "",
+  gameStartTime: 0,
+  history: loadHistory(),
+  playLock: false,
+
+  auto: {
+    autoBet: 5,
+    autoCount: 10,
+    autoAdvanced: false,
+    onWinMode: "reset",
+    onLossMode: "reset",
+    winInc: 0,
+    lossInc: 0,
+    stopProfit: 0,
+    stopLoss: 0,
+    autoDiff: "Medium",
+  },
+  autoRunning: false,
+  autoLastRoundWon: false,
+  autoTotalProfit: 0,
+  autoCount: 10,
+  autoIsInfinite: false,
+
+  // ── actions ────────────────────────────────────────────────
+  setTestMode: (v) => set({ testMode: v }),
+  setBalance: (v) => set({ balance: v }),
+  setBet: (v) => set({ bet: v }),
+  setDiff: (v) => set({ diff: v }),
+  setGstate: (v) => set({ gstate: v }),
+  setRgstate: (v) => set({ rgstate: v }),
+  setCurRow: (v) => set({ curRow: v }),
+  setCurMult: (v) => set({ curMult: v }),
+  setCurWin: (v) => set({ curWin: v }),
+  setToast: (msg) => set({ toast: msg }),
+  setTower: (tower) => set({ tower }),
+  setRevealed: (revealed) => set({ revealed }),
+
+  revealTile: (r, c, content) =>
+    set((state) => {
+      const newRevealed = { ...state.revealed };
+      if (!newRevealed[r]) {
+        newRevealed[r] = {};
+      } else {
+        newRevealed[r] = { ...newRevealed[r] };
+      }
+      newRevealed[r][c] = content;
+      return { revealed: newRevealed };
+    }),
+
+  newGameId: () =>
+    set({
+      gameId: `game_${Date.now()}_${++_counter}`,
+      gameStartTime: Date.now(),
+    }),
+
+  setPlayLock: (v) => set({ playLock: v }),
+
+  setHistory: (entries) => set({ history: entries }),
+
+  addHistoryEntry: (entry) =>
+    set((state) => {
+      saveHistoryEntry(entry);
+      const newHistory = [entry, ...state.history].slice(0, 50);
+      return { history: newHistory };
+    }),
+
+  setAuto: (partial) =>
+    set((state) => ({
+      auto: { ...state.auto, ...partial },
+    })),
+
+  setAutoRunning: (v) => set({ autoRunning: v }),
+  setAutoLastRoundWon: (v) => set({ autoLastRoundWon: v }),
+  setAutoTotalProfit: (v) => set({ autoTotalProfit: v }),
+  setAutoCount: (v) => set({ autoCount: v }),
+  setAutoIsInfinite: (v) => set({ autoIsInfinite: v }),
+
+  resetRound: () =>
+    set({
+      curRow: 0,
+      curMult: 1,
+      curWin: 0,
+      revealed: {},
+      tower: [],
+    }),
+}));
+
+export default useGameStore;

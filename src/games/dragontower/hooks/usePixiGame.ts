@@ -1,7 +1,23 @@
 import { useEffect, useRef, useCallback } from 'react';
 import * as PIXI from 'pixi.js';
 import { Difficulty, GameState, TileContent, TileState } from '../types';
-import { CW, CH, PAD, TGAP, RGAP, WALL_H, DIFF, MULTS } from '../constants';
+import { CW, CH, CH_MOBILE, PANEL_H, PAD, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_COLS,
+  GRID_TOP_RESERVE, TILE_ASPECT_RATIO, TILE_ASPECT_RATIO_MOBILE, GRID_BOTTOM_MARGIN, GRID_LAYER_Y,
+  DRAGON_NORMAL_MAX_W, DRAGON_NORMAL_MAX_H, DRAGON_FIRE_MAX_W, DRAGON_FIRE_MAX_H,
+  DRAGON_BREATH_AMPLITUDE, DRAGON_BREATH_FREQ,
+  TOP_FLAME_W_EXT, TOP_FLAME_H, TOP_FLAME_Y_ANCHOR,
+  FLAME_BORDER_Y_OFFSET,
+  MOBILE_BREAKPOINT, PANEL_PX, PANEL_PY, PANEL_DIFF_H, PANEL_MID_H, PANEL_BOT_H,
+  PANEL_ROW_GAP, PANEL_MID_GAP, PANEL_BOT_GAP, PANEL_Y_OFFSET,
+  PANEL_LBL_COLOR, PANEL_GOLD_COLOR, PLAY_R, PLAY_BTN_Y_OFFSET, PLAY_LABEL_FONT, PLAY_AMT_FONT, PLAY_COIN_SIZE,
+  PANEL_LBL_FONT, PANEL_AMT_FONT, PANEL_INNER_PX, PANEL_CARD_RADIUS, PANEL_CARD_BG,
+  PANEL_DIFF_RIGHT, PANEL_BAL_AMT_X, PANEL_COIN_SIZE, PANEL_COIN_GAP,
+  PANEL_BET_COIN_SIZE, PANEL_BET_COIN_X, PANEL_BET_AMT_X, PANEL_BET_AMT_FONT,
+  PANEL_BET_LBL_Y, PANEL_BET_BOT_OFFSET,
+  PANEL_ARROW_UP_W, PANEL_ARROW_UP_H, PANEL_ARROW_DOWN_W, PANEL_ARROW_DOWN_H, PANEL_ARROW_RIGHT, PANEL_ARROW_UP_Y, PANEL_ARROW_DOWN_Y,
+  PANEL_PROFIT_LBL_Y, PANEL_PROFIT_MULT_GAP, PANEL_PROFIT_AMT_FONT, PANEL_PROFIT_BOT_OFFSET, PANEL_PROFIT_COIN_GAP,
+  PANEL_RANDOM_INNER_PX, PANEL_PROFIT_INNER_PX,
+} from '../constants';
 
 interface TileObj {
   root: PIXI.Container;
@@ -27,6 +43,10 @@ interface UsePixiGameOptions {
     diff: Difficulty;
     revealed: Record<number, Record<number, TileContent>>;
   };
+  onBetChange?: (v: number) => void;
+  onDiffChange?: (v: Difficulty) => void;
+  onPlayAction?: () => void;
+  onRandom?: () => void;
 }
 
 export function usePixiGame(
@@ -61,23 +81,47 @@ export function usePixiGame(
   const revealedSetRef = useRef<Set<string>>(new Set());
   const tileAnimsRef = useRef<{ root: PIXI.Container; progress: number }[]>([]);
 
+  // ── Mobile Panel refs ──
+  const panelLayerRef = useRef<PIXI.Container | null>(null);
+  const isMobileRef = useRef(typeof window !== 'undefined' && window.innerWidth <= 767);
+  const panelTextsRef = useRef<Record<string, any>>({});
+  const panelCooldownRef = useRef(false);
+  const dragonGlowRef = useRef<PIXI.Graphics | null>(null);
+
   const onTileClickRef = useRef(options.onTileClick);
   const onPlayAgainRef = useRef(options.onPlayAgain);
   const getStateRef = useRef(options.getState);
+  const onBetChangeRef = useRef(options.onBetChange);
+  const onDiffChangeRef = useRef(options.onDiffChange);
+  const onPlayActionRef = useRef(options.onPlayAction);
+  const onRandomRef = useRef(options.onRandom);
   useEffect(() => { onTileClickRef.current = options.onTileClick; }, [options.onTileClick]);
   useEffect(() => { onPlayAgainRef.current = options.onPlayAgain; }, [options.onPlayAgain]);
   useEffect(() => { getStateRef.current = options.getState; }, [options.getState]);
+  useEffect(() => { onBetChangeRef.current = options.onBetChange; }, [options.onBetChange]);
+  useEffect(() => { onDiffChangeRef.current = options.onDiffChange; }, [options.onDiffChange]);
+  useEffect(() => { onPlayActionRef.current = options.onPlayAction; }, [options.onPlayAction]);
+  useEffect(() => { onRandomRef.current = options.onRandom; }, [options.onRandom]);
 
   // ─── Helpers ────────────────────────────────────────────────
   const calcLayout = useCallback((diff: Difficulty) => {
     const cfg = DIFF[diff];
-    const gridW = CW - PAD * 2;
-    const tileW = (gridW - TGAP * (cfg.cols - 1)) / cfg.cols;
-    const maxH = (CH - 270 - RGAP * (cfg.rows - 1)) / cfg.rows;
-    const tileH = Math.min(tileW * 0.30, maxH);
+    const fullGridW = CW - PAD * 2;
+    // Fixed grid width based on REF_COLS (Medium = 3)
+    const refTileW = (fullGridW - TGAP * (REF_COLS - 1)) / REF_COLS;
+    const fixedGridW = REF_COLS * refTileW + (REF_COLS - 1) * TGAP;
+    // Tile width adapts to fit actual cols within fixed grid width
+    const tileW = (fixedGridW - TGAP * (cfg.cols - 1)) / cfg.cols;
+    // Tile height stays constant (based on ref tile size, smaller on mobile)
+    const aspectRatio = isMobileRef.current ? TILE_ASPECT_RATIO_MOBILE : TILE_ASPECT_RATIO;
+    const maxH = (CH - GRID_TOP_RESERVE - RGAP * (cfg.rows - 1)) / cfg.rows;
+    const tileH = Math.min(refTileW * aspectRatio, maxH);
     const gridH = cfg.rows * tileH + (cfg.rows - 1) * RGAP;
-    const gridY = CH - gridH - 100;
-    return { cols: cfg.cols, rows: cfg.rows, tileW, tileH, gridH, gridY };
+    const gridY = CH - gridH - GRID_BOTTOM_MARGIN;
+    // Center tiles within canvas
+    const actualW = cfg.cols * tileW + (cfg.cols - 1) * TGAP;
+    const offsetX = (fullGridW - actualW) / 2;
+    return { cols: cfg.cols, rows: cfg.rows, tileW, tileH, gridH, gridY, offsetX };
   }, []);
 
   const setTileSprite = useCallback((container: PIXI.Container, tex: PIXI.Texture | null, w: number, h: number) => {
@@ -224,11 +268,11 @@ export function usePixiGame(
     // ── Top flame background — BEHIND dragon (shown on win/cashout) ──
     if (TEX.top_flame_bg) {
       const topFlame = new PIXI.Sprite(TEX.top_flame_bg);
-      const topFlameW = fw + 80;
-      const topFlameH = 250;
+      const topFlameW = fw + TOP_FLAME_W_EXT;
+      const topFlameH = TOP_FLAME_H;
       topFlame.width = topFlameW; topFlame.height = topFlameH;
       topFlame.anchor.set(0.5, 1);
-      topFlame.x = CW / 2; topFlame.y = wcy + 72;
+      topFlame.x = CW / 2; topFlame.y = wcy + TOP_FLAME_Y_ANCHOR;
       topFlame.alpha = 0; topFlame.visible = false;
       topFlame.label = 'topFlameBg';
       gridLayer.addChild(topFlame);
@@ -239,7 +283,7 @@ export function usePixiGame(
     const dTex = TEX.dragon_normal ?? TEX.dragon_small;
     if (dTex) {
       const ds = new PIXI.Sprite(dTex);
-      const sc = Math.min(270 / ds.texture.width, 170 / ds.texture.height);
+      const sc = Math.min(DRAGON_NORMAL_MAX_W / ds.texture.width, DRAGON_NORMAL_MAX_H / ds.texture.height);
       ds.scale.set(sc); ds.anchor.set(0.5, 1); ds.x = CW / 2; ds.y = wcy + 40;
       ds.label = 'wallDragon';
       dragonBaseScaleRef.current = sc;
@@ -285,7 +329,7 @@ export function usePixiGame(
       left.width = fbW;
       left.height = fbH;
       left.x = fx - fbW + 115;
-      left.y = fy - 10;
+      left.y = fy - FLAME_BORDER_Y_OFFSET;
       left.alpha = 0;
       left.visible = false;
       flameBorderLeftRef.current = left;
@@ -296,7 +340,7 @@ export function usePixiGame(
       right.height = fbH;
       right.scale.x = -Math.abs(right.scale.x); // flip while keeping calculated scale
       right.x = fx + fw + 35;
-      right.y = fy - 10;
+      right.y = fy - FLAME_BORDER_Y_OFFSET;
       right.alpha = 0;
       right.visible = false;
       flameBorderRightRef.current = right;
@@ -365,7 +409,7 @@ export function usePixiGame(
       const vRow = L.rows - 1 - r;
       const rowY = L.gridY + vRow * (L.tileH + RGAP);
       for (let c = 0; c < L.cols; c++) {
-        const tile = makeTile(r, c, PAD + c * (L.tileW + TGAP), rowY, L.tileW, L.tileH);
+        const tile = makeTile(r, c, PAD + L.offsetX + c * (L.tileW + TGAP), rowY, L.tileW, L.tileH);
         row[c] = tile;
         gridLayer.addChild(tile.root);
       }
@@ -538,21 +582,15 @@ export function usePixiGame(
     amtText.x = CW / 2 - 12; amtText.y = cardY + 92;
     container.addChild(amtText);
 
-    const coinR = 10;
     const coinX = cardX + cardW - 28;
-    const coinY = cardY + 92 + coinR;
-    const coin = new PIXI.Graphics();
-    coin.circle(coinX, coinY, coinR).fill({ color: 0xf0a020 });
-    coin.circle(coinX, coinY, coinR * 0.7).fill({ color: 0xc07010 });
-    container.addChild(coin);
-
-    const coinLabel = new PIXI.Text({
-      text: '₿',
-      style: { fontFamily: 'Arial', fontSize: 10, fontWeight: '900', fill: 0xffffff },
-    });
-    coinLabel.anchor.set(0.5);
-    coinLabel.x = coinX; coinLabel.y = coinY;
-    container.addChild(coinLabel);
+    const coinY = cardY + 92 + 10;
+    if (TEX.gcoin) {
+      const coin = new PIXI.Sprite(TEX.gcoin);
+      coin.width = 20; coin.height = 20;
+      coin.anchor.set(0.5);
+      coin.x = coinX; coin.y = coinY;
+      container.addChild(coin);
+    }
 
     // Set pivot to center so scale animation pops from middle
     container.pivot.set(CW / 2, CH / 2);
@@ -613,7 +651,7 @@ export function usePixiGame(
     const fxLayer = fxLayerRef.current;
     if (!fxLayer) return;
     const L = calcLayout(diff);
-    const cx = PAD + c * (L.tileW + TGAP) + L.tileW / 2;
+    const cx = PAD + L.offsetX + c * (L.tileW + TGAP) + L.tileW / 2;
     const cy = L.gridY + (L.rows - 1 - r) * (L.tileH + RGAP) + L.tileH / 2;
     const pal = type === 'fire'
       ? [0xff2200, 0xff5500, 0xff8800, 0xffbb00]
@@ -729,7 +767,7 @@ export function usePixiGame(
     const fxLayer = fxLayerRef.current;
     if (!fxLayer) return;
     const L = calcLayout(diff);
-    const cx = PAD + c * (L.tileW + TGAP) + L.tileW / 2;
+    const cx = PAD + L.offsetX + c * (L.tileW + TGAP) + L.tileW / 2;
     const cy = L.gridY + (L.rows - 1 - r) * (L.tileH + RGAP) + L.tileH / 2;
     const fireColors = [0xff0000, 0xff2200, 0xff4400, 0xff6600, 0xff8800, 0xcc0000];
     const emberColors = [0xff3300, 0xff5500, 0xff7700, 0xdd2200];
@@ -841,8 +879,8 @@ export function usePixiGame(
       if (ch.label === 'wallDragon') {
         (ch as PIXI.Sprite).texture = tex;
         const sc = win
-          ? Math.min(350 / tex.width, 250 / tex.height)
-          : Math.min(270 / tex.width, 170 / tex.height);
+          ? Math.min(DRAGON_FIRE_MAX_W / tex.width, DRAGON_FIRE_MAX_H / tex.height)
+          : Math.min(DRAGON_NORMAL_MAX_W / tex.width, DRAGON_NORMAL_MAX_H / tex.height);
         ch.scale.set(sc);
         dragonBaseScaleRef.current = sc;
         break;
@@ -857,6 +895,7 @@ export function usePixiGame(
     const topFlame = topFlameBgRef.current;
     const gTop = glowTopRef.current;
     const gBottom = glowBottomRef.current;
+    // Flame borders only visible on win/cashout
     if (left) { left.visible = show; left.alpha = show ? 0.8 : 0; }
     if (right) { right.visible = show; right.alpha = show ? 0.8 : 0; }
     if (topFlame) { topFlame.visible = show && !!winOnly; topFlame.alpha = (show && !!winOnly) ? 0.7 : 0; }
@@ -1000,7 +1039,7 @@ export function usePixiGame(
       // On mobile: fit canvas within available space, maintain aspect ratio
       const wrapW = wrap.clientWidth;
       const wrapH = wrap.clientHeight;
-      const aspect = CW / CH;
+      const aspect = CW / CH_MOBILE;
       let w, h;
       if (wrapW / wrapH > aspect) {
         // Height constrained
@@ -1015,10 +1054,20 @@ export function usePixiGame(
       canvas.style.height = `${h}px`;
       wrap.style.width = '100%';
     } else {
-      // Let CSS handle sizing — canvas fills wrap via height:100% + object-fit
-      // Just clear any previously set inline styles
-      canvas.style.width = '';
-      canvas.style.height = '';
+      // On desktop: fit canvas within wrapper, maintain aspect ratio
+      const wrapW = wrap.clientWidth;
+      const wrapH = wrap.clientHeight;
+      const aspect = CW / CH;
+      let w, h;
+      if (wrapW / wrapH > aspect) {
+        h = wrapH;
+        w = Math.round(h * aspect);
+      } else {
+        w = wrapW;
+        h = Math.round(w / aspect);
+      }
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
     }
   }, [canvasWrapRef]);
 
@@ -1039,6 +1088,14 @@ export function usePixiGame(
       result_bg:     BASE+'/result_background.png',
       flame_border:  BASE+'/flame-border.png',
       top_flame_bg:  BASE+'/top-flame-bg.png',
+      dif_bg:        BASE+'/dif-bg.png',
+      bal_bg:        BASE+'/bal-bg.png',
+      randompic_bg:  BASE+'/randompic-bg.png',
+      bet_bg:        BASE+'/bet-bg.png',
+      bet_up_bg:     BASE+'/bet-up-bg.png',
+      bet_down_bg:   BASE+'/bet-down-bg.png',
+      total_profit_bg: BASE+'/total-profit-bg.png',
+      gcoin:           BASE+'/gcoin.png',
     };
 
     const loadOne = async (key: string, path: string) => {
@@ -1065,10 +1122,12 @@ export function usePixiGame(
     let destroyed = false;
 
     (async () => {
+      const mobile = window.innerWidth <= MOBILE_BREAKPOINT;
+      isMobileRef.current = mobile;
       const app = new PIXI.Application();
       await app.init({
         width: CW,
-        height: CH,
+        height: mobile ? CH_MOBILE : CH,
         backgroundAlpha: 0,
         resolution: Math.min(window.devicePixelRatio ?? 1, 2),
         autoDensity: true,
@@ -1089,6 +1148,7 @@ export function usePixiGame(
       const fxLayer = new PIXI.Container();
       const uiLayer = new PIXI.Container();
       bgLayerRef.current = bgLayer;
+      gridLayer.y = GRID_LAYER_Y;
       gridLayerRef.current = gridLayer;
       fxLayerRef.current = fxLayer;
       uiLayerRef.current = uiLayer;
@@ -1134,8 +1194,8 @@ export function usePixiGame(
         // ── FIRE BORDER ANIMATION — always visible during play ─────
         const st = getStateRef.current();
  
-        // ── Idle ambient embers — subtle fire even when not playing ──
-        if (st.gstate === 'idle' && frameRef.current % 8 === 0) {
+        // ── Ambient embers — only on win/cashout ──
+        if (st.gstate === 'ended' && frameRef.current % 8 === 0) {
           const idleColors = [0xff5500, 0xff7700, 0xff9900];
           for (let i = 0; i < 2; i++) {
             const pg = new PIXI.Graphics() as any;
@@ -1170,7 +1230,7 @@ export function usePixiGame(
           const ch = gridLayer.children[i];
           if (ch.label === 'wallDragon') {
             const base = dragonBaseScaleRef.current;
-            const breath = base * (1 + 0.015 * Math.sin(frameRef.current * 0.015));
+            const breath = base * (1 + DRAGON_BREATH_AMPLITUDE * Math.sin(frameRef.current * DRAGON_BREATH_FREQ));
             ch.scale.set(breath);
             break;
           }
@@ -1207,7 +1267,29 @@ export function usePixiGame(
       });
 
       scaleCanvas();
-      const onResize = () => scaleCanvas();
+      const onResize = () => {
+        const wasMobile = isMobileRef.current;
+        const nowMobile = window.innerWidth <= MOBILE_BREAKPOINT;
+        isMobileRef.current = nowMobile;
+
+        if (wasMobile !== nowMobile) {
+          // Resize the PixiJS renderer for the new mode
+          app.renderer.resize(CW, nowMobile ? CH_MOBILE : CH);
+
+          // Show/hide mobile panel layer
+          const panelLayer = panelLayerRef.current;
+          if (panelLayer) {
+            panelLayer.visible = nowMobile;
+          }
+
+          // Rebuild grid with new aspect ratio
+          const st = getStateRef.current();
+          buildGrid(st.diff);
+          refreshGrid(st.diff, st.gstate, st.curRow, st.revealed);
+        }
+
+        scaleCanvas();
+      };
       window.addEventListener('resize', onResize);
 
       // Store cleanup handler for resize listener
@@ -1225,10 +1307,358 @@ export function usePixiGame(
     };
   }, [canvasWrapRef, scaleCanvas]);
 
+  // ── Coin helper ──────────────────────────────────────────────
+  const makeCoin = (size: number) => {
+    const TEX = texRef.current;
+    if (TEX.gcoin) {
+      const sp = new PIXI.Sprite(TEX.gcoin);
+      sp.width = size; sp.height = size;
+      sp.anchor.set(0.5);
+      return sp;
+    }
+    // Fallback if texture not loaded
+    const c = new PIXI.Graphics();
+    c.circle(0, 0, size / 2).fill({ color: 0xedb830 });
+    return c;
+  };
+
+  // ── Mobile Panel (PixiJS) ─────────────────────────────────────
+  const buildMobilePanel = useCallback(() => {
+    const app = appRef.current;
+    if (!app) return;
+    const TEX = texRef.current;
+
+    const panelLayer = new PIXI.Container();
+    panelLayer.y = CH - PANEL_Y_OFFSET;
+    panelLayer.visible = isMobileRef.current; // only visible on mobile
+    panelLayerRef.current = panelLayer;
+    app.stage.addChild(panelLayer);
+
+    const pw = CW;
+    const px = PANEL_PX;
+    const contentW = pw - px * 2;
+    const DIFF_OPTS: Difficulty[] = ['Easy', 'Medium', 'Hard', 'Expert', 'Master'];
+    const lblStyle = { fontFamily: 'Rajdhani', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' as const };
+    const amtStyle = { fontFamily: 'Rajdhani', fontSize: PANEL_AMT_FONT, fill: PANEL_GOLD_COLOR, fontWeight: '700' as const };
+
+    let yy = PANEL_PY;
+
+    // ── Row 1: Difficulty ──────────────────────────────────────
+    const diffCard = new PIXI.Container();
+    diffCard.x = px; diffCard.y = yy;
+    if (TEX.dif_bg) {
+      const bg = new PIXI.Sprite(TEX.dif_bg);
+      bg.width = contentW; bg.height = PANEL_DIFF_H;
+      diffCard.addChild(bg);
+    } else {
+      const bg = new PIXI.Graphics();
+      bg.roundRect(0, 0, contentW, PANEL_DIFF_H, PANEL_CARD_RADIUS).fill({ color: PANEL_CARD_BG, alpha: 0.9 });
+      diffCard.addChild(bg);
+    }
+    const diffLbl = new PIXI.Text({ text: 'DIFFICULTY', style: { ...lblStyle, letterSpacing: 2 } });
+    diffLbl.x = PANEL_INNER_PX; diffLbl.y = PANEL_DIFF_H / 2; diffLbl.anchor.set(0, 0.5);
+    diffCard.addChild(diffLbl);
+
+    // Diff value + dropdown arrow "Medium ▼"
+    const diffText = new PIXI.Text({ text: 'Medium', style: { fontFamily: 'Rajdhani', fontSize: PANEL_AMT_FONT, fill: 0xe2e8f0, fontWeight: '700' } });
+    const diffArrow = new PIXI.Text({ text: ' ▼', style: { fontFamily: 'Rajdhani', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' } });
+    diffText.anchor.set(1, 0.5); diffText.x = contentW - PANEL_DIFF_RIGHT; diffText.y = PANEL_DIFF_H / 2;
+    diffArrow.anchor.set(0, 0.5); diffArrow.x = contentW - PANEL_DIFF_RIGHT + 2; diffArrow.y = PANEL_DIFF_H / 2;
+    diffCard.addChild(diffText); diffCard.addChild(diffArrow);
+
+    // Tap to cycle difficulty
+    const diffHit = new PIXI.Container();
+    const diffHitBg = new PIXI.Graphics();
+    diffHitBg.rect(0, 0, contentW, PANEL_DIFF_H).fill({ color: 0x000000, alpha: 0.001 });
+    diffHit.addChild(diffHitBg);
+    diffHit.eventMode = 'static'; diffHit.cursor = 'pointer';
+    diffHit.on('pointerdown', () => {
+      const cur = diffText.text as Difficulty;
+      const idx = DIFF_OPTS.indexOf(cur);
+      const next = DIFF_OPTS[(idx + 1) % DIFF_OPTS.length];
+      onDiffChangeRef.current?.(next);
+    });
+    diffCard.addChild(diffHit);
+    panelLayer.addChild(diffCard);
+    yy += PANEL_DIFF_H + PANEL_ROW_GAP;
+
+    // ── Row 2: Balance | [gap for play btn] | Random Pick ─────
+    const midW = (contentW - PANEL_MID_GAP) / 2;
+
+    // Balance card — "BALANCE  0.00  (coin)" all on one row
+    const balCard = new PIXI.Container();
+    balCard.x = px; balCard.y = yy;
+    if (TEX.bal_bg) {
+      const bg = new PIXI.Sprite(TEX.bal_bg);
+      bg.width = midW; bg.height = PANEL_MID_H;
+      balCard.addChild(bg);
+    } else {
+      const bg = new PIXI.Graphics();
+      bg.roundRect(0, 0, midW, PANEL_MID_H, PANEL_CARD_RADIUS).fill({ color: PANEL_CARD_BG, alpha: 0.9 });
+      balCard.addChild(bg);
+    }
+    const balLbl = new PIXI.Text({ text: 'BALANCE', style: { ...lblStyle, letterSpacing: 1.8 } });
+    balLbl.x = PANEL_INNER_PX; balLbl.y = PANEL_MID_H / 2; balLbl.anchor.set(0, 0.5);
+    balCard.addChild(balLbl);
+
+    const balText = new PIXI.Text({ text: '0.00', style: amtStyle });
+    balText.x = PANEL_BAL_AMT_X; balText.y = PANEL_MID_H / 2; balText.anchor.set(0, 0.5);
+    balCard.addChild(balText);
+
+    const balCoin = makeCoin(PANEL_COIN_SIZE);
+    balCoin.x = balText.x + balText.width + PANEL_COIN_GAP; balCoin.y = PANEL_MID_H / 2;
+    balCard.addChild(balCoin);
+    panelLayer.addChild(balCard);
+
+    // Random Pick card — centered text
+    const rndCard = new PIXI.Container();
+    rndCard.x = px + midW + PANEL_MID_GAP; rndCard.y = yy;
+    if (TEX.randompic_bg) {
+      const bg = new PIXI.Sprite(TEX.randompic_bg);
+      bg.width = midW; bg.height = PANEL_MID_H;
+      rndCard.addChild(bg);
+    } else {
+      const bg = new PIXI.Graphics();
+      bg.roundRect(0, 0, midW, PANEL_MID_H, PANEL_CARD_RADIUS).fill({ color: PANEL_CARD_BG, alpha: 0.9 });
+      rndCard.addChild(bg);
+    }
+    const rndLbl = new PIXI.Text({ text: 'RANDOM PICK', style: { ...lblStyle, letterSpacing: 1.5 } });
+    rndLbl.x = PANEL_RANDOM_INNER_PX; rndLbl.y = PANEL_MID_H / 2; rndLbl.anchor.set(0, 0.5);
+    rndCard.addChild(rndLbl);
+    const randomBtn = new PIXI.Container();
+    const rndHitBg = new PIXI.Graphics();
+    rndHitBg.rect(0, 0, midW, PANEL_MID_H).fill({ color: 0x000000, alpha: 0.001 });
+    randomBtn.addChild(rndHitBg);
+    randomBtn.eventMode = 'static'; randomBtn.cursor = 'pointer';
+    randomBtn.on('pointerdown', () => { onRandomRef.current?.(); });
+    rndCard.addChild(randomBtn);
+    panelLayer.addChild(rndCard);
+    yy += PANEL_MID_H + PANEL_ROW_GAP;
+
+    // ── Row 3: Bet | Play Button | Total Profit ───────────────
+    // Bottom row card width based on PANEL_BOT_GAP
+    const botSideW = (contentW - PANEL_BOT_GAP) / 2;
+
+    // Bet card — "BET" top-left, arrows top-right, coin + amount bottom-left
+    const betCard = new PIXI.Container();
+    betCard.x = px; betCard.y = yy;
+    if (TEX.bet_bg) {
+      const bg = new PIXI.Sprite(TEX.bet_bg);
+      bg.width = botSideW; bg.height = PANEL_BOT_H;
+      betCard.addChild(bg);
+    } else {
+      const bg = new PIXI.Graphics();
+      bg.roundRect(0, 0, botSideW, PANEL_BOT_H, PANEL_CARD_RADIUS).fill({ color: PANEL_CARD_BG, alpha: 0.9 });
+      betCard.addChild(bg);
+    }
+    const betLbl = new PIXI.Text({ text: 'BET', style: { ...lblStyle, letterSpacing: 1.8 } });
+    betLbl.x = PANEL_INNER_PX; betLbl.y = PANEL_BET_LBL_Y;
+    betCard.addChild(betLbl);
+
+    // Coin + bet amount on bottom row
+    const betCoin = makeCoin(PANEL_BET_COIN_SIZE);
+    betCoin.x = PANEL_BET_COIN_X; betCoin.y = PANEL_BOT_H - PANEL_BET_BOT_OFFSET;
+    betCard.addChild(betCoin);
+
+    const betText = new PIXI.Text({ text: '5', style: { ...amtStyle, fontSize: PANEL_BET_AMT_FONT } });
+    betText.x = PANEL_BET_AMT_X; betText.y = PANEL_BOT_H - PANEL_BET_BOT_OFFSET; betText.anchor.set(0, 0.5);
+    betCard.addChild(betText);
+
+    // Up/Down arrows on right side
+    const arrowX = botSideW - PANEL_ARROW_RIGHT;
+    const makeArrowBtn = (yPos: number, label: string, aw: number, ah: number, onTap: () => void) => {
+      const btn = new PIXI.Container();
+      btn.x = arrowX; btn.y = yPos;
+      if (label === '▲' && TEX.bet_up_bg) {
+        const sp = new PIXI.Sprite(TEX.bet_up_bg);
+        sp.width = aw; sp.height = ah; btn.addChild(sp);
+      } else if (label === '▼' && TEX.bet_down_bg) {
+        const sp = new PIXI.Sprite(TEX.bet_down_bg);
+        sp.width = aw; sp.height = ah; btn.addChild(sp);
+      } else {
+        const bg = new PIXI.Graphics();
+        bg.roundRect(0, 0, aw, ah, 4).fill({ color: 0x1a2a3a });
+        btn.addChild(bg);
+        const txt = new PIXI.Text({ text: label, style: { fontFamily: 'Rajdhani', fontSize: PANEL_AMT_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' } });
+        txt.anchor.set(0.5); txt.x = aw / 2; txt.y = ah / 2;
+        btn.addChild(txt);
+      }
+      const hit = new PIXI.Graphics();
+      hit.rect(0, 0, aw, ah).fill({ color: 0x000000, alpha: 0.001 });
+      btn.addChild(hit);
+      btn.eventMode = 'static'; btn.cursor = 'pointer';
+      btn.on('pointerdown', onTap);
+      return btn;
+    };
+
+    const upArrow = makeArrowBtn(PANEL_ARROW_UP_Y, '▲', PANEL_ARROW_UP_W, PANEL_ARROW_UP_H, () => {
+      const cur = parseFloat(betText.text) || 0;
+      onBetChangeRef.current?.(Math.max(0.01, parseFloat((cur * 2).toFixed(2))));
+    });
+    betCard.addChild(upArrow);
+    panelTextsRef.current.upArrow = upArrow;
+
+    const downArrow = makeArrowBtn(PANEL_ARROW_DOWN_Y, '▼', PANEL_ARROW_DOWN_W, PANEL_ARROW_DOWN_H, () => {
+      const cur = parseFloat(betText.text) || 0;
+      onBetChangeRef.current?.(Math.max(0.01, parseFloat((cur * 0.5).toFixed(2))));
+    });
+    betCard.addChild(downArrow);
+    panelTextsRef.current.downArrow = downArrow;
+    panelLayer.addChild(betCard);
+
+    // Total Profit card — aligned with Random Pick (right column)
+    const profitCard = new PIXI.Container();
+    profitCard.x = px + botSideW + PANEL_BOT_GAP; profitCard.y = yy;
+    if (TEX.total_profit_bg) {
+      const bg = new PIXI.Sprite(TEX.total_profit_bg);
+      bg.width = botSideW; bg.height = PANEL_BOT_H;
+      profitCard.addChild(bg);
+    } else {
+      const bg = new PIXI.Graphics();
+      bg.roundRect(0, 0, botSideW, PANEL_BOT_H, PANEL_CARD_RADIUS).fill({ color: PANEL_CARD_BG, alpha: 0.9 });
+      profitCard.addChild(bg);
+    }
+    // "TOTAL PROFIT (1.00×)" left-aligned on one line
+    const profitLbl = new PIXI.Text({ text: 'TOTAL PROFIT', style: { ...lblStyle, letterSpacing: 1.5 } });
+    profitLbl.x = PANEL_PROFIT_INNER_PX; profitLbl.y = PANEL_PROFIT_LBL_Y;
+    profitCard.addChild(profitLbl);
+
+    const multText = new PIXI.Text({ text: '(1.00×)', style: { fontFamily: 'Rajdhani', fontSize: PANEL_LBL_FONT, fill: 0xc8a44a, fontWeight: '700' } });
+    multText.x = profitLbl.x + profitLbl.width + PANEL_PROFIT_MULT_GAP; multText.y = PANEL_PROFIT_LBL_Y;
+    profitCard.addChild(multText);
+
+    // Amount + coin left-aligned on bottom row
+    const profitText = new PIXI.Text({ text: '0.00000000', style: { ...amtStyle, fontSize: PANEL_PROFIT_AMT_FONT } });
+    profitText.x = PANEL_PROFIT_INNER_PX; profitText.y = PANEL_BOT_H - PANEL_PROFIT_BOT_OFFSET; profitText.anchor.set(0, 0.5);
+    profitCard.addChild(profitText);
+
+    const profitCoin = makeCoin(PANEL_COIN_SIZE);
+    profitCoin.x = profitText.x + profitText.width + PANEL_PROFIT_COIN_GAP; profitCoin.y = PANEL_BOT_H - PANEL_PROFIT_BOT_OFFSET;
+    profitCard.addChild(profitCoin);
+    panelLayer.addChild(profitCard);
+
+    // ── Play Button (centered in gap between rows 2 & 3) ──────
+    const playX = CW / 2;
+    const playY = yy - PANEL_ROW_GAP / 2 + PLAY_BTN_Y_OFFSET;
+    const playCircle = new PIXI.Graphics();
+    // Radial gradient approximation — outer ring + inner bright fill
+    playCircle.circle(0, 0, PLAY_R + 4).fill({ color: 0x9aaa00, alpha: 0.3 });
+    playCircle.circle(0, 0, PLAY_R).fill({ color: 0xc8d800 });
+    playCircle.circle(0, 0, PLAY_R - 8).fill({ color: 0xe8f020, alpha: 0.5 });
+    playCircle.x = playX; playCircle.y = playY;
+    playCircle.eventMode = 'static'; playCircle.cursor = 'pointer';
+    playCircle.on('pointerdown', () => {
+      if (panelCooldownRef.current) return;
+      onPlayActionRef.current?.();
+    });
+    panelLayer.addChild(playCircle);
+
+    // Play triangle
+    const playTriangle = new PIXI.Graphics();
+    playTriangle.poly([
+      { x: -10, y: -14 },
+      { x: -10, y: 14 },
+      { x: 16, y: 0 },
+    ]).fill({ color: 0x1c2e00 });
+    playTriangle.x = playX + 3; playTriangle.y = playY;
+    panelLayer.addChild(playTriangle);
+
+    // Cash-out coin icon (hidden by default, shown when canCash)
+    let playCoin: PIXI.Sprite | PIXI.Text;
+    if (TEX.gcoin) {
+      playCoin = new PIXI.Sprite(TEX.gcoin);
+      playCoin.width = PLAY_COIN_SIZE; playCoin.height = PLAY_COIN_SIZE;
+      playCoin.anchor.set(0.5);
+    } else {
+      playCoin = new PIXI.Text({ text: '💰', style: { fontSize: PLAY_LABEL_FONT } });
+      (playCoin as PIXI.Text).anchor.set(0.5);
+    }
+    playCoin.x = playX; playCoin.y = playY - 10;
+    playCoin.visible = false;
+    panelLayer.addChild(playCoin);
+
+    // Cash-out amount text (hidden by default)
+    const playAmtText = new PIXI.Text({ text: '', style: { fontFamily: 'Rajdhani', fontSize: PLAY_AMT_FONT, fill: 0x1c2e00, fontWeight: '800' } });
+    playAmtText.anchor.set(0.5); playAmtText.x = playX; playAmtText.y = playY + 14;
+    playAmtText.visible = false;
+    panelLayer.addChild(playAmtText);
+
+    // Store all refs
+    panelTextsRef.current = {
+      ...panelTextsRef.current,
+      balanceText: balText,
+      balanceCoin: balCoin,
+      betText: betText,
+      diffText: diffText,
+      multText: multText,
+      profitText: profitText,
+      profitCoin: profitCoin,
+      playCircle: playCircle,
+      playTriangle: playTriangle,
+      playCoin: playCoin,
+      playAmtText: playAmtText,
+      randomBtn: randomBtn,
+      diffHit: diffHit,
+    };
+  }, []);
+
+  interface PanelState {
+    balance: number;
+    bet: number;
+    diff: Difficulty;
+    gstate: GameState;
+    curMult: number;
+    curWin: number;
+  }
+
+  const updateMobilePanel = useCallback((state: PanelState) => {
+    const t = panelTextsRef.current;
+    const fmt = (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    if (t.balanceText) {
+      t.balanceText.text = fmt(state.balance);
+      // Reposition coin after amount text
+      if (t.balanceCoin) t.balanceCoin.x = t.balanceText.x + t.balanceText.width + PANEL_COIN_GAP;
+    }
+    if (t.betText) t.betText.text = String(state.bet);
+    if (t.diffText) t.diffText.text = state.diff;
+    if (t.multText) t.multText.text = `(${state.curMult.toFixed(2)}×)`;
+    if (t.profitText) {
+      t.profitText.text = state.curWin.toFixed(8);
+      if (t.profitCoin) t.profitCoin.x = t.profitText.x + t.profitText.width + PANEL_PROFIT_COIN_GAP;
+    }
+
+    const playing = state.gstate === 'playing';
+    const canCash = playing && state.curMult > 1;
+    const disabled = (playing && !canCash) || panelCooldownRef.current;
+
+    // Play button state
+    if (t.playCircle) t.playCircle.alpha = disabled ? 0.45 : 1;
+    if (t.playTriangle && t.playCoin && t.playAmtText) {
+      if (canCash) {
+        t.playTriangle.visible = false;
+        t.playCoin.visible = true;
+        t.playAmtText.visible = true;
+        t.playAmtText.text = fmt(state.curWin);
+      } else {
+        t.playTriangle.visible = true;
+        t.playCoin.visible = false;
+        t.playAmtText.visible = false;
+      }
+    }
+    // Disable arrows and diff during play
+    if (t.upArrow) { t.upArrow.alpha = playing ? 0.35 : 1; t.upArrow.eventMode = playing ? 'none' : 'static'; }
+    if (t.downArrow) { t.downArrow.alpha = playing ? 0.35 : 1; t.downArrow.eventMode = playing ? 'none' : 'static'; }
+    if (t.diffHit) { t.diffHit.eventMode = playing ? 'none' : 'static'; }
+    if (t.randomBtn) t.randomBtn.alpha = playing ? 1 : 0.4;
+  }, []);
+
   return {
     buildGrid,
     refreshGrid,
     buildVignette,
+    buildMobilePanel,
+    updateMobilePanel,
     loadTextures,
     spawnFX,
     spawnWinCelebration,
@@ -1245,6 +1675,7 @@ export function usePixiGame(
     showResultOverlay,
     hideResultOverlay,
     texRef,
+    panelCooldownRef,
     appReady: !!appRef.current,
   };
 }
