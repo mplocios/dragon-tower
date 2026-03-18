@@ -1038,31 +1038,29 @@ export function usePixiGame(
     if (isMobile) {
       // On mobile: fit canvas within available space, maintain aspect ratio
       const wrapW = wrap.clientWidth;
-      const wrapH = wrap.clientHeight;
+      const maxH = window.innerHeight;
       const aspect = CW / CH_MOBILE;
-      let w, h;
-      if (wrapW / wrapH > aspect) {
-        // Height constrained
-        h = wrapH;
+      // Start width-constrained, then cap by viewport height
+      let w = wrapW;
+      let h = Math.round(w / aspect);
+      if (h > maxH) {
+        h = maxH;
         w = Math.round(h * aspect);
-      } else {
-        // Width constrained
-        w = wrapW;
-        h = Math.round(w / aspect);
       }
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
       wrap.style.width = '100%';
     } else {
-      // On desktop: fit canvas within wrapper, maintain aspect ratio
+      // Clear any mobile inline styles on wrap
+      wrap.style.width = '';
+      // On desktop: fit canvas to 90% of available height
       const wrapW = wrap.clientWidth;
-      const wrapH = wrap.clientHeight;
+      const maxH = Math.min(wrap.clientHeight || window.innerHeight, window.innerHeight) * 0.9;
       const aspect = CW / CH;
-      let w, h;
-      if (wrapW / wrapH > aspect) {
-        h = wrapH;
-        w = Math.round(h * aspect);
-      } else {
+      let h = maxH;
+      let w = Math.round(h * aspect);
+      // If wider than wrapper, constrain by width instead
+      if (w > wrapW) {
         w = wrapW;
         h = Math.round(w / aspect);
       }
@@ -1491,15 +1489,30 @@ export function usePixiGame(
       return btn;
     };
 
+    // Insufficient funds warning text (hidden by default)
+    const insuffText = new PIXI.Text({ text: 'Insufficient funds', style: { fontFamily: 'Rajdhani', fontSize: 11, fill: 0xff4444, fontWeight: '700' } });
+    insuffText.anchor.set(0.5, 0); insuffText.x = botSideW / 2; insuffText.y = PANEL_BOT_H + 2;
+    insuffText.visible = false;
+    betCard.addChild(insuffText);
+
+    const parseFmt = (s: string) => parseFloat(s.replace(/,/g, '')) || 0;
+
     const upArrow = makeArrowBtn(PANEL_ARROW_UP_Y, '▲', PANEL_ARROW_UP_W, PANEL_ARROW_UP_H, () => {
-      const cur = parseFloat(betText.text) || 0;
-      onBetChangeRef.current?.(Math.max(0.01, parseFloat((cur * 2).toFixed(2))));
+      const cur = parseFmt(betText.text);
+      const newBet = parseFloat((cur * 2).toFixed(2));
+      const bal = parseFmt(balText.text);
+      if (newBet > bal) {
+        insuffText.visible = true;
+        setTimeout(() => { insuffText.visible = false; }, 2000);
+        return;
+      }
+      onBetChangeRef.current?.(Math.max(0.01, newBet));
     });
     betCard.addChild(upArrow);
     panelTextsRef.current.upArrow = upArrow;
 
     const downArrow = makeArrowBtn(PANEL_ARROW_DOWN_Y, '▼', PANEL_ARROW_DOWN_W, PANEL_ARROW_DOWN_H, () => {
-      const cur = parseFloat(betText.text) || 0;
+      const cur = parseFmt(betText.text);
       onBetChangeRef.current?.(Math.max(0.01, parseFloat((cur * 0.5).toFixed(2))));
     });
     betCard.addChild(downArrow);

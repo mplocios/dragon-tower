@@ -173,6 +173,8 @@ const DragonTower: React.FC = () => {
         });
 
         gs().setRgstate("endgame");
+        gs().setPlayLock(true);
+        pixiGame.panelCooldownRef.current = true;
         pixiGame.stopNormalBgSound();
         pixiGame.playLoseSound();
         pixiGame.spawnLoseExplosion(r, c, s.diff);
@@ -205,6 +207,7 @@ const DragonTower: React.FC = () => {
 
         scheduleTimer(() => {
           pixiGame.showResultOverlay("lose", 0, s.bet);
+          engageLockRef.current(2000);
         }, 900);
 
         // ── HIT EGG ─────────────────────────────────────────
@@ -256,7 +259,8 @@ const DragonTower: React.FC = () => {
 
           // ── ALL ROWS CLEARED = WIN ──────────────────────
           if (nextRow >= DIFF[s.diff].rows) {
-            engageLockRef.current(1500);
+            gs().setPlayLock(true);
+            pixiGame.panelCooldownRef.current = true;
             const newBal = s.balance + newWin;
             gs().setBalance(newBal);
             gs().setGstate("ended");
@@ -311,14 +315,10 @@ const DragonTower: React.FC = () => {
             }, 500);
             scheduleTimer(() => {
               pixiGame.showResultOverlay("win", newMult, newWin);
+              engageLockRef.current(2000);
             }, 500);
           } else {
-            pixiGame.refreshGrid(
-              s.diff,
-              gs().gstate,
-              nextRow,
-              gs().revealed,
-            );
+            pixiGame.refreshGrid(s.diff, gs().gstate, nextRow, gs().revealed);
           }
         } else {
           pixiGame.refreshGrid(s.diff, gs().gstate, s.curRow, gs().revealed);
@@ -467,6 +467,8 @@ const DragonTower: React.FC = () => {
     });
 
     gs().setRgstate("endgame");
+    gs().setPlayLock(true);
+    pixiGame.panelCooldownRef.current = true;
     pixiGame.stopNormalBgSound();
     pixiGame.swapDragonSprite(true);
     pixiGame.showFlameEffects(true, true);
@@ -493,6 +495,7 @@ const DragonTower: React.FC = () => {
       pixiGame.refreshGrid(s.diff, "ended", s.curRow, rev);
     }, 500);
     pixiGame.showResultOverlay("win", mult, win);
+    engageLockRef.current(2000);
   }, [pixiGame, revealUnselectedEggs, scheduleTimer]);
 
   // ─────────────────────────────────────────────────────────
@@ -681,7 +684,9 @@ const DragonTower: React.FC = () => {
 
       const settings = s.auto;
       const roundWon = s.autoLastRoundWon;
-      const roundProfit = roundWon ? s.curWin - settings.autoBet : -settings.autoBet;
+      const roundProfit = roundWon
+        ? s.curWin - settings.autoBet
+        : -settings.autoBet;
 
       gs().setAutoTotalProfit(s.autoTotalProfit + roundProfit);
 
@@ -703,21 +708,18 @@ const DragonTower: React.FC = () => {
               : settings.autoBet;
       }
 
-      console.log(
-        `${roundWon ? "✅" : "❌"} [AUTO:ROUND_END] Round finished`,
-        {
-          gameId: s.gameId,
-          timestamp: new Date().toISOString(),
-          result: roundWon ? "win" : "lose",
-          roundProfit,
-          roundBet: settings.autoBet,
-          nextBet: newBet,
-          totalProfit: gs().autoTotalProfit,
-          roundsLeft: gs().autoCount,
-          balance: gs().balance,
-          difficulty: settings.autoDiff,
-        },
-      );
+      console.log(`${roundWon ? "✅" : "❌"} [AUTO:ROUND_END] Round finished`, {
+        gameId: s.gameId,
+        timestamp: new Date().toISOString(),
+        result: roundWon ? "win" : "lose",
+        roundProfit,
+        roundBet: settings.autoBet,
+        nextBet: newBet,
+        totalProfit: gs().autoTotalProfit,
+        roundsLeft: gs().autoCount,
+        balance: gs().balance,
+        difficulty: settings.autoDiff,
+      });
 
       gs().setAuto({ autoBet: newBet });
 
