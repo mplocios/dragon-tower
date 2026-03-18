@@ -5,6 +5,8 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_C
   GRID_TOP_RESERVE, TILE_ASPECT_RATIO, TILE_ASPECT_RATIO_MOBILE, GRID_BOTTOM_MARGIN, GRID_LAYER_Y,
   DRAGON_NORMAL_MAX_W, DRAGON_NORMAL_MAX_H, DRAGON_FIRE_MAX_W, DRAGON_FIRE_MAX_H,
   DRAGON_BREATH_AMPLITUDE, DRAGON_BREATH_FREQ,
+  DRAGON_ICON_SCALE_W, DRAGON_ICON_SCALE_H,
+  DRAGON_ICON_Y_OFFSET, DRAGON_ICON_FLOAT_SPEED, DRAGON_ICON_FLOAT_AMP,
   TOP_FLAME_W_EXT, TOP_FLAME_H, TOP_FLAME_Y_ANCHOR,
   FLAME_BORDER_Y_OFFSET,
   MOBILE_BREAKPOINT, PANEL_PX, PANEL_PY, PANEL_DIFF_H, PANEL_MID_H, PANEL_BOT_H,
@@ -204,10 +206,14 @@ export function usePixiGame(
     } else if (type === 'dragon') {
       if (TEX.dragon_icon) {
         const sp = new PIXI.Sprite(TEX.dragon_icon);
-        const sc = Math.min((w * 1.08) / sp.texture.width, (h * 1.17) / sp.texture.height);
-        sp.scale.set(sc); sp.anchor.set(0.5); sp.x = w / 2; sp.y = h / 2;
+        const sc = Math.min((w * DRAGON_ICON_SCALE_W) / sp.texture.width, (h * DRAGON_ICON_SCALE_H) / sp.texture.height);
+        sp.scale.set(sc); sp.anchor.set(0.5); sp.x = w / 2; sp.y = h / 2 + DRAGON_ICON_Y_OFFSET;
+        sp.label = 'dragonIcon';
+        (sp as any)._baseY = sp.y;
+        (sp as any)._floatOffset = Math.random() * Math.PI * 2;
         tile.icons.addChild(sp);
       }
+      tile.root.zIndex = 10;
       tile.root.alpha = 1;
       if (animate) {
         tile.root.scale.set(0.4);
@@ -1080,7 +1086,7 @@ export function usePixiGame(
       dragon_fire:   BASE+'/dragon-fire.png',
       wall:          BASE+'/wall.png',
       egg:           BASE+'/dragon-egg-3.png',
-      dragon_icon:   BASE+'/dragon-icon.png',
+      dragon_icon:   BASE+'/dragon-icon-2.png',
       tile_dark:     BASE+'/black-tile.png',
       tile_green:    BASE+'/green-tile.png',
       result_bg:     BASE+'/result_background.png',
@@ -1147,6 +1153,7 @@ export function usePixiGame(
       const uiLayer = new PIXI.Container();
       bgLayerRef.current = bgLayer;
       gridLayer.y = GRID_LAYER_Y;
+      gridLayer.sortableChildren = true;
       gridLayerRef.current = gridLayer;
       fxLayerRef.current = fxLayer;
       uiLayerRef.current = uiLayer;
@@ -1186,6 +1193,24 @@ export function usePixiGame(
             const s = startScale + (1 - startScale) * Math.min(ease, 1.08);
             a.root.scale.set(s);
             a.root.alpha = Math.min(1, t * 2.5);
+          }
+        }
+
+        // ── Dragon icon floating animation ──────────────────────
+        const tiles = tileObjsRef.current;
+        for (let ri = 0; ri < tiles.length; ri++) {
+          const row = tiles[ri];
+          for (let ci = 0; ci < row.length; ci++) {
+            const tile = row[ci];
+            if (!tile) continue;
+            for (let k = 0; k < tile.icons.children.length; k++) {
+              const ch = tile.icons.children[k];
+              if (ch.label === 'dragonIcon') {
+                const baseY = (ch as any)._baseY ?? 0;
+                const offset = (ch as any)._floatOffset ?? 0;
+                ch.y = baseY + Math.sin(frameRef.current * DRAGON_ICON_FLOAT_SPEED + offset) * DRAGON_ICON_FLOAT_AMP;
+              }
+            }
           }
         }
 

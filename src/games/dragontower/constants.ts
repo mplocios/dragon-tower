@@ -94,7 +94,7 @@ export const DRAGON_GLOW_Y_OFFSET = 10;
 /** Play button circle radius */
 export const PLAY_R = 57;
 /** Play button y-offset adjustment (negative = up, positive = down) */
-export const PLAY_BTN_Y_OFFSET = 25;
+export const PLAY_BTN_Y_OFFSET = 22;
 /** Play button label font size (e.g. "CASH OUT") */
 export const PLAY_LABEL_FONT = 14;
 /** Play button amount font size (e.g. "5.00") */
@@ -120,7 +120,7 @@ export const PANEL_ROW_GAP = 5;
 /** Gap between middle row cards (balance & random pick) */
 export const PANEL_MID_GAP = 20;
 /** Gap between bottom row cards (bet & profit) */
-export const PANEL_BOT_GAP = 97;
+export const PANEL_BOT_GAP = 87;
 /** Panel layer y-offset from CH (panelLayer.y = CH - PANEL_Y_OFFSET) */
 export const PANEL_Y_OFFSET = 80;
 /** Label text color in panel cards */
@@ -230,9 +230,15 @@ export const EGG_SCALE_W = 0.87;
 /** Egg icon height scale relative to tile height */
 export const EGG_SCALE_H = 1.08;
 /** Dragon icon width scale relative to tile width */
-export const DRAGON_ICON_SCALE_W = 1.08;
+export const DRAGON_ICON_SCALE_W = 1.58;
 /** Dragon icon height scale relative to tile height */
-export const DRAGON_ICON_SCALE_H = 1.17;
+export const DRAGON_ICON_SCALE_H = 1.67;
+/** Dragon icon y-offset from tile center (negative = higher) */
+export const DRAGON_ICON_Y_OFFSET = -10;
+/** Dragon icon float animation speed (lower = slower) */
+export const DRAGON_ICON_FLOAT_SPEED = 0.02;
+/** Dragon icon float animation amplitude (pixels) */
+export const DRAGON_ICON_FLOAT_AMP = 2;
 
 // ─── Animation ──────────────────────────────────────────────────────
 /** Frames between ambient ember spawns */
