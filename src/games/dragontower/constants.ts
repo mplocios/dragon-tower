@@ -92,9 +92,9 @@ export const DRAGON_GLOW_Y_OFFSET = 10;
 
 // ─── Play Button ────────────────────────────────────────────────────
 /** Play button circle radius */
-export const PLAY_R = 57;
+export const PLAY_R = 60;
 /** Play button y-offset adjustment (negative = up, positive = down) */
-export const PLAY_BTN_Y_OFFSET = 22;
+export const PLAY_BTN_Y_OFFSET = 24;
 /** Play button label font size (e.g. "CASH OUT") */
 export const PLAY_LABEL_FONT = 14;
 /** Play button amount font size (e.g. "5.00") */
@@ -114,13 +114,13 @@ export const PANEL_DIFF_H = 50;
 /** Middle row card height (balance / random pick) */
 export const PANEL_MID_H = 60;
 /** Bottom row card height (bet / profit) */
-export const PANEL_BOT_H = 70;
+export const PANEL_BOT_H = 75;
 /** Gap between panel rows */
-export const PANEL_ROW_GAP = 5;
+export const PANEL_ROW_GAP = 8;
 /** Gap between middle row cards (balance & random pick) */
 export const PANEL_MID_GAP = 20;
 /** Gap between bottom row cards (bet & profit) */
-export const PANEL_BOT_GAP = 87;
+export const PANEL_BOT_GAP = 90;
 /** Panel layer y-offset from CH (panelLayer.y = CH - PANEL_Y_OFFSET) */
 export const PANEL_Y_OFFSET = 80;
 /** Label text color in panel cards */
@@ -160,7 +160,7 @@ export const PANEL_BET_AMT_FONT = 16;
 /** Bet label y position */
 export const PANEL_BET_LBL_Y = 12;
 /** Bet bottom row y offset from card bottom */
-export const PANEL_BET_BOT_OFFSET = 18;
+export const PANEL_BET_BOT_OFFSET = 25;
 /** Arrow up button width */
 export const PANEL_ARROW_UP_W = 40;
 /** Arrow up button height */
@@ -168,7 +168,7 @@ export const PANEL_ARROW_UP_H = 24;
 /** Arrow down button width */
 export const PANEL_ARROW_DOWN_W = 50;
 /** Arrow down button height */
-export const PANEL_ARROW_DOWN_H = 24;
+export const PANEL_ARROW_DOWN_H = 30;
 /** Arrow x offset from card right edge */
 export const PANEL_ARROW_RIGHT = 72;
 /** Arrow up y position */
@@ -226,9 +226,11 @@ export const SHAKE_INTENSITY = 10;
 
 // ─── Sprite Scale Factors ───────────────────────────────────────────
 /** Egg icon width scale relative to tile width */
-export const EGG_SCALE_W = 0.87;
+export const EGG_SCALE_W = 1.27;
 /** Egg icon height scale relative to tile height */
-export const EGG_SCALE_H = 1.08;
+export const EGG_SCALE_H = 1.15;
+/** Egg icon y-offset from tile center (negative = higher) */
+export const EGG_Y_OFFSET = -5;
 /** Dragon icon width scale relative to tile width */
 export const DRAGON_ICON_SCALE_W = 1.38;
 /** Dragon icon height scale relative to tile height */

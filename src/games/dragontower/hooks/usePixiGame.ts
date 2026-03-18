@@ -5,7 +5,7 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_C
   GRID_TOP_RESERVE, TILE_ASPECT_RATIO, TILE_ASPECT_RATIO_MOBILE, GRID_BOTTOM_MARGIN, GRID_LAYER_Y,
   DRAGON_NORMAL_MAX_W, DRAGON_NORMAL_MAX_H, DRAGON_FIRE_MAX_W, DRAGON_FIRE_MAX_H,
   DRAGON_BREATH_AMPLITUDE, DRAGON_BREATH_FREQ,
-  DRAGON_ICON_SCALE_W, DRAGON_ICON_SCALE_H,
+  EGG_SCALE_W, EGG_SCALE_H, EGG_Y_OFFSET, DRAGON_ICON_SCALE_W, DRAGON_ICON_SCALE_H,
   DRAGON_ICON_Y_OFFSET, DRAGON_ICON_FLOAT_SPEED, DRAGON_ICON_FLOAT_AMP, DRAGON_ICON_ALPHA, DRAGON_ICON_TINT,
   DRAGON_SHADOW_W, DRAGON_SHADOW_H, DRAGON_SHADOW_Y, DRAGON_SHADOW_ALPHA,
   DRAGON_SPRITE_FRAMES, DRAGON_SPRITE_SPEED,
@@ -86,6 +86,8 @@ export function usePixiGame(
   const dragonBaseScaleRef = useRef(1);
   const revealedSetRef = useRef<Set<string>>(new Set());
   const tileAnimsRef = useRef<{ root: PIXI.Container; progress: number }[]>([]);
+  const activeTickersRef = useRef<Set<(...args: any[]) => void>>(new Set());
+  const activeTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
   // ── Mobile Panel refs ──
   const panelLayerRef = useRef<PIXI.Container | null>(null);
@@ -203,11 +205,12 @@ export function usePixiGame(
     if (type === 'egg') {
       if (TEX.egg) {
         const sp = new PIXI.Sprite(TEX.egg);
-        const sc = Math.min((w * 0.87) / sp.texture.width, (h * 1.08) / sp.texture.height);
-        sp.scale.set(sc); sp.anchor.set(0.5); sp.x = w / 2; sp.y = h / 2;
+        const sc = Math.min((w * EGG_SCALE_W) / sp.texture.width, (h * EGG_SCALE_H) / sp.texture.height);
+        sp.scale.set(sc); sp.anchor.set(0.5); sp.x = w / 2; sp.y = h / 2 + EGG_Y_OFFSET;
         tile.icons.addChild(sp);
       }
       tile.root.alpha = 1;
+      tile.root.zIndex = 5;
       if (animate) {
         tile.root.scale.set(0.4);
         tileAnimsRef.current.push({ root: tile.root, progress: 0 });
@@ -215,11 +218,12 @@ export function usePixiGame(
     } else if (type === 'egg_dim') {
       if (TEX.egg) {
         const sp = new PIXI.Sprite(TEX.egg);
-        const sc = Math.min((w * 0.87) / sp.texture.width, (h * 1.08) / sp.texture.height);
-        sp.scale.set(sc); sp.anchor.set(0.5); sp.x = w / 2; sp.y = h / 2;
+        const sc = Math.min((w * EGG_SCALE_W) / sp.texture.width, (h * EGG_SCALE_H) / sp.texture.height);
+        sp.scale.set(sc); sp.anchor.set(0.5); sp.x = w / 2; sp.y = h / 2 + EGG_Y_OFFSET;
         tile.icons.addChild(sp);
       }
       tile.root.alpha = 0.5;
+      tile.root.zIndex = 5;
     } else if (type === 'dragon') {
       const frames = dragonFramesRef.current;
       if (frames.length > 0) {
@@ -654,6 +658,7 @@ export function usePixiGame(
         container.scale.set(1);
         container.alpha = 1;
         appRef.current?.ticker.remove(popTicker);
+        activeTickersRef.current.delete(popTicker);
         return;
       }
       // Elastic overshoot ease
@@ -665,12 +670,16 @@ export function usePixiGame(
       container.alpha = Math.min(1, t * 2.5);
     };
     appRef.current?.ticker.add(popTicker);
+    activeTickersRef.current.add(popTicker);
 
     if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
-    resultTimerRef.current = setTimeout(() => {
+    const tid = setTimeout(() => {
       resultTimerRef.current = null;
+      activeTimeoutsRef.current.delete(tid);
       onPlayAgainRef.current();
     }, 7000);
+    resultTimerRef.current = tid;
+    activeTimeoutsRef.current.add(tid);
   }, []);
 
   const hideResultOverlay = useCallback(() => {
@@ -686,6 +695,43 @@ export function usePixiGame(
     }
   }, []);
 
+  // ─── Reset All Animation State ─────────────────────────────
+  const resetAnimationState = useCallback(() => {
+    const app = appRef.current;
+    if (!app) return;
+
+    // Remove all tracked ticker callbacks
+    activeTickersRef.current.forEach((fn) => app.ticker.remove(fn));
+    activeTickersRef.current.clear();
+
+    // Clear all tracked timeouts
+    activeTimeoutsRef.current.forEach((id) => clearTimeout(id));
+    activeTimeoutsRef.current.clear();
+
+    // Reset stage position (in case screenShake was interrupted)
+    app.stage.x = 0;
+    app.stage.y = 0;
+
+    // Clear all particles
+    const fxLayer = fxLayerRef.current;
+    if (fxLayer) {
+      const particles = particlesRef.current;
+      for (let i = particles.length - 1; i >= 0; i--) {
+        fxLayer.removeChild(particles[i]);
+        particles[i].destroy();
+      }
+      particlesRef.current = [];
+      // Remove any leftover flash overlays etc
+      fxLayer.removeChildren();
+    }
+
+    // Clear tile entrance animations
+    tileAnimsRef.current = [];
+
+    // Hide result overlay
+    hideResultOverlay();
+  }, [hideResultOverlay]);
+
   // ─── Particles ───────────────────────────────────────────────
   const spawnFX = useCallback((
     r: number, c: number,
@@ -696,7 +742,7 @@ export function usePixiGame(
     if (!fxLayer) return;
     const L = calcLayout(diff);
     const cx = PAD + L.offsetX + c * (L.tileW + TGAP) + L.tileW / 2;
-    const cy = L.gridY + (L.rows - 1 - r) * (L.tileH + RGAP) + L.tileH / 2;
+    const cy = L.gridY + (L.rows - 1 - r) * (L.tileH + RGAP) + L.tileH / 2 + GRID_LAYER_Y;
     const pal = type === 'fire'
       ? [0xff2200, 0xff5500, 0xff8800, 0xffbb00]
       : [0x20ff60, 0x14ff50, 0x88ffb8, 0x40ff80];
@@ -765,7 +811,8 @@ export function usePixiGame(
     positions.forEach((p) => fireworkBurst(p.x, p.y, 24, 3.5, sparkleColors));
 
     // ── WAVE 2: Delayed secondary fireworks (300ms) ──
-    setTimeout(() => {
+    const w2 = setTimeout(() => {
+      activeTimeoutsRef.current.delete(w2);
       if (!fxLayerRef.current) return;
       const pos2 = [
         { x: CW * 0.15, y: L.gridY + L.gridH * 0.15 },
@@ -774,9 +821,11 @@ export function usePixiGame(
       ];
       pos2.forEach((p) => fireworkBurst(p.x, p.y, 30, 4, goldColors));
     }, 300);
+    activeTimeoutsRef.current.add(w2);
 
     // ── WAVE 3: Final grand fireworks (650ms) ──
-    setTimeout(() => {
+    const w3 = setTimeout(() => {
+      activeTimeoutsRef.current.delete(w3);
       if (!fxLayerRef.current) return;
       const pos3 = [
         { x: CW * 0.3, y: L.gridY + L.gridH * 0.1 },
@@ -787,6 +836,7 @@ export function usePixiGame(
       ];
       pos3.forEach((p) => fireworkBurst(p.x, p.y, 28, 4.5, [...sparkleColors, ...goldColors]));
     }, 650);
+    activeTimeoutsRef.current.add(w3);
 
     // Screen flash effect — brief golden overlay
     const flash = new PIXI.Graphics();
@@ -799,11 +849,13 @@ export function usePixiGame(
         fxLayer.removeChild(flash);
         flash.destroy();
         appRef.current?.ticker.remove(flashTicker);
+        activeTickersRef.current.delete(flashTicker);
         return;
       }
       flash.alpha = flashLife * 0.15;
     };
     appRef.current?.ticker.add(flashTicker);
+    activeTickersRef.current.add(flashTicker);
   }, [calcLayout]);
 
   // ─── Lose Fire Explosion ────────────────────────────────────
@@ -812,7 +864,7 @@ export function usePixiGame(
     if (!fxLayer) return;
     const L = calcLayout(diff);
     const cx = PAD + L.offsetX + c * (L.tileW + TGAP) + L.tileW / 2;
-    const cy = L.gridY + (L.rows - 1 - r) * (L.tileH + RGAP) + L.tileH / 2;
+    const cy = L.gridY + (L.rows - 1 - r) * (L.tileH + RGAP) + L.tileH / 2 + GRID_LAYER_Y;
     const fireColors = [0xff0000, 0xff2200, 0xff4400, 0xff6600, 0xff8800, 0xcc0000];
     const emberColors = [0xff3300, 0xff5500, 0xff7700, 0xdd2200];
 
@@ -864,14 +916,17 @@ export function usePixiGame(
         fxLayer.removeChild(flash);
         flash.destroy();
         appRef.current?.ticker.remove(flashTicker);
+        activeTickersRef.current.delete(flashTicker);
         return;
       }
       flash.alpha = flashLife * 0.15;
     };
     appRef.current?.ticker.add(flashTicker);
+    activeTickersRef.current.add(flashTicker);
 
     // Delayed secondary explosion
-    setTimeout(() => {
+    const secId = setTimeout(() => {
+      activeTimeoutsRef.current.delete(secId);
       if (!fxLayerRef.current) return;
       for (let i = 0; i < 30; i++) {
         const col = fireColors[Math.floor(Math.random() * fireColors.length)];
@@ -881,6 +936,7 @@ export function usePixiGame(
           col, 2 + Math.random() * 4, 0.75, 0.01 + Math.random() * 0.02);
       }
     }, 200);
+    activeTimeoutsRef.current.add(secId);
   }, [calcLayout]);
 
   // ─── Screen Shake ───────────────────────────────────────────
@@ -900,6 +956,7 @@ export function usePixiGame(
         stage.x = origX;
         stage.y = origY;
         app.ticker.remove(shakeHandler);
+        activeTickersRef.current.delete(shakeHandler);
         return;
       }
       const decay = 1 - frame / maxFrames;
@@ -907,6 +964,7 @@ export function usePixiGame(
       stage.y = origY + (Math.random() - 0.5) * intensity * decay * 2;
     };
     app.ticker.add(shakeHandler);
+    activeTickersRef.current.add(shakeHandler);
   }, []);
 
   // ─── Swap Dragon Sprite ─────────────────────────────────────
@@ -1792,6 +1850,7 @@ export function usePixiGame(
     scaleCanvas,
     showResultOverlay,
     hideResultOverlay,
+    resetAnimationState,
     texRef,
     panelCooldownRef,
     appReady: !!appRef.current,

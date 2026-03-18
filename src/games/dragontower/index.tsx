@@ -49,6 +49,7 @@ const DragonTower: React.FC = () => {
   const pendingTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lockTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runNextAutoRoundRef = useRef<() => void>(() => {});
   const resetGameRef = useRef<() => void>(() => {});
   const engageLockRef = useRef<(ms?: number) => void>(() => {});
@@ -421,10 +422,17 @@ const DragonTower: React.FC = () => {
       gs().setAutoLastRoundWon(false);
 
       clearPendingTimers();
-      pixiGame.hideResultOverlay();
+      // Clear any lingering lock timeout from previous game
+      if (lockTimeoutRef.current) {
+        clearTimeout(lockTimeoutRef.current);
+        lockTimeoutRef.current = null;
+      }
+      // Kill all running animations/particles/timers from previous game
+      pixiGame.resetAnimationState();
       pixiGame.buildGrid(currentDiff);
       pixiGame.showFlameEffects(false);
       pixiGame.stopLoseSound();
+      pixiGame.swapDragonSprite(false);
       pixiGame.playNormalBgSound();
       pixiGame.refreshGrid(currentDiff, "playing", 0, {});
     },
@@ -537,7 +545,7 @@ const DragonTower: React.FC = () => {
       difficulty: s.diff,
     });
     gs().setRgstate("playagain");
-    pixiGame.hideResultOverlay();
+    pixiGame.resetAnimationState();
     pixiGame.swapDragonSprite(false);
 
     gs().resetRound();
@@ -557,9 +565,12 @@ const DragonTower: React.FC = () => {
 
   const engageLock = useCallback(
     (ms = 1000) => {
+      // Clear any previous lock timeout so it doesn't unlock prematurely
+      if (lockTimeoutRef.current) clearTimeout(lockTimeoutRef.current);
       gs().setPlayLock(true);
       pixiGame.panelCooldownRef.current = true;
-      setTimeout(() => {
+      lockTimeoutRef.current = setTimeout(() => {
+        lockTimeoutRef.current = null;
         gs().setPlayLock(false);
         pixiGame.panelCooldownRef.current = false;
         // Force panel redraw so button visually re-enables
@@ -587,17 +598,18 @@ const DragonTower: React.FC = () => {
       engageLock(1000);
       cashOut();
     } else if (s.gstate !== "playing") {
-      engageLock(1000);
-      // Reset first if coming from ended state
+      // Clear any leftover animations/timers from previous game before starting
+      clearPendingTimers();
       if (s.gstate === "ended") {
         pixiGame.hideResultOverlay();
         pixiGame.swapDragonSprite(false);
         pixiGame.showFlameEffects(false);
         pixiGame.stopLoseSound();
       }
+      engageLock(1000);
       startGame();
     }
-  }, [cashOut, startGame, pixiGame, engageLock]);
+  }, [cashOut, startGame, pixiGame, engageLock, clearPendingTimers]);
 
   // ─────────────────────────────────────────────────────────
   // DIFFICULTY CHANGE
@@ -945,6 +957,7 @@ const DragonTower: React.FC = () => {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
       const s = gs();
+      if (s.playLock) return;
       if (e.code === "Space") {
         e.preventDefault();
         if (s.gstate === "playing" && s.curMult > 1) cashOut();
