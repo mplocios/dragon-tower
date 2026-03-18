@@ -606,7 +606,6 @@ const DragonTower: React.FC = () => {
         pixiGame.showFlameEffects(false);
         pixiGame.stopLoseSound();
       }
-      engageLock(1000);
       startGame();
     }
   }, [cashOut, startGame, pixiGame, engageLock, clearPendingTimers]);

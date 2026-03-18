@@ -82,6 +82,7 @@ export function usePixiGame(
   const eggSoundRef = useRef<HTMLAudioElement | null>(null);
 
   const multDisplayRef = useRef<PIXI.Container | null>(null);
+  const multFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const frameRef = useRef(0);
   const dragonBaseScaleRef = useRef(1);
   const revealedSetRef = useRef<Set<string>>(new Set());
@@ -570,6 +571,27 @@ export function usePixiGame(
         multDisplayRef.current.visible = true;
         multDisplayRef.current.alpha = 0.95;
         multDisplayRef.current.scale.set(1.25);
+
+        // Auto-fade after 3 seconds
+        if (multFadeTimerRef.current) clearTimeout(multFadeTimerRef.current);
+        const fadeTarget = multDisplayRef.current;
+        multFadeTimerRef.current = setTimeout(() => {
+          multFadeTimerRef.current = null;
+          if (!fadeTarget || !fadeTarget.visible) return;
+          // Start fade-out via ticker
+          const fadeTicker = () => {
+            fadeTarget.alpha -= 0.03;
+            if (fadeTarget.alpha <= 0) {
+              fadeTarget.visible = false;
+              fadeTarget.alpha = 0;
+              appRef.current?.ticker.remove(fadeTicker);
+              activeTickersRef.current.delete(fadeTicker);
+            }
+          };
+          appRef.current?.ticker.add(fadeTicker);
+          activeTickersRef.current.add(fadeTicker);
+        }, 3000);
+        activeTimeoutsRef.current.add(multFadeTimerRef.current);
       } else {
         if (multDisplayRef.current) {
           multDisplayRef.current.visible = false;
