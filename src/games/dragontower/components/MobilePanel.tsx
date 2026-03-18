@@ -36,7 +36,7 @@ const cardStyle = (
   border: "none",
   outline: "none",
   background: "transparent",
-  backgroundImage: `url("${BASE}/assets/${bgImage}")`,
+  backgroundImage: `url("${BASE}/assets/dragontower/images/${bgImage}")`,
   backgroundSize: "100% 100%",
   backgroundPosition: "center",
   backgroundRepeat: "no-repeat",
@@ -50,13 +50,13 @@ const arrowBtn = (
   pressed: boolean,
   disabled: boolean,
 ): React.CSSProperties => ({
-  width: 32,
+  width: 28,
   height: 26,
   border: "none",
   outline: "none",
   borderRadius: 5,
   background: "transparent",
-  backgroundImage: `url("${BASE}/assets/${img}")`,
+  backgroundImage: `url("${BASE}/assets/dragontower/images/${img}")`,
   backgroundSize: "100% 100%",
   backgroundRepeat: "no-repeat",
   cursor: disabled ? "not-allowed" : "pointer",
@@ -69,13 +69,13 @@ const arrowBtn = (
 });
 
 // ─── TWEAK THESE ─────────────────────────────────────────────
-const PLAY_SIZE = 80; // play button diameter (px)
+const PLAY_SIZE = 100; // play button diameter (px)
 const PLAY_OFFSET_X = 0;
-const PLAY_OFFSET_Y = 10;
-const MID_CENTER_GAP = 20; // gap between Balance and Random Pick (px)
-const BOT_CENTER_GAP = 70; // gap between Bet and Total Profit (px)
-const MID_H = 50; // Balance / Random Pick row height (px)
-const BOT_H = 58; // Bet / Total Profit row height (px)
+const PLAY_OFFSET_Y = 20;
+const MID_CENTER_GAP = 30; // gap between Balance and Random Pick (px)
+const BOT_CENTER_GAP = 85; // gap between Bet and Total Profit (px)
+const MID_H = 60; // Balance / Random Pick row height (px)
+const BOT_H = 65; // Bet / Total Profit row height (px)
 const ROW_GAP = 5; // vertical gap between row 1 and row 2 (px)
 // ─────────────────────────────────────────────────────────────
 

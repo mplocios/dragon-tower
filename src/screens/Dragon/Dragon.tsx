@@ -70,8 +70,10 @@ export const Dragon = (): JSX.Element => {
   }, []);
 
   const handleFullscreen = useCallback(() => {
+    const el = document.getElementById('dr-container');
+    if (!el) return;
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+      el.requestFullscreen().catch(() => {});
       setIsFullscreen(true);
     } else {
       document.exitFullscreen().catch(() => {});
@@ -176,16 +178,16 @@ export const Dragon = (): JSX.Element => {
       )}
 
       <main className="flex-1 flex flex-col w-full">
-        <div className="relative">
+        <div className="relative shrink-0">
           <img
-            className="absolute top-px right-0 w-[388px] h-[75px] hidden xl:block"
+            className="absolute top-px right-0 w-[388px] h-[75px] hidden xl:block pointer-events-none"
             alt="Header background"
             src="/dragon-tower/header-background.png"
           />
 
           <div
             id="head-1"
-            className="flex items-center justify-between px-3 sm:px-4 lg:px-[22px] py-0 h-[60px] sm:h-[75px] bg-[#020401] fixed top-0 left-0 right-0 z-30 lg:sticky"
+            className="flex items-center justify-between px-3 sm:px-4 lg:px-[22px] py-0 h-[60px] sm:h-[75px] bg-[#020401] fixed top-0 left-0 right-0 z-30 lg:relative lg:z-auto"
           >
             <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-4">
               <Button

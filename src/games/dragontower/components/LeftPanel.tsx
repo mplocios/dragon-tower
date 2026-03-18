@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Difficulty, GameState, HistoryEntry } from "../types";
+import { Difficulty, GameState } from "../types";
 
 interface LeftPanelProps {
   balance: number;
@@ -32,7 +32,6 @@ interface AutoSettings {
 
 interface LeftPanelFullProps extends LeftPanelProps {
   auto: AutoSettings;
-  history: HistoryEntry[];
   onAutoToggle: () => void;
   onAutoBetChange: (v: number) => void;
   onAutoDiffChange: (v: Difficulty) => void;
@@ -79,17 +78,18 @@ const C = {
 
 const S = {
   panel: {
-    minWidth: 280,
+    // width: 300,
+    minWidth: 270,
     flexShrink: 0,
     background: C.bg,
     flexDirection: "column" as const,
     borderRadius: "18px 0 0 18px",
+    // borderRight: `1px solid ${C.border}`,
     fontFamily: "'Rajdhani', sans-serif",
     color: C.textPrimary,
-    padding: "14px 12px 20px",
+    padding: "14px 14px 20px",
     gap: 11,
     overflowY: "auto" as const,
-    overflowX: "hidden" as const,
   },
 
   // ── Tabs ──
@@ -142,12 +142,11 @@ const S = {
     borderRadius: 9,
     display: "flex",
     alignItems: "center",
-    padding: "0 8px",
-    height: 40,
-    gap: 6,
+    padding: "0 10px",
+    height: 44,
+    gap: 8,
     border: `1.5px solid ${focused ? C.borderFocus : C.border}`,
     transition: "border-color .15s",
-    minWidth: 0,
   }),
   input: {
     flex: 1,
@@ -163,14 +162,14 @@ const S = {
 
   // ── Bitcoin coin icon ──
   coinIcon: {
-    width: 20,
-    height: 20,
+    width: 22,
+    height: 22,
     borderRadius: "50%",
     background: `linear-gradient(135deg, ${C.btcOrange}, #a05808)`,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: 900,
     color: "#fff",
     flexShrink: 0,
@@ -186,13 +185,12 @@ const S = {
     fontFamily: "'Rajdhani', sans-serif",
     fontSize: 13,
     fontWeight: 700,
-    padding: "0 8px",
-    height: 40,
+    padding: "0 11px",
+    height: 44,
     cursor: disabled ? "not-allowed" : "pointer",
     whiteSpace: "nowrap" as const,
     transition: "all .15s",
     flexShrink: 0,
-    minWidth: 32,
   }),
   betRow: { display: "flex", gap: 5 },
 
@@ -337,13 +335,12 @@ const LeftPanel: React.FC<LeftPanelFullProps> = ({
   onCashOut,
   onRandom,
   auto,
-  history,
   onAutoToggle,
   onAutoBetChange,
   onAutoDiffChange,
   onAutoSettingsChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<"manual" | "auto" | "history">("manual");
+  const [activeTab, setActiveTab] = useState<"manual" | "auto">("manual");
   const [cooldown, setCooldown] = useState(false);
 
   const playing = gstate === "playing";
@@ -377,12 +374,6 @@ const LeftPanel: React.FC<LeftPanelFullProps> = ({
           onClick={() => setActiveTab("auto")}
         >
           Auto
-        </button>
-        <button
-          style={S.tab(activeTab === "history")}
-          onClick={() => setActiveTab("history")}
-        >
-          History
         </button>
       </div>
 
@@ -862,196 +853,6 @@ const LeftPanel: React.FC<LeftPanelFullProps> = ({
               </span>
             </div>
           )}
-        </>
-      )}
-
-      {/* ══════════════ HISTORY ══════════════ */}
-      {activeTab === "history" && (
-        <>
-          {/* Stats summary */}
-          {(() => {
-            const wins = history.filter((h) => h.result === "win").length;
-            const losses = history.filter((h) => h.result === "lose").length;
-            const totalProfit = history.reduce((s, h) => s + h.profit, 0);
-            const bestMult = history.reduce(
-              (m, h) => Math.max(m, h.multiplier),
-              0,
-            );
-            return (
-              <div
-                style={{
-                  ...S.sectionBox,
-                  gap: 8,
-                }}
-              >
-                <span
-                  style={{
-                    ...S.lbl,
-                    fontSize: 11,
-                    letterSpacing: 1.5,
-                  }}
-                >
-                  Statistics
-                </span>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 6,
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 10, color: C.labelColor }}>
-                      Games
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 700,
-                        color: C.textPrimary,
-                      }}
-                    >
-                      {history.length}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: C.labelColor }}>
-                      Win Rate
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 700,
-                        color: wins > losses ? C.green : C.red,
-                      }}
-                    >
-                      {history.length
-                        ? ((wins / history.length) * 100).toFixed(1)
-                        : 0}
-                      %
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: C.labelColor }}>
-                      Total P/L
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 700,
-                        color: totalProfit >= 0 ? C.green : C.red,
-                      }}
-                    >
-                      {totalProfit >= 0 ? "+" : ""}
-                      {fmt(totalProfit)}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: C.labelColor }}>
-                      Best Mult
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 700,
-                        color: C.gold,
-                      }}
-                    >
-                      {bestMult.toFixed(2)}x
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          <div style={S.divider} />
-
-          <span style={{ ...S.lbl, fontSize: 10 }}>Recent Games</span>
-
-          {/* History list */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 4,
-              maxHeight: 340,
-              overflowY: "auto",
-            }}
-          >
-            {history.length === 0 && (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: 20,
-                  color: C.labelColor,
-                  fontSize: 12,
-                }}
-              >
-                No games played yet
-              </div>
-            )}
-            {history.slice(0, 30).map((h, i) => (
-              <div
-                key={h.id + i}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "7px 10px",
-                  background: C.surface,
-                  borderRadius: 7,
-                  border: `1px solid ${C.border}`,
-                  gap: 6,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background:
-                        h.result === "win" ? C.green : C.red,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: C.textPrimary,
-                      }}
-                    >
-                      {h.difficulty} &middot;{" "}
-                      {h.multiplier > 0
-                        ? `${h.multiplier.toFixed(2)}x`
-                        : "0.00x"}
-                    </div>
-                    <div
-                      style={{ fontSize: 10, color: C.labelColor }}
-                    >
-                      Bet {fmt(h.bet)} &middot; Row {h.rowsCleared}
-                      /{9}
-                    </div>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color:
-                      h.profit >= 0 ? C.green : C.red,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {h.profit >= 0 ? "+" : ""}
-                  {fmt(h.profit)}
-                </div>
-              </div>
-            ))}
-          </div>
         </>
       )}
     </div>

@@ -1,8 +1,8 @@
 import { Difficulty, DiffConfig } from './types';
 
-export const CW = 420;
-export const CH = 720;
-export const PAD = 20;
+export const CW = 520;
+export const CH = 780;
+export const PAD = 40;
 export const TGAP = 6;
 export const RGAP = 5;
 export const WALL_H = 52;

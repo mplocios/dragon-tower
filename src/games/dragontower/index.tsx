@@ -199,6 +199,8 @@ const DragonTower: React.FC = () => {
           // 🔌 POST /api/game/result { gameId, result:"lose", bet, payout:0, row, difficulty }
         });
         setRgstate("endgame");
+        pixiGame.stopNormalBgSound();
+        pixiGame.playLoseSound();
         pixiGame.spawnLoseExplosion(r, c, st.diff);
         pixiGame.screenShake();
         pixiGame.refreshGrid(st.diff, newState, st.curRow, st.revealed);
@@ -210,7 +212,7 @@ const DragonTower: React.FC = () => {
           timestamp: Date.now(),
           difficulty: st.diff,
           bet: betRef.current,
-          result: 'lose',
+          result: "lose",
           multiplier: 0,
           payout: 0,
           profit: -betRef.current,
@@ -231,6 +233,7 @@ const DragonTower: React.FC = () => {
         // ── HIT EGG ─────────────────────────────────────────────
       } else {
         pixiGame.spawnFX(r, c, "sparkle", st.diff);
+        pixiGame.playEggSound();
         const m =
           MULTS[st.diff][r] ?? MULTS[st.diff][MULTS[st.diff].length - 1];
         const newMult = m;
@@ -319,8 +322,10 @@ const DragonTower: React.FC = () => {
               // 🔌 POST /api/game/result { gameId, result:"win", bet, multiplier, payout, rowsCompleted, difficulty }
             });
 
+            pixiGame.stopNormalBgSound();
             pixiGame.swapDragonSprite(true);
-            pixiGame.spawnWinCelebration(st.diff);
+            pixiGame.showFlameEffects(true, true);
+
             pixiGame.refreshGrid(st.diff, "ended", nextRow, st.revealed);
 
             // Save history entry
@@ -329,7 +334,7 @@ const DragonTower: React.FC = () => {
               timestamp: Date.now(),
               difficulty: st.diff,
               bet: betRef.current,
-              result: 'win',
+              result: "win",
               multiplier: newMult,
               payout: newWin,
               profit: parseFloat((newWin - betRef.current).toFixed(2)),
@@ -437,8 +442,10 @@ const DragonTower: React.FC = () => {
       autoLastRoundWonRef.current = false;
 
       pixiGame.hideResultOverlay();
-      // clearSession();
       pixiGame.buildGrid(currentDiff);
+      pixiGame.showFlameEffects(false);
+      pixiGame.stopLoseSound();
+      pixiGame.playNormalBgSound();
       pixiGame.refreshGrid(currentDiff, "playing", 0, revealed);
     },
     [showToast, pixiGame],
@@ -485,8 +492,9 @@ const DragonTower: React.FC = () => {
     });
     setRgstate("endgame");
     clearSession();
+    pixiGame.stopNormalBgSound();
     pixiGame.swapDragonSprite(true);
-    pixiGame.spawnWinCelebration(st.diff);
+    pixiGame.showFlameEffects(true, true);
     pixiGame.refreshGrid(st.diff, "ended", st.curRow, st.revealed);
 
     // Save history entry
@@ -495,7 +503,7 @@ const DragonTower: React.FC = () => {
       timestamp: Date.now(),
       difficulty: st.diff,
       bet: betRef.current,
-      result: 'win',
+      result: "win",
       multiplier: mult,
       payout: win,
       profit: parseFloat((win - betRef.current).toFixed(2)),
@@ -562,6 +570,9 @@ const DragonTower: React.FC = () => {
     setCurMult(1);
     setCurWin(0);
     pixiGame.buildGrid(stateRef.current.diff);
+    pixiGame.showFlameEffects(false);
+    pixiGame.stopLoseSound();
+    pixiGame.playNormalBgSound();
     pixiGame.refreshGrid(stateRef.current.diff, "idle", 0, {});
   }, [pixiGame]);
 
@@ -907,20 +918,20 @@ const DragonTower: React.FC = () => {
     const handleKey = (e: KeyboardEvent) => {
       // Don't trigger shortcuts when typing in inputs
       const tag = (e.target as HTMLElement).tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
       const st = stateRef.current;
-      if (e.code === 'Space') {
+      if (e.code === "Space") {
         e.preventDefault();
-        if (st.gstate === 'playing' && curMultRef.current > 1) cashOut();
-        else if (st.gstate !== 'playing') startGame();
-      } else if (e.code === 'KeyR' && st.gstate === 'playing') {
+        if (st.gstate === "playing" && curMultRef.current > 1) cashOut();
+        else if (st.gstate !== "playing") startGame();
+      } else if (e.code === "KeyR" && st.gstate === "playing") {
         e.preventDefault();
         doRandom();
       }
     };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
   }, [cashOut, startGame, doRandom]);
 
   // ── Render ──────────────────────────────────────────────────

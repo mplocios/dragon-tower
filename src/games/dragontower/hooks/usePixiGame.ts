@@ -43,6 +43,17 @@ export function usePixiGame(
   const texRef = useRef<Record<string, PIXI.Texture>>({});
   const resultOverlayRef = useRef<PIXI.Container | null>(null);
   const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flameBorderLeftRef = useRef<PIXI.Sprite | null>(null);
+  const flameBorderRightRef = useRef<PIXI.Sprite | null>(null);
+  const topFlameBgRef = useRef<PIXI.Sprite | null>(null);
+  const glowTopRef = useRef<PIXI.Graphics | null>(null);
+  const glowBottomRef = useRef<PIXI.Graphics | null>(null);
+  const checkoutSoundRef = useRef<HTMLAudioElement | null>(null);
+  const bgSoundRef = useRef<HTMLAudioElement | null>(null);
+  const normalBgSoundRef = useRef<HTMLAudioElement | null>(null);
+  const loseSoundRef = useRef<HTMLAudioElement | null>(null);
+  const brickSoundRef = useRef<HTMLAudioElement | null>(null);
+  const eggSoundRef = useRef<HTMLAudioElement | null>(null);
 
   const multDisplayRef = useRef<PIXI.Container | null>(null);
   const frameRef = useRef(0);
@@ -62,10 +73,10 @@ export function usePixiGame(
     const cfg = DIFF[diff];
     const gridW = CW - PAD * 2;
     const tileW = (gridW - TGAP * (cfg.cols - 1)) / cfg.cols;
-    const maxH = (CH - 220 - RGAP * (cfg.rows - 1)) / cfg.rows;
-    const tileH = Math.min(tileW * 0.55, maxH);
+    const maxH = (CH - 270 - RGAP * (cfg.rows - 1)) / cfg.rows;
+    const tileH = Math.min(tileW * 0.30, maxH);
     const gridH = cfg.rows * tileH + (cfg.rows - 1) * RGAP;
-    const gridY = CH - gridH - 60;
+    const gridY = CH - gridH - 100;
     return { cols: cfg.cols, rows: cfg.rows, tileW, tileH, gridH, gridY };
   }, []);
 
@@ -210,11 +221,26 @@ export function usePixiGame(
       gridLayer.addChild(wt);
     }
 
+    // ── Top flame background — BEHIND dragon (shown on win/cashout) ──
+    if (TEX.top_flame_bg) {
+      const topFlame = new PIXI.Sprite(TEX.top_flame_bg);
+      const topFlameW = fw + 80;
+      const topFlameH = 250;
+      topFlame.width = topFlameW; topFlame.height = topFlameH;
+      topFlame.anchor.set(0.5, 1);
+      topFlame.x = CW / 2; topFlame.y = wcy + 72;
+      topFlame.alpha = 0; topFlame.visible = false;
+      topFlame.label = 'topFlameBg';
+      gridLayer.addChild(topFlame);
+      topFlameBgRef.current = topFlame;
+    }
+
+    // Dragon — ABOVE top flame bg
     const dTex = TEX.dragon_normal ?? TEX.dragon_small;
     if (dTex) {
       const ds = new PIXI.Sprite(dTex);
-      const sc = Math.min(200 / ds.texture.width, 130 / ds.texture.height);
-      ds.scale.set(sc); ds.anchor.set(0.5, 1); ds.x = CW / 2; ds.y = wcy + 35;
+      const sc = Math.min(270 / ds.texture.width, 170 / ds.texture.height);
+      ds.scale.set(sc); ds.anchor.set(0.5, 1); ds.x = CW / 2; ds.y = wcy + 40;
       ds.label = 'wallDragon';
       dragonBaseScaleRef.current = sc;
       gridLayer.addChild(ds);
@@ -224,9 +250,56 @@ export function usePixiGame(
       const wb = new PIXI.Sprite(TEX.wall_bottom);
       const wbH = 76;
       wb.width = fw + 36; wb.height = wbH;
-      wb.x = fx - 18; wb.y = fy + fh - wbH / 2 + 20;
+      wb.x = fx - 18; wb.y = fy + fh - wbH / 2 + 15;
       wb.alpha = 1;
       gridLayer.addChild(wb);
+    }
+
+    // ── Top glow (around dragon area) — shown on win/cashout ──
+    const glowTop = new PIXI.Graphics();
+    glowTop.rect(fx - 20, wcy - 10, fw + 40, WALL_H + 40).fill({ color: 0xff6600, alpha: 0.12 });
+    glowTop.rect(fx - 10, wcy, fw + 20, WALL_H + 20).fill({ color: 0xff8800, alpha: 0.08 });
+    glowTop.alpha = 0; glowTop.visible = false;
+    glowTop.label = 'glowTop';
+    gridLayer.addChild(glowTop);
+    glowTopRef.current = glowTop;
+
+    // ── Bottom glow (below tower) — shown on win/cashout ──
+    const glowBottom = new PIXI.Graphics();
+    glowBottom.rect(fx - 10, fy + fh - 8, fw + 20, 30).fill({ color: 0xff5500, alpha: 0.15 });
+    glowBottom.rect(fx, fy + fh - 4, fw, 18).fill({ color: 0xff7700, alpha: 0.1 });
+    glowBottom.alpha = 0; glowBottom.visible = false;
+    glowBottom.label = 'glowBottom';
+    gridLayer.addChild(glowBottom);
+    glowBottomRef.current = glowBottom;
+
+    // ── Flame border sprites ──
+    flameBorderLeftRef.current = null;
+    flameBorderRightRef.current = null;
+    if (TEX.flame_border) {
+      const fbW = 150;
+      const fbH = fh + 20;
+
+      // Left flame border — no flip, fire points right (into tower)
+      const left = new PIXI.Sprite(TEX.flame_border);
+      left.width = fbW;
+      left.height = fbH;
+      left.x = fx - fbW + 115;
+      left.y = fy - 10;
+      left.alpha = 0;
+      left.visible = false;
+      flameBorderLeftRef.current = left;
+
+      // Right flame border — flipped, fire points left (into tower)
+      const right = new PIXI.Sprite(TEX.flame_border);
+      right.width = fbW;
+      right.height = fbH;
+      right.scale.x = -Math.abs(right.scale.x); // flip while keeping calculated scale
+      right.x = fx + fw + 35;
+      right.y = fy - 10;
+      right.alpha = 0;
+      right.visible = false;
+      flameBorderRightRef.current = right;
     }
   }, [calcLayout]);
 
@@ -301,6 +374,27 @@ export function usePixiGame(
       gridLayer.addChild(ml);
       row._ml = ml;
       tileObjsRef.current[r] = row;
+    }
+
+    // ── Add flame borders to uiLayer (topmost layer, above everything) ──
+    const uiL = uiLayerRef.current;
+    if (uiL) {
+      // Remove old flame borders from uiLayer
+      for (let i = uiL.children.length - 1; i >= 0; i--) {
+        const ch = uiL.children[i];
+        if (ch.label === 'flameBorderLeft' || ch.label === 'flameBorderRight') {
+          uiL.removeChild(ch);
+          ch.destroy();
+        }
+      }
+      if (flameBorderLeftRef.current) {
+        flameBorderLeftRef.current.label = 'flameBorderLeft';
+        uiL.addChild(flameBorderLeftRef.current);
+      }
+      if (flameBorderRightRef.current) {
+        flameBorderRightRef.current.label = 'flameBorderRight';
+        uiL.addChild(flameBorderRightRef.current);
+      }
     }
   }, [calcLayout, drawFrame, makeTile]);
 
@@ -460,18 +554,41 @@ export function usePixiGame(
     coinLabel.x = coinX; coinLabel.y = coinY;
     container.addChild(coinLabel);
 
-    container.scale.set(0.5);
+    // Set pivot to center so scale animation pops from middle
+    container.pivot.set(CW / 2, CH / 2);
+    container.x = CW / 2;
+    container.y = CH / 2;
+    container.scale.set(0);
     container.alpha = 0;
-    tileAnimsRef.current.push({ root: container, progress: 0 });
 
     uiLayer.addChild(container);
     resultOverlayRef.current = container;
+
+    // Pop-out animation from center
+    let t = 0;
+    const popTicker = () => {
+      t += 0.045;
+      if (t >= 1) {
+        container.scale.set(1);
+        container.alpha = 1;
+        appRef.current?.ticker.remove(popTicker);
+        return;
+      }
+      // Elastic overshoot ease
+      const ease = t < 0.6
+        ? (t / 0.6) * 1.15
+        : 1.15 - 0.15 * ((t - 0.6) / 0.4);
+      const s = Math.min(ease, 1.12);
+      container.scale.set(s);
+      container.alpha = Math.min(1, t * 2.5);
+    };
+    appRef.current?.ticker.add(popTicker);
 
     if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
     resultTimerRef.current = setTimeout(() => {
       resultTimerRef.current = null;
       onPlayAgainRef.current();
-    }, 3000);
+    }, 7000);
   }, []);
 
   const hideResultOverlay = useCallback(() => {
@@ -724,13 +841,140 @@ export function usePixiGame(
       if (ch.label === 'wallDragon') {
         (ch as PIXI.Sprite).texture = tex;
         const sc = win
-          ? Math.min(300 / tex.width, 240 / tex.height)
-          : Math.min(200 / tex.width, 130 / tex.height);
+          ? Math.min(350 / tex.width, 250 / tex.height)
+          : Math.min(270 / tex.width, 170 / tex.height);
         ch.scale.set(sc);
         dragonBaseScaleRef.current = sc;
         break;
       }
     }
+  }, []);
+
+  // ─── Show/Hide Flame Effects ────────────────────────────────
+  const showFlameEffects = useCallback((show: boolean, winOnly?: boolean) => {
+    const left = flameBorderLeftRef.current;
+    const right = flameBorderRightRef.current;
+    const topFlame = topFlameBgRef.current;
+    const gTop = glowTopRef.current;
+    const gBottom = glowBottomRef.current;
+    if (left) { left.visible = show; left.alpha = show ? 0.8 : 0; }
+    if (right) { right.visible = show; right.alpha = show ? 0.8 : 0; }
+    if (topFlame) { topFlame.visible = show && !!winOnly; topFlame.alpha = (show && !!winOnly) ? 0.7 : 0; }
+    if (gTop) { gTop.visible = show; gTop.alpha = show ? 0.8 : 0; }
+    if (gBottom) { gBottom.visible = show; gBottom.alpha = show ? 0.8 : 0; }
+
+    // ── Sound effects ──
+    const SOUND_BASE = '/dragon-tower/assets/dragontower/sounds';
+    if (show) {
+      // Stop any existing sounds first so they replay fresh
+      if (checkoutSoundRef.current) { checkoutSoundRef.current.pause(); checkoutSoundRef.current = null; }
+      if (bgSoundRef.current) { bgSoundRef.current.pause(); bgSoundRef.current = null; }
+
+      // Play checkout sound once
+      const checkout = new Audio(`${SOUND_BASE}/fsounds-checkout.wav`);
+      checkout.loop = false;
+      checkout.volume = 0.8;
+      checkout.play().catch(() => {});
+      checkoutSoundRef.current = checkout;
+
+      // Play background fire sound alongside
+      const bg = new Audio(`${SOUND_BASE}/fbgsound.wav`);
+      bg.loop = false;
+      bg.volume = 0.5;
+      bg.play().catch(() => {});
+      bgSoundRef.current = bg;
+    } else {
+      // Stop all sounds on return to normal
+      if (checkoutSoundRef.current) {
+        checkoutSoundRef.current.pause();
+        checkoutSoundRef.current.currentTime = 0;
+        checkoutSoundRef.current = null;
+      }
+      if (bgSoundRef.current) {
+        bgSoundRef.current.pause();
+        bgSoundRef.current.currentTime = 0;
+        bgSoundRef.current = null;
+      }
+    }
+  }, []);
+
+  // ─── Normal Background Sound (loop) ─────────────────────────
+  const playNormalBgSound = useCallback(() => {
+    const SOUND_BASE = '/dragon-tower/assets/dragontower/sounds';
+    if (normalBgSoundRef.current) {
+      normalBgSoundRef.current.pause();
+      normalBgSoundRef.current.currentTime = 0;
+      normalBgSoundRef.current = null;
+    }
+    const audio = new Audio(`${SOUND_BASE}/normal-state-bg-sound.wav`);
+    audio.loop = true;
+    audio.volume = 0.3;
+    audio.play().catch(() => {});
+    normalBgSoundRef.current = audio;
+  }, []);
+
+  const stopNormalBgSound = useCallback(() => {
+    if (normalBgSoundRef.current) {
+      normalBgSoundRef.current.pause();
+      normalBgSoundRef.current.currentTime = 0;
+      normalBgSoundRef.current = null;
+    }
+  }, []);
+
+  // ─── Lose Sound (once) + bg fire ──────────────────────────
+  const playLoseSound = useCallback(() => {
+    const SOUND_BASE = '/dragon-tower/assets/dragontower/sounds';
+    // Stop any existing lose/bg sounds
+    if (loseSoundRef.current) { loseSoundRef.current.pause(); loseSoundRef.current = null; }
+    if (bgSoundRef.current) { bgSoundRef.current.pause(); bgSoundRef.current = null; }
+    if (brickSoundRef.current) { brickSoundRef.current.pause(); brickSoundRef.current = null; }
+
+    const lose = new Audio(`${SOUND_BASE}/lose-fsound.wav`);
+    lose.loop = false;
+    lose.volume = 0.8;
+    lose.play().catch(() => {});
+    loseSoundRef.current = lose;
+
+    const brick = new Audio(`${SOUND_BASE}/brick-s1.wav`);
+    brick.loop = false;
+    brick.volume = 0.8;
+    brick.play().catch(() => {});
+    brickSoundRef.current = brick;
+
+    const bg = new Audio(`${SOUND_BASE}/fbgsound.wav`);
+    bg.loop = false;
+    bg.volume = 0.5;
+    bg.play().catch(() => {});
+    bgSoundRef.current = bg;
+  }, []);
+
+  const stopLoseSound = useCallback(() => {
+    if (loseSoundRef.current) {
+      loseSoundRef.current.pause();
+      loseSoundRef.current.currentTime = 0;
+      loseSoundRef.current = null;
+    }
+    if (brickSoundRef.current) {
+      brickSoundRef.current.pause();
+      brickSoundRef.current.currentTime = 0;
+      brickSoundRef.current = null;
+    }
+    if (bgSoundRef.current) {
+      bgSoundRef.current.pause();
+      bgSoundRef.current.currentTime = 0;
+      bgSoundRef.current = null;
+    }
+  }, []);
+
+  // ─── Egg Pick Sound (once) ─────────────────────────────────
+  const playEggSound = useCallback(() => {
+    const SOUND_BASE = '/dragon-tower/assets/dragontower/sounds';
+    if (eggSoundRef.current) { eggSoundRef.current.pause(); eggSoundRef.current = null; }
+    const egg = new Audio(`${SOUND_BASE}/Win_egg.wav`);
+    egg.loop = false;
+    egg.volume = 0.8;
+    egg.play().catch(() => {});
+    eggSoundRef.current = egg;
   }, []);
 
   // ─── Build Vignette ──────────────────────────────────────────
@@ -780,20 +1024,21 @@ export function usePixiGame(
 
   // ─── Load Textures ───────────────────────────────────────────
   const loadTextures = useCallback(async (onLoaded?: () => void) => {
-    const BASE = '/dragon-tower'
+    const BASE = '/dragon-tower/assets/dragontower/images'
     const TEX = texRef.current;
     const imgMap: Record<string, string> = {
-      dragon_small:  BASE+'/assets/dragon-small.png',
-      wall_bottom:   BASE+'/assets/wall.png',
-      dragon_normal: BASE+'/assets/dragon-normal.png',
-      dragon_fire:   BASE+'/assets/dragon-fire.png',
-      wall:          BASE+'/assets/wall.png',
-      tile_tex:      BASE+'/assets/tile-tex.png',
-      egg:           BASE+'/assets/dragon-egg-3.png',
-      dragon_icon:   BASE+'/assets/dragon-icon.png',
-      tile_dark:     BASE+'/assets/black-tile.png',
-      tile_green:    BASE+'/assets/green-tile.png',
-      result_bg:     BASE+'/assets/result_background.png',
+      dragon_small:  BASE+'/dragon-normal.png',
+      wall_bottom:   BASE+'/wall.png',
+      dragon_normal: BASE+'/dragon-normal.png',
+      dragon_fire:   BASE+'/dragon-fire.png',
+      wall:          BASE+'/wall.png',
+      egg:           BASE+'/dragon-egg-3.png',
+      dragon_icon:   BASE+'/dragon-icon.png',
+      tile_dark:     BASE+'/black-tile.png',
+      tile_green:    BASE+'/green-tile.png',
+      result_bg:     BASE+'/result_background.png',
+      flame_border:  BASE+'/flame-border.png',
+      top_flame_bg:  BASE+'/top-flame-bg.png',
     };
 
     const loadOne = async (key: string, path: string) => {
@@ -888,133 +1133,7 @@ export function usePixiGame(
 
         // ── FIRE BORDER ANIMATION — always visible during play ─────
         const st = getStateRef.current();
-        if (st.gstate === 'playing') {
-          const cfg = DIFF[st.diff];
-          const gridW = CW - PAD * 2;
-          const tileW = (gridW - TGAP * (cfg.cols - 1)) / cfg.cols;
-          const maxH = (CH - 220 - RGAP * (cfg.rows - 1)) / cfg.rows;
-          const tileH = Math.min(tileW * 0.55, maxH);
-          const gridH = cfg.rows * tileH + (cfg.rows - 1) * RGAP;
-          const gridY = CH - gridH - 60;
-
-          const fxX = PAD - 13;
-          const fw = CW - fxX * 2;
-          const leftX = fxX - 4;
-          const rightX = fxX + fw + 4;
-          const fireColors = [0xff2200, 0xff4400, 0xff6600, 0xff8800, 0xffaa00, 0xffcc00, 0xffdd33];
-          const coreColors = [0xff0000, 0xff1100, 0xff3300, 0xee2200];
-
-          // ── Main fire streams — left & right borders (every frame) ──
-          if (frameRef.current % 2 === 0) {
-            for (const sx of [leftX, rightX]) {
-              const isLeft = sx < CW / 2;
-              // 3-5 particles per side per frame for dense fire
-              const count = 3 + Math.floor(Math.random() * 3);
-              for (let i = 0; i < count; i++) {
-                const pg = new PIXI.Graphics() as any;
-                const col = fireColors[Math.floor(Math.random() * fireColors.length)];
-                const size = 1.5 + Math.random() * 5;
-                pg.circle(0, 0, size).fill({ color: col, alpha: 0.6 + Math.random() * 0.4 });
-                pg.x = sx + (Math.random() - 0.5) * 14;
-                pg.y = gridY + 10 + Math.random() * (gridH - 20);
-                pg._vx = (isLeft ? -1 : 1) * (0.2 + Math.random() * 0.8);
-                pg._vy = -(1.0 + Math.random() * 2.5);
-                pg._life = 1;
-                pg._decay = 0.012 + Math.random() * 0.022;
-                fxLayer.addChild(pg);
-                particles.push(pg);
-              }
-            }
-          }
-
-          // ── Inner core flames — brighter, tighter to wall (every frame) ──
-          for (const sx of [leftX + 2, rightX - 2]) {
-            if (Math.random() > 0.4) {
-              const pg = new PIXI.Graphics() as any;
-              const col = coreColors[Math.floor(Math.random() * coreColors.length)];
-              pg.circle(0, 0, 1 + Math.random() * 3).fill({ color: col, alpha: 0.8 + Math.random() * 0.2 });
-              pg.x = sx + (Math.random() - 0.5) * 6;
-              pg.y = gridY + 20 + Math.random() * (gridH - 40);
-              pg._vx = 0;
-              pg._vy = -(1.5 + Math.random() * 3);
-              pg._life = 1;
-              pg._decay = 0.018 + Math.random() * 0.03;
-              fxLayer.addChild(pg);
-              particles.push(pg);
-            }
-          }
-
-          // ── Bottom fire base — hot glow at base of tower ──────────
-          if (frameRef.current % 3 === 0) {
-            const baseY = gridY + gridH + 5;
-            for (let i = 0; i < 4; i++) {
-              const pg = new PIXI.Graphics() as any;
-              const col = fireColors[Math.floor(Math.random() * fireColors.length)];
-              pg.circle(0, 0, 2 + Math.random() * 4).fill({ color: col, alpha: 0.5 + Math.random() * 0.3 });
-              pg.x = fxX + 10 + Math.random() * (fw - 20);
-              pg.y = baseY + Math.random() * 8;
-              pg._vx = (Math.random() - 0.5) * 0.6;
-              pg._vy = -(0.8 + Math.random() * 1.5);
-              pg._life = 1;
-              pg._decay = 0.02 + Math.random() * 0.03;
-              fxLayer.addChild(pg);
-              particles.push(pg);
-            }
-          }
-
-          // ── Rising embers — float up past dragon ──────────────────
-          if (frameRef.current % 4 === 0) {
-            for (let i = 0; i < 3; i++) {
-              const pg = new PIXI.Graphics() as any;
-              const col = fireColors[Math.floor(Math.random() * fireColors.length)];
-              pg.circle(0, 0, 0.6 + Math.random() * 1.8).fill({ color: col, alpha: 0.3 + Math.random() * 0.4 });
-              pg.x = fxX + Math.random() * fw;
-              pg.y = gridY + gridH;
-              pg._vx = (Math.random() - 0.5) * 0.5;
-              pg._vy = -(0.5 + Math.random() * 1.2);
-              pg._life = 1;
-              pg._decay = 0.004 + Math.random() * 0.008;
-              fxLayer.addChild(pg);
-              particles.push(pg);
-            }
-          }
-
-          // ── Top flames near dragon — heat wave ─────────────────────
-          if (frameRef.current % 5 === 0) {
-            for (let i = 0; i < 2; i++) {
-              const topX = CW * 0.15 + Math.random() * CW * 0.7;
-              const topY = gridY - 20 - Math.random() * 50;
-              const pg = new PIXI.Graphics() as any;
-              const col = fireColors[Math.floor(Math.random() * fireColors.length)];
-              pg.circle(0, 0, 0.8 + Math.random() * 2.5).fill({ color: col, alpha: 0.3 + Math.random() * 0.35 });
-              pg.x = topX; pg.y = topY;
-              pg._vx = (Math.random() - 0.5) * 1;
-              pg._vy = -(0.3 + Math.random() * 1);
-              pg._life = 1;
-              pg._decay = 0.015 + Math.random() * 0.025;
-              fxLayer.addChild(pg);
-              particles.push(pg);
-            }
-          }
-
-          // ── Sparks that fly off the border ─────────────────────────
-          if (frameRef.current % 8 === 0) {
-            for (const sx of [leftX, rightX]) {
-              const isLeft = sx < CW / 2;
-              const pg = new PIXI.Graphics() as any;
-              pg.circle(0, 0, 0.5 + Math.random() * 1.2).fill({ color: 0xffee44, alpha: 0.9 });
-              pg.x = sx;
-              pg.y = gridY + Math.random() * gridH;
-              pg._vx = (isLeft ? -1 : 1) * (2 + Math.random() * 4);
-              pg._vy = -(2 + Math.random() * 4);
-              pg._life = 1;
-              pg._decay = 0.04 + Math.random() * 0.06;
-              fxLayer.addChild(pg);
-              particles.push(pg);
-            }
-          }
-        }
-
+ 
         // ── Idle ambient embers — subtle fire even when not playing ──
         if (st.gstate === 'idle' && frameRef.current % 8 === 0) {
           const idleColors = [0xff5500, 0xff7700, 0xff9900];
@@ -1043,7 +1162,7 @@ export function usePixiGame(
                 row[c].root.alpha = pulseAlpha;
               }
             }
-          }
+          } 
         }
 
         // ── Dragon breathing animation ────────────────────────────
@@ -1051,10 +1170,29 @@ export function usePixiGame(
           const ch = gridLayer.children[i];
           if (ch.label === 'wallDragon') {
             const base = dragonBaseScaleRef.current;
-            const breath = base * (1 + 0.02 * Math.sin(frameRef.current * 0.035));
+            const breath = base * (1 + 0.015 * Math.sin(frameRef.current * 0.015));
             ch.scale.set(breath);
             break;
           }
+        }
+
+        // ── Flame & glow pulse (slow) ─────────────────────────────
+        const pulse = Math.sin(frameRef.current * 0.02);
+        const flameL = flameBorderLeftRef.current;
+        const flameR = flameBorderRightRef.current;
+        const gTop = glowTopRef.current;
+        const gBot = glowBottomRef.current;
+        if (flameL && flameL.visible) {
+          flameL.alpha = 0.75 + 0.08 * pulse;
+        }
+        if (flameR && flameR.visible) {
+          flameR.alpha = 0.75 + 0.08 * Math.sin(frameRef.current * 0.02 + 0.5);
+        }
+        if (gTop && gTop.visible) {
+          gTop.alpha = 0.7 + 0.1 * pulse;
+        }
+        if (gBot && gBot.visible) {
+          gBot.alpha = 0.7 + 0.1 * Math.sin(frameRef.current * 0.02 + 1);
         }
 
         // ── Multiplier display smooth scale ───────────────────────
@@ -1097,6 +1235,12 @@ export function usePixiGame(
     spawnLoseExplosion,
     screenShake,
     swapDragonSprite,
+    showFlameEffects,
+    playNormalBgSound,
+    stopNormalBgSound,
+    playLoseSound,
+    stopLoseSound,
+    playEggSound,
     scaleCanvas,
     showResultOverlay,
     hideResultOverlay,
