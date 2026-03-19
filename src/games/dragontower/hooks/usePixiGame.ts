@@ -101,6 +101,7 @@ export function usePixiGame(
   const panelTextsRef = useRef<Record<string, any>>({});
   const panelCooldownRef = useRef(false);
   const dragonGlowRef = useRef<PIXI.Graphics | null>(null);
+  const stoneBgRef = useRef<PIXI.Container | null>(null);
 
   const onTileClickRef = useRef(options.onTileClick);
   const onPlayAgainRef = useRef(options.onPlayAgain);
@@ -275,17 +276,24 @@ export function usePixiGame(
     const gridLayer = gridLayerRef.current;
     if (!gridLayer) return;
 
+    // Remove previous stone background
+    if (stoneBgRef.current) {
+      gridLayer.removeChild(stoneBgRef.current);
+      stoneBgRef.current.destroy({ children: true });
+      stoneBgRef.current = null;
+    }
+
+    const container = new PIXI.Container();
     const g = new PIXI.Graphics();
-    const ix = fx, iy = fy, iw = fw, ih = fh;
     const rng = () => Math.random();
 
     // Solid dark stone base
-    g.rect(ix, iy, iw, ih).fill({ color: 0x141418 });
+    g.rect(fx, fy, fw, fh).fill({ color: 0x141418 });
 
     // Scattered noise for rough stone texture
     for (let i = 0; i < 1200; i++) {
-      const dx = ix + rng() * iw;
-      const dy = iy + rng() * ih;
+      const dx = fx + rng() * fw;
+      const dy = fy + rng() * fh;
       const bright = rng() > 0.4;
       const shade = bright
         ? 0x1a + Math.floor(rng() * 16)
@@ -297,8 +305,8 @@ export function usePixiGame(
 
     // Subtle large blotches for uneven stone surface
     for (let i = 0; i < 30; i++) {
-      const bx = ix + rng() * iw;
-      const by = iy + rng() * ih;
+      const bx = fx + rng() * (fw - 40);
+      const by = fy + rng() * (fh - 30);
       const bw = 15 + rng() * 40;
       const bh = 10 + rng() * 30;
       const dark = rng() > 0.5;
@@ -307,8 +315,17 @@ export function usePixiGame(
       g.rect(bx, by, bw, bh).fill({ color, alpha: 0.06 + rng() * 0.1 });
     }
 
-    g.zIndex = -1;
-    gridLayer.addChild(g);
+    container.addChild(g);
+
+    // Clip to frame bounds
+    const mask = new PIXI.Graphics();
+    mask.rect(fx, fy, fw, fh).fill({ color: 0xffffff });
+    container.addChild(mask);
+    container.mask = mask;
+
+    container.zIndex = -1;
+    gridLayer.addChild(container);
+    stoneBgRef.current = container;
   }, []);
 
   // ─── Draw Frame ─────────────────────────────────────────────
@@ -586,7 +603,7 @@ export function usePixiGame(
       const ml = tileObjs[r]._ml;
       if (ml) {
         ml.text = mults[r] ? `${mults[r]}×` : '';
-        ml.style.fill = isCur ? 0xeacc50 : isPast ? 0x5a8a3a : 0x2a4060;
+        ml.style.fill = isCur ? 0xeacc50 : isPast ? 0xd4842a : 0x2a4060;
         ml.style.fontSize = isCur ? 12 : 10;
       }
       for (let c = 0; c < tileObjs[r].length; c++) {
