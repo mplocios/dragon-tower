@@ -1581,11 +1581,15 @@ export function usePixiGame(
     diffHitBg.rect(0, 0, contentW, PANEL_DIFF_H).fill({ color: 0x000000, alpha: 0.001 });
     diffHit.addChild(diffHitBg);
     diffHit.eventMode = 'static'; diffHit.cursor = 'pointer';
+    let diffCooldown = false;
     diffHit.on('pointerdown', () => {
+      if (diffCooldown || panelCooldownRef.current) return;
+      diffCooldown = true;
       const cur = diffText.text as Difficulty;
       const idx = DIFF_OPTS.indexOf(cur);
       const next = DIFF_OPTS[(idx + 1) % DIFF_OPTS.length];
       onDiffChangeRef.current?.(next);
+      setTimeout(() => { diffCooldown = false; }, 300);
     });
     diffCard.addChild(diffHit);
     panelLayer.addChild(diffCard);
@@ -1833,6 +1837,7 @@ export function usePixiGame(
       playAmtText: playAmtText,
       randomBtn: randomBtn,
       diffHit: diffHit,
+      diffCard: diffCard,
     };
   }, []);
 
@@ -1895,6 +1900,7 @@ export function usePixiGame(
     if (t.upArrow) { t.upArrow.alpha = playing ? 0.35 : 1; t.upArrow.eventMode = playing ? 'none' : 'static'; }
     if (t.downArrow) { t.downArrow.alpha = playing ? 0.35 : 1; t.downArrow.eventMode = playing ? 'none' : 'static'; }
     if (t.diffHit) { t.diffHit.eventMode = playing ? 'none' : 'static'; }
+    if (t.diffCard) { t.diffCard.alpha = playing ? 0.45 : 1; }
     if (t.randomBtn) t.randomBtn.alpha = playing ? 1 : 0.4;
   }, []);
 
