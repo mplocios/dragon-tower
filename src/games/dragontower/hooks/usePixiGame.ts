@@ -1548,6 +1548,9 @@ export function usePixiGame(
       });
 
       scaleCanvas();
+      // Re-scale after layout settles (fixes stale size on refresh at tablet widths)
+      requestAnimationFrame(() => scaleCanvas());
+
       const onResize = () => {
         const wasMobile = isMobileRef.current;
         const nowMobile = window.innerWidth <= MOBILE_BREAKPOINT;
@@ -1573,8 +1576,18 @@ export function usePixiGame(
       };
       window.addEventListener('resize', onResize);
 
+      // Observe wrapper size changes (handles layout shifts after load)
+      let ro: ResizeObserver | null = null;
+      if (wrap) {
+        ro = new ResizeObserver(() => scaleCanvas());
+        ro.observe(wrap);
+      }
+
       // Store cleanup handler for resize listener
-      (app as any)._resizeCleanup = () => window.removeEventListener('resize', onResize);
+      (app as any)._resizeCleanup = () => {
+        window.removeEventListener('resize', onResize);
+        if (ro) ro.disconnect();
+      };
     })();
 
     return () => {

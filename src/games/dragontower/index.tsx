@@ -982,9 +982,11 @@ const DragonTower: React.FC = () => {
         onAutoToggle={toggleAutobet}
       />
 
-      <div id="game-panel">
-        <div id="dragon-bg"></div>
-        <div id="canvas-wrap" ref={canvasWrapRef}></div>
+      <div id="game-panel-outer">
+        <div id="game-panel">
+          <div id="dragon-bg"></div>
+          <div id="canvas-wrap" ref={canvasWrapRef}></div>
+        </div>
       </div>
 
       <Toast message={toast} />

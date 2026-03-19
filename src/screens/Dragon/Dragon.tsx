@@ -404,12 +404,7 @@ export const Dragon = (): JSX.Element => {
         </header>
 
         <div className="flex-1 flex items-center justify-center lg:p-[15px]">
-          <div
-            id="dr-container"
-            className="w-full h-full border border-[#333] rounded-2xl bg-[#0a0a0d]"
-          >
-            <DragonTower />
-          </div>
+          <DragonTower />
         </div>
       </main>
 

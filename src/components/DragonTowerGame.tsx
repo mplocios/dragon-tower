@@ -218,6 +218,7 @@ export const DragonTowerGame = (): JSX.Element => {
           )}
         </div>
       </div>
+
     </div>
   );
 };
