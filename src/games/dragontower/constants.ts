@@ -106,9 +106,9 @@ export const TOP_LIGHTING_Y_OFFSET = 20;
 
 // ─── Play Button ────────────────────────────────────────────────────
 /** Play button circle radius */
-export const PLAY_R = 55;
+export const PLAY_R = 57;
 /** Play button y-offset adjustment (negative = up, positive = down) */
-export const PLAY_BTN_Y_OFFSET = 22;
+export const PLAY_BTN_Y_OFFSET = 25;
 /** Play button label font size (e.g. "CASH OUT") */
 export const PLAY_LABEL_FONT = 14;
 /** Play button amount font size (e.g. "5.00") */
@@ -126,7 +126,7 @@ export const PANEL_PY = 8;
 /** Difficulty row card height */
 export const PANEL_DIFF_H = 50;
 /** Middle row card height (balance / random pick) */
-export const PANEL_MID_H = 60;
+export const PANEL_MID_H = 57;
 /** Bottom row card height (bet / profit) */
 export const PANEL_BOT_H = 75;
 /** Gap between panel rows */

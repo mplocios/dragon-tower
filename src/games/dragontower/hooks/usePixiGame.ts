@@ -274,8 +274,7 @@ export function usePixiGame(
     if (!gridLayer) return;
 
     const g = new PIXI.Graphics();
-    const inset = 9;
-    const ix = fx + inset, iy = fy + inset, iw = fw - inset * 2, ih = fh - inset * 2;
+    const ix = fx, iy = fy, iw = fw, ih = fh;
     const rng = () => Math.random();
 
     // Solid dark stone base
