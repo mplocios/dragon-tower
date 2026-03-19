@@ -72,7 +72,7 @@ export const WALL_BOTTOM_H = 76;
 /** Top flame bg width extension beyond frame width */
 export const TOP_FLAME_W_EXT = 80;
 /** Top flame bg height */
-export const TOP_FLAME_H = 250;
+export const TOP_FLAME_H = 450;
 /** Top flame y-anchor offset from wall center-y */
 export const TOP_FLAME_Y_ANCHOR = 72;
 /** Dragon normal sprite max width for scale calculation */
@@ -82,7 +82,7 @@ export const DRAGON_NORMAL_MAX_H = 170;
 /** Dragon fire sprite max width for scale calculation */
 export const DRAGON_FIRE_MAX_W = 400;
 /** Dragon fire sprite max height for scale calculation */
-export const DRAGON_FIRE_MAX_H = 370;
+export const DRAGON_FIRE_MAX_H = 470;
 /** Dragon sprite y-offset from wall center-y */
 export const DRAGON_Y_OFFSET = 40;
 /** Dragon glow circle radii (outer to inner) */

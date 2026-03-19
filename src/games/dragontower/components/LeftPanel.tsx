@@ -153,7 +153,7 @@ const S = {
     background: C.surface,
     border: `1.5px solid ${C.border}`,
     borderRadius: 8,
-    color: disabled ? "#2a3a4a" : C.valueColor,
+    color: C.valueColor,
     fontFamily: "'Rajdhani', sans-serif",
     fontSize: 13,
     fontWeight: 700,
@@ -237,13 +237,12 @@ const S = {
   },
   rndBtn: (disabled: boolean): React.CSSProperties => ({
     width: "100%",
-    background: "transparent",
-    border: `1.5px solid ${disabled ? "#1a2535" : C.border}`,
+    background: "#33333A",
+    border: "none",
     borderRadius: 11,
-    color: disabled ? "#2a3a4a" : C.labelColor,
-    fontFamily: "'Rajdhani', sans-serif",
-    fontSize: 13,
-    fontWeight: 700,
+    fontFamily: "'Poppins', sans-serif",
+    fontSize: 16,
+    fontWeight: 600,
     padding: 11,
     cursor: disabled ? "not-allowed" : "pointer",
     transition: "all .18s",
@@ -466,7 +465,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 {fmt(curWin)}
               </span>
             </div>
-            <div style={S.inputBox()}>
+            <div style={{ ...S.inputBox(), background: "#33333A", border: "none" }}>
               <span style={{ ...S.input, cursor: "default" }}>
                 {fmtBtc(curWin)}
               </span>
