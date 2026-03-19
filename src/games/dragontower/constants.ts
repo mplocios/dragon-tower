@@ -95,6 +95,14 @@ export const DRAGON_GLOW_Y_OFFSET = 0;
 export const DRAGON_GLOW_COLORS = [0xff4400, 0xff6600, 0x000000] as const;
 /** Dragon glow alphas [outer, middle, inner] */
 export const DRAGON_GLOW_ALPHAS = [0.08, 0.12, 0.18] as const;
+/** Dragon glow gradient steps */
+export const DRAGON_GLOW_STEPS = 25;
+/** Dragon glow gradient color */
+export const DRAGON_GLOW_GRADIENT_COLOR = 0xff5500;
+/** Dragon glow min alpha (outer edge) */
+export const DRAGON_GLOW_ALPHA_MIN = 0.001;
+/** Dragon glow max alpha (center) */
+export const DRAGON_GLOW_ALPHA_MAX = 0.02;
 
 // ─── Top Lighting ───────────────────────────────────────────────────
 /** Top lighting width extension beyond frame width */

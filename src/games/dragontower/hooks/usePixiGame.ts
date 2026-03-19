@@ -7,6 +7,7 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_C
   WALL_OVERSHOOT_W, WALL_OVERSHOOT_H, WALL_OFFSET_X, WALL_OFFSET_Y,
   DRAGON_BREATH_AMPLITUDE, DRAGON_BREATH_FREQ, DRAGON_Y_OFFSET,
   DRAGON_GLOW_RADII, DRAGON_GLOW_X_OFFSET, DRAGON_GLOW_Y_OFFSET, DRAGON_GLOW_COLORS, DRAGON_GLOW_ALPHAS,
+  DRAGON_GLOW_STEPS, DRAGON_GLOW_GRADIENT_COLOR, DRAGON_GLOW_ALPHA_MIN, DRAGON_GLOW_ALPHA_MAX,
   EGG_SCALE_W, EGG_SCALE_H, EGG_Y_OFFSET, DRAGON_ICON_SCALE_W, DRAGON_ICON_SCALE_H,
   DRAGON_ICON_Y_OFFSET, DRAGON_ICON_FLOAT_SPEED, DRAGON_ICON_FLOAT_AMP, DRAGON_ICON_ALPHA, DRAGON_ICON_TINT,
   DRAGON_SHADOW_W, DRAGON_SHADOW_H, DRAGON_SHADOW_Y, DRAGON_SHADOW_ALPHA,
@@ -386,12 +387,16 @@ export function usePixiGame(
       gridLayer.addChild(ds);
     }
 
-    // Dragon glow — IN FRONT of dragon, always visible in normal/lose
+    // Dragon glow — smooth radial gradient, IN FRONT of dragon
     const dragonGlow = new PIXI.Graphics();
     const glowX = CW / 2 + DRAGON_GLOW_X_OFFSET, glowY = wcy + DRAGON_GLOW_Y_OFFSET;
-    dragonGlow.circle(glowX, glowY, DRAGON_GLOW_RADII[0]).fill({ color: DRAGON_GLOW_COLORS[0], alpha: DRAGON_GLOW_ALPHAS[0] });
-    dragonGlow.circle(glowX, glowY, DRAGON_GLOW_RADII[1]).fill({ color: DRAGON_GLOW_COLORS[1], alpha: DRAGON_GLOW_ALPHAS[1] });
-    dragonGlow.circle(glowX, glowY, DRAGON_GLOW_RADII[2]).fill({ color: DRAGON_GLOW_COLORS[2], alpha: DRAGON_GLOW_ALPHAS[2] });
+    const maxR = DRAGON_GLOW_RADII[0];
+    for (let i = 0; i < DRAGON_GLOW_STEPS; i++) {
+      const t = i / (DRAGON_GLOW_STEPS - 1); // 0 = outer, 1 = inner
+      const r = maxR * (1 - t);
+      const a = DRAGON_GLOW_ALPHA_MIN + t * DRAGON_GLOW_ALPHA_MAX;
+      dragonGlow.circle(glowX, glowY, r).fill({ color: DRAGON_GLOW_GRADIENT_COLOR, alpha: a });
+    }
     dragonGlow.label = 'dragonGlow';
     dragonGlow.zIndex = 21;
     gridLayer.addChild(dragonGlow);
@@ -1496,7 +1501,9 @@ export function usePixiGame(
         const dGlow = dragonGlowRef.current;
         if (dGlow && dGlow.visible) {
           const t = (breathVal + 1) / 2; // 0 = exhale, 1 = inhale
-          dGlow.alpha = 0.5 + 0.5 * t;
+          // Smooth easing: cubic ease-in-out for seamless pulse
+          const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+          dGlow.alpha = 0.7 + 0.3 * eased;
         }
 
         // ── Flame & glow pulse (slow) ─────────────────────────────
