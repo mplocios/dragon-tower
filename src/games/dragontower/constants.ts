@@ -98,9 +98,9 @@ export const DRAGON_GLOW_ALPHAS = [0.08, 0.12, 0.18] as const;
 
 // ─── Play Button ────────────────────────────────────────────────────
 /** Play button circle radius */
-export const PLAY_R = 60;
+export const PLAY_R = 55;
 /** Play button y-offset adjustment (negative = up, positive = down) */
-export const PLAY_BTN_Y_OFFSET = 24;
+export const PLAY_BTN_Y_OFFSET = 22;
 /** Play button label font size (e.g. "CASH OUT") */
 export const PLAY_LABEL_FONT = 14;
 /** Play button amount font size (e.g. "5.00") */
@@ -124,9 +124,9 @@ export const PANEL_BOT_H = 75;
 /** Gap between panel rows */
 export const PANEL_ROW_GAP = 8;
 /** Gap between middle row cards (balance & random pick) */
-export const PANEL_MID_GAP = 20;
+export const PANEL_MID_GAP = 15;
 /** Gap between bottom row cards (bet & profit) */
-export const PANEL_BOT_GAP = 90;
+export const PANEL_BOT_GAP = 85;
 /** Panel layer y-offset from CH (panelLayer.y = CH - PANEL_Y_OFFSET) */
 export const PANEL_Y_OFFSET = 80;
 /** Label text color in panel cards */

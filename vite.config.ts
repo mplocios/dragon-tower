@@ -6,7 +6,7 @@ import { defineConfig } from "vite";
 export default defineConfig({
 
   plugins: [react()],
-   base: "/dragon-tower/",
+   base: `${process.env.VITE_BASE || "/dragon-tower"}/`,
   css: {
     postcss: {
       plugins: [tailwind()],

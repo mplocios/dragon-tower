@@ -24,7 +24,7 @@ const fmt = (v: number) =>
 
 const DIFF_OPTS: Difficulty[] = ["Easy", "Medium", "Hard", "Expert", "Master"];
 
-const BASE = "/dragon-tower";
+const BASE = import.meta.env.VITE_BASE || "/dragon-tower";
 
 // Label color — used for all labels/text except amounts
 const LBL = "#91A9B6";
@@ -102,6 +102,13 @@ const MobilePanel: React.FC<MobilePanelProps> = ({
   const playing = gstate === "playing";
   const canCash = playing && curMult > 1;
   const btnDisabled = (playing && !canCash) || cooldown;
+
+  useEffect(() => {
+    const img = new Image();
+    img.src = `${BASE}/assets/play_btn.png`;
+    img.onload = () => console.log("loaded play btn");
+    img.onerror = () => console.error("failed to load play btn:", img.src);
+  }, []);
 
   useEffect(() => {
     if (rgstate === "playagain") {
@@ -428,18 +435,10 @@ const MobilePanel: React.FC<MobilePanelProps> = ({
               style={{
                 width: PLAY_SIZE,
                 height: PLAY_SIZE,
-                borderRadius: "50%",
                 border: "none",
                 background: canCash
-                  ? "radial-gradient(circle at 36% 30%, #f4ff40, #c8d800 55%, #9aaa00)"
-                  : btnDisabled
-                    ? "radial-gradient(circle at 36% 30%, #888, #555 55%, #333)"
-                    : "radial-gradient(circle at 36% 30%, #f4ff40, #c8d800 55%, #9aaa00)",
-                boxShadow: canCash
-                  ? undefined
-                  : btnDisabled
-                    ? "0 0 0 4px rgba(100,100,100,.12), 0 4px 14px rgba(0,0,0,.4)"
-                    : "0 0 0 6px rgba(180,200,0,.22), 0 0 0 12px rgba(180,200,0,.1), 0 8px 28px rgba(180,200,0,.55)",
+                  ? "transparent"
+                  : `url("${BASE}/assets/play_btn.png") center / 100% 100% no-repeat`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -464,7 +463,7 @@ const MobilePanel: React.FC<MobilePanelProps> = ({
                   e.currentTarget.style.transform = "scale(1.07)";
               }}
             >
-              {canCash ? (
+              {canCash && (
                 <div style={{ textAlign: "center", lineHeight: 1.2 }}>
                   <div style={{ fontSize: 18 }}>💰</div>
                   <div
@@ -478,17 +477,6 @@ const MobilePanel: React.FC<MobilePanelProps> = ({
                     {fmt(curWin)}
                   </div>
                 </div>
-              ) : (
-                <div
-                  style={{
-                    width: 0,
-                    height: 0,
-                    borderStyle: "solid",
-                    borderWidth: "14px 0 14px 24px",
-                    borderColor: `transparent transparent transparent ${btnDisabled ? "#555" : "#1c2e00"}`,
-                    marginLeft: 6,
-                  }}
-                />
               )}
             </button>
           </div>

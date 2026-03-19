@@ -1212,7 +1212,8 @@ export function usePixiGame(
 
   // ─── Load Textures ───────────────────────────────────────────
   const loadTextures = useCallback(async (onLoaded?: () => void) => {
-    const BASE = '/dragon-tower/assets/dragontower/images'
+    const VBASE = import.meta.env.VITE_BASE || '/dragon-tower';
+    const BASE = VBASE + '/assets/dragontower/images'
     const TEX = texRef.current;
     const imgMap: Record<string, string> = {
       dragon_small:  BASE+'/dragon-normal.png',
@@ -1235,6 +1236,8 @@ export function usePixiGame(
       bet_down_bg:   BASE+'/bet-down-bg.png',
       total_profit_bg: BASE+'/total-profit-bg.png',
       gcoin:           BASE+'/gcoin.png',
+      play_btn:        VBASE + '/assets/play_btn.png',
+      play_btn_empty:  VBASE + '/assets/play_btn_empty.png',
     };
 
     const loadOne = async (key: string, path: string) => {
@@ -1761,11 +1764,19 @@ export function usePixiGame(
     // ── Play Button (centered in gap between rows 2 & 3) ──────
     const playX = CW / 2;
     const playY = yy - PANEL_ROW_GAP / 2 + PLAY_BTN_Y_OFFSET;
-    const playCircle = new PIXI.Graphics();
-    // Radial gradient approximation — outer ring + inner bright fill
-    playCircle.circle(0, 0, PLAY_R + 4).fill({ color: 0x9aaa00, alpha: 0.3 });
-    playCircle.circle(0, 0, PLAY_R).fill({ color: 0xc8d800 });
-    playCircle.circle(0, 0, PLAY_R - 8).fill({ color: 0xe8f020, alpha: 0.5 });
+    let playCircle: PIXI.Sprite | PIXI.Graphics;
+    if (TEX.play_btn) {
+      playCircle = new PIXI.Sprite(TEX.play_btn);
+      playCircle.anchor.set(0.5);
+      playCircle.width = PLAY_R * 2;
+      playCircle.height = PLAY_R * 2;
+    } else {
+      const g = new PIXI.Graphics();
+      g.circle(0, 0, PLAY_R + 4).fill({ color: 0x9aaa00, alpha: 0.3 });
+      g.circle(0, 0, PLAY_R).fill({ color: 0xc8d800 });
+      g.circle(0, 0, PLAY_R - 8).fill({ color: 0xe8f020, alpha: 0.5 });
+      playCircle = g;
+    }
     playCircle.x = playX; playCircle.y = playY;
     playCircle.eventMode = 'static'; playCircle.cursor = 'pointer';
     playCircle.on('pointerdown', () => {
@@ -1774,13 +1785,15 @@ export function usePixiGame(
     });
     panelLayer.addChild(playCircle);
 
-    // Play triangle
+    // Play triangle (only needed if no play_btn texture)
     const playTriangle = new PIXI.Graphics();
-    playTriangle.poly([
-      { x: -10, y: -14 },
-      { x: -10, y: 14 },
-      { x: 16, y: 0 },
-    ]).fill({ color: 0x1c2e00 });
+    if (!TEX.play_btn) {
+      playTriangle.poly([
+        { x: -10, y: -14 },
+        { x: -10, y: 14 },
+        { x: 16, y: 0 },
+      ]).fill({ color: 0x1c2e00 });
+    }
     playTriangle.x = playX + 3; playTriangle.y = playY;
     panelLayer.addChild(playTriangle);
 
@@ -1854,7 +1867,18 @@ export function usePixiGame(
     const disabled = (playing && !canCash) || panelCooldownRef.current;
 
     // Play button state
-    if (t.playCircle) t.playCircle.alpha = disabled ? 0.45 : 1;
+    const TEX = texRef.current;
+    if (t.playCircle) {
+      t.playCircle.alpha = disabled ? 0.45 : 1;
+      // Swap play button texture for cashout state
+      if (t.playCircle instanceof PIXI.Sprite) {
+        if (canCash && TEX.play_btn_empty) {
+          t.playCircle.texture = TEX.play_btn_empty;
+        } else if (TEX.play_btn) {
+          t.playCircle.texture = TEX.play_btn;
+        }
+      }
+    }
     if (t.playTriangle && t.playCoin && t.playAmtText) {
       if (canCash) {
         t.playTriangle.visible = false;
