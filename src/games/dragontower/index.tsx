@@ -875,6 +875,7 @@ const DragonTower: React.FC = () => {
 
     const tid = setTimeout(async () => {
       await pixiGame.loadTextures();
+      pixiGame.preloadSounds();
       pixiGame.buildVignette();
       pixiGame.buildMobilePanel();
 

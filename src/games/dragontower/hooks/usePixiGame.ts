@@ -84,6 +84,7 @@ export function usePixiGame(
   const loseSoundRef = useRef<HTMLAudioElement | null>(null);
   const brickSoundRef = useRef<HTMLAudioElement | null>(null);
   const eggSoundRef = useRef<HTMLAudioElement | null>(null);
+  const soundCacheRef = useRef<Record<string, HTMLAudioElement>>({});
 
   const multDisplayRef = useRef<PIXI.Container | null>(null);
   const multFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1090,6 +1091,39 @@ export function usePixiGame(
   }, []);
 
   // ─── Show/Hide Flame Effects ────────────────────────────────
+  // ─── Sound Preloading ──────────────────────────────────────
+  const SOUND_BASE = (import.meta.env.VITE_BASE || '/dragon-tower') + '/assets/dragontower/sounds';
+  const SOUND_FILES = [
+    'fsounds-checkout.wav',
+    'fbgsound.wav',
+    'normal-state-bg-sound.wav',
+    'lose-fsound.wav',
+    'brick-s1.wav',
+    'Win_egg.wav',
+  ];
+
+  const preloadSounds = useCallback(() => {
+    const cache = soundCacheRef.current;
+    SOUND_FILES.forEach((file) => {
+      if (cache[file]) return;
+      const audio = new Audio(`${SOUND_BASE}/${file}`);
+      audio.preload = 'auto';
+      audio.load();
+      cache[file] = audio;
+    });
+  }, []);
+
+  const playSound = useCallback((file: string, opts?: { loop?: boolean; volume?: number }): HTMLAudioElement => {
+    const cache = soundCacheRef.current;
+    // Clone from preloaded source for instant playback
+    const src = cache[file];
+    const audio = src ? src.cloneNode(true) as HTMLAudioElement : new Audio(`${SOUND_BASE}/${file}`);
+    audio.loop = opts?.loop ?? false;
+    audio.volume = opts?.volume ?? 0.8;
+    audio.play().catch(() => {});
+    return audio;
+  }, []);
+
   const showFlameEffects = useCallback((show: boolean, winOnly?: boolean) => {
     const left = flameBorderLeftRef.current;
     const right = flameBorderRightRef.current;
@@ -1107,27 +1141,13 @@ export function usePixiGame(
     if (dGlow) { dGlow.visible = !show; }
 
     // ── Sound effects ──
-    const SOUND_BASE = '/dragon-tower/assets/dragontower/sounds';
     if (show) {
-      // Stop any existing sounds first so they replay fresh
       if (checkoutSoundRef.current) { checkoutSoundRef.current.pause(); checkoutSoundRef.current = null; }
       if (bgSoundRef.current) { bgSoundRef.current.pause(); bgSoundRef.current = null; }
 
-      // Play checkout sound once
-      const checkout = new Audio(`${SOUND_BASE}/fsounds-checkout.wav`);
-      checkout.loop = false;
-      checkout.volume = 0.8;
-      checkout.play().catch(() => {});
-      checkoutSoundRef.current = checkout;
-
-      // Play background fire sound alongside
-      const bg = new Audio(`${SOUND_BASE}/fbgsound.wav`);
-      bg.loop = false;
-      bg.volume = 0.5;
-      bg.play().catch(() => {});
-      bgSoundRef.current = bg;
+      checkoutSoundRef.current = playSound('fsounds-checkout.wav', { volume: 0.8 });
+      bgSoundRef.current = playSound('fbgsound.wav', { volume: 0.5 });
     } else {
-      // Stop all sounds on return to normal
       if (checkoutSoundRef.current) {
         checkoutSoundRef.current.pause();
         checkoutSoundRef.current.currentTime = 0;
@@ -1139,22 +1159,17 @@ export function usePixiGame(
         bgSoundRef.current = null;
       }
     }
-  }, []);
+  }, [playSound]);
 
   // ─── Normal Background Sound (loop) ─────────────────────────
   const playNormalBgSound = useCallback(() => {
-    const SOUND_BASE = '/dragon-tower/assets/dragontower/sounds';
     if (normalBgSoundRef.current) {
       normalBgSoundRef.current.pause();
       normalBgSoundRef.current.currentTime = 0;
       normalBgSoundRef.current = null;
     }
-    const audio = new Audio(`${SOUND_BASE}/normal-state-bg-sound.wav`);
-    audio.loop = true;
-    audio.volume = 0.3;
-    audio.play().catch(() => {});
-    normalBgSoundRef.current = audio;
-  }, []);
+    normalBgSoundRef.current = playSound('normal-state-bg-sound.wav', { loop: true, volume: 0.3 });
+  }, [playSound]);
 
   const stopNormalBgSound = useCallback(() => {
     if (normalBgSoundRef.current) {
@@ -1166,30 +1181,14 @@ export function usePixiGame(
 
   // ─── Lose Sound (once) + bg fire ──────────────────────────
   const playLoseSound = useCallback(() => {
-    const SOUND_BASE = '/dragon-tower/assets/dragontower/sounds';
-    // Stop any existing lose/bg sounds
     if (loseSoundRef.current) { loseSoundRef.current.pause(); loseSoundRef.current = null; }
     if (bgSoundRef.current) { bgSoundRef.current.pause(); bgSoundRef.current = null; }
     if (brickSoundRef.current) { brickSoundRef.current.pause(); brickSoundRef.current = null; }
 
-    const lose = new Audio(`${SOUND_BASE}/lose-fsound.wav`);
-    lose.loop = false;
-    lose.volume = 0.8;
-    lose.play().catch(() => {});
-    loseSoundRef.current = lose;
-
-    const brick = new Audio(`${SOUND_BASE}/brick-s1.wav`);
-    brick.loop = false;
-    brick.volume = 0.8;
-    brick.play().catch(() => {});
-    brickSoundRef.current = brick;
-
-    const bg = new Audio(`${SOUND_BASE}/fbgsound.wav`);
-    bg.loop = false;
-    bg.volume = 0.5;
-    bg.play().catch(() => {});
-    bgSoundRef.current = bg;
-  }, []);
+    loseSoundRef.current = playSound('lose-fsound.wav', { volume: 0.8 });
+    brickSoundRef.current = playSound('brick-s1.wav', { volume: 0.8 });
+    bgSoundRef.current = playSound('fbgsound.wav', { volume: 0.5 });
+  }, [playSound]);
 
   const stopLoseSound = useCallback(() => {
     if (loseSoundRef.current) {
@@ -1211,14 +1210,9 @@ export function usePixiGame(
 
   // ─── Egg Pick Sound (once) ─────────────────────────────────
   const playEggSound = useCallback(() => {
-    const SOUND_BASE = '/dragon-tower/assets/dragontower/sounds';
     if (eggSoundRef.current) { eggSoundRef.current.pause(); eggSoundRef.current = null; }
-    const egg = new Audio(`${SOUND_BASE}/Win_egg.wav`);
-    egg.loop = false;
-    egg.volume = 0.8;
-    egg.play().catch(() => {});
-    eggSoundRef.current = egg;
-  }, []);
+    eggSoundRef.current = playSound('Win_egg.wav', { volume: 0.8 });
+  }, [playSound]);
 
   // ─── Build Vignette ──────────────────────────────────────────
   const buildVignette = useCallback(() => {
@@ -1979,6 +1973,7 @@ export function usePixiGame(
     buildMobilePanel,
     updateMobilePanel,
     loadTextures,
+    preloadSounds,
     spawnFX,
     spawnWinCelebration,
     spawnLoseExplosion,
