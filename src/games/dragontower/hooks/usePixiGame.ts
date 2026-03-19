@@ -1822,7 +1822,9 @@ export function usePixiGame(
     profitCard.addChild(profitText);
 
     const profitCoin = makeCoin(PANEL_COIN_SIZE);
-    profitCoin.x = profitText.x + profitText.width + PANEL_PROFIT_COIN_GAP; profitCoin.y = PANEL_BOT_H - PANEL_PROFIT_BOT_OFFSET;
+    const maxCoinX = botSideW - PANEL_COIN_SIZE / 2 - 6;
+    profitCoin.x = Math.min(profitText.x + profitText.width + PANEL_PROFIT_COIN_GAP, maxCoinX);
+    profitCoin.y = PANEL_BOT_H - PANEL_PROFIT_BOT_OFFSET;
     profitCard.addChild(profitCoin);
     panelLayer.addChild(profitCard);
 
@@ -1899,6 +1901,7 @@ export function usePixiGame(
       randomBtn: randomBtn,
       diffHit: diffHit,
       diffCard: diffCard,
+      profitCardW: botSideW,
     };
   }, []);
 
@@ -1925,7 +1928,10 @@ export function usePixiGame(
     if (t.multText) t.multText.text = `(${state.curMult.toFixed(2)}×)`;
     if (t.profitText) {
       t.profitText.text = state.curWin.toFixed(8);
-      if (t.profitCoin) t.profitCoin.x = t.profitText.x + t.profitText.width + PANEL_PROFIT_COIN_GAP;
+      if (t.profitCoin) {
+        const maxX = (t.profitCardW || 192) - PANEL_COIN_SIZE / 2 - 6;
+        t.profitCoin.x = Math.min(t.profitText.x + t.profitText.width + PANEL_PROFIT_COIN_GAP, maxX);
+      }
     }
 
     const playing = state.gstate === 'playing';
