@@ -3,8 +3,8 @@ import { Difficulty, DiffConfig } from './types';
 export const CW = 520;
 export const CH = 780;
 export const PAD = 40;
-export const TGAP = 6;
-export const RGAP = 5;
+export const TGAP = 8;
+export const RGAP = 8;
 export const WALL_H = 52;
 /** Reference column count for fixed grid width (Medium = 3 cols) */
 export const REF_COLS = 3;

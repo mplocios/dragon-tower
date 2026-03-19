@@ -602,9 +602,7 @@ export function usePixiGame(
       const revRow = revealed[r] ?? {};
       const ml = tileObjs[r]._ml;
       if (ml) {
-        ml.text = mults[r] ? `${mults[r]}×` : '';
-        ml.style.fill = isCur ? 0xeacc50 : isPast ? 0xd4842a : 0x2a4060;
-        ml.style.fontSize = isCur ? 12 : 10;
+        ml.visible = false;
       }
       for (let c = 0; c < tileObjs[r].length; c++) {
         const tile = tileObjs[r][c];
