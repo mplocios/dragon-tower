@@ -12,6 +12,7 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_C
   DRAGON_SHADOW_W, DRAGON_SHADOW_H, DRAGON_SHADOW_Y, DRAGON_SHADOW_ALPHA,
   DRAGON_SPRITE_FRAMES, DRAGON_SPRITE_SPEED,
   TOP_FLAME_W_EXT, TOP_FLAME_H, TOP_FLAME_Y_ANCHOR,
+  TOP_LIGHTING_W_EXT, TOP_LIGHTING_H_EXT, TOP_LIGHTING_Y_OFFSET,
   FLAME_BORDER_Y_OFFSET,
   MOBILE_BREAKPOINT, PANEL_PX, PANEL_PY, PANEL_DIFF_H, PANEL_MID_H, PANEL_BOT_H,
   PANEL_ROW_GAP, PANEL_MID_GAP, PANEL_BOT_GAP, PANEL_Y_OFFSET,
@@ -267,35 +268,79 @@ export function usePixiGame(
     }
   }, []);
 
+  // ─── Stone Background ──────────────────────────────────────
+  const buildStoneBackground = useCallback((fx: number, fy: number, fw: number, fh: number) => {
+    const gridLayer = gridLayerRef.current;
+    if (!gridLayer) return;
+
+    const g = new PIXI.Graphics();
+    const inset = 9;
+    const ix = fx + inset, iy = fy + inset, iw = fw - inset * 2, ih = fh - inset * 2;
+    const rng = () => Math.random();
+
+    // Solid dark stone base
+    g.rect(ix, iy, iw, ih).fill({ color: 0x141418 });
+
+    // Scattered noise for rough stone texture
+    for (let i = 0; i < 1200; i++) {
+      const dx = ix + rng() * iw;
+      const dy = iy + rng() * ih;
+      const bright = rng() > 0.4;
+      const shade = bright
+        ? 0x1a + Math.floor(rng() * 16)
+        : 0x08 + Math.floor(rng() * 8);
+      const color = (shade << 16) | (shade << 8) | shade;
+      const size = 1 + Math.floor(rng() * 2);
+      g.rect(dx, dy, size, size).fill({ color, alpha: 0.15 + rng() * 0.35 });
+    }
+
+    // Subtle large blotches for uneven stone surface
+    for (let i = 0; i < 30; i++) {
+      const bx = ix + rng() * iw;
+      const by = iy + rng() * ih;
+      const bw = 15 + rng() * 40;
+      const bh = 10 + rng() * 30;
+      const dark = rng() > 0.5;
+      const shade = dark ? 0x0a : 0x1c;
+      const color = (shade << 16) | (shade << 8) | shade;
+      g.rect(bx, by, bw, bh).fill({ color, alpha: 0.06 + rng() * 0.1 });
+    }
+
+    g.zIndex = -1;
+    gridLayer.addChild(g);
+  }, []);
+
   // ─── Draw Frame ─────────────────────────────────────────────
   const drawFrame = useCallback((L: ReturnType<typeof calcLayout>) => {
     const TEX = texRef.current;
     const gridLayer = gridLayerRef.current!;
     const fx = PAD - 13, fy = L.gridY - 13;
     const fw = CW - fx - (PAD - 13), fh = L.gridH + 26, wcy = fy - WALL_H;
-    const g = new PIXI.Graphics();
+    // Stone background inside the tower frame
+    buildStoneBackground(fx, fy, fw, fh);
 
-    // Frame background
-    g.roundRect(fx, fy, fw, fh, 0).fill({ color: 0x4f4f51 });
-
-    // Horizontal lines
-    for (let y = fy + 20; y < fy + fh - 5; y += 20) {
-      g.moveTo(fx + 6, y).lineTo(fx + fw - 6, y);
-    }
-    // Vertical brick pattern
-    for (let r2 = 0; r2 * 20 < fh; r2++) {
-      const yy = fy + r2 * 20, off = (r2 % 2) * 24;
-      for (let x = fx + off; x < fx + fw; x += 48) {
-        g.moveTo(x, yy).lineTo(x, Math.min(yy + 20, fy + fh));
+    if (TEX.tower_border) {
+      const border = new PIXI.Sprite(TEX.tower_border);
+      border.width = fw; border.height = fh;
+      border.x = fx; border.y = fy;
+      gridLayer.addChild(border);
+    } else {
+      const g = new PIXI.Graphics();
+      g.roundRect(fx, fy, fw, fh, 0).fill({ color: 0x4f4f51 });
+      for (let y = fy + 20; y < fy + fh - 5; y += 20) {
+        g.moveTo(fx + 6, y).lineTo(fx + fw - 6, y);
       }
+      for (let r2 = 0; r2 * 20 < fh; r2++) {
+        const yy = fy + r2 * 20, off = (r2 % 2) * 24;
+        for (let x = fx + off; x < fx + fw; x += 48) {
+          g.moveTo(x, yy).lineTo(x, Math.min(yy + 20, fy + fh));
+        }
+      }
+      g.stroke({ width: 1.5, color: 0x4f4f51, alpha: 0.85 });
+      g.roundRect(fx + 9, fy + 9, fw - 18, fh - 18, 0).fill({ color: 0x060c18, alpha: 0.75 });
+      g.roundRect(fx, fy, fw, fh, 0).stroke({ width: 1, color: 0x48402e, alpha: 0.25 });
+      gridLayer.addChild(g);
     }
-    g.stroke({ width: 1.5, color: 0x4f4f51, alpha: 0.85 });
-
-    // Inner dark area
-    g.roundRect(fx + 9, fy + 9, fw - 18, fh - 18, 0).fill({ color: 0x060c18, alpha: 0.75 });
-    // Border
-    g.roundRect(fx, fy, fw, fh, 0).stroke({ width: 1, color: 0x48402e, alpha: 0.25 });
-    gridLayer.addChild(g);
 
     // ── Fire glow overlays on left & right borders ──────────────
     const glowG = new PIXI.Graphics();
@@ -353,6 +398,20 @@ export function usePixiGame(
     gridLayer.addChild(dragonGlow);
     dragonGlowRef.current = dragonGlow;
 
+    // ── Top lighting — below dragon, in front of everything ──
+    if (TEX.top_lighting) {
+      const topLight = new PIXI.Sprite(TEX.top_lighting);
+      topLight.anchor.set(0.5, 0.5);
+      topLight.x = CW / 2;
+      topLight.y = wcy + WALL_H / 2 + TOP_LIGHTING_Y_OFFSET;
+      topLight.width = fw + TOP_LIGHTING_W_EXT;
+      topLight.height = WALL_H + TOP_LIGHTING_H_EXT;
+      topLight.zIndex = 50;
+      topLight.blendMode = 'add';
+      topLight.label = 'topLighting';
+      gridLayer.addChild(topLight);
+    }
+
     if (TEX.wall_bottom) {
       const wb = new PIXI.Sprite(TEX.wall_bottom);
       const wbH = 76;
@@ -408,7 +467,7 @@ export function usePixiGame(
       right.visible = false;
       flameBorderRightRef.current = right;
     }
-  }, [calcLayout]);
+  }, [calcLayout, buildStoneBackground]);
 
   // ─── Make Tile ──────────────────────────────────────────────
   const makeTile = useCallback((
@@ -1159,13 +1218,7 @@ export function usePixiGame(
 
   // ─── Build Vignette ──────────────────────────────────────────
   const buildVignette = useCallback(() => {
-    const bgLayer = bgLayerRef.current;
-    if (!bgLayer) return;
-    bgLayer.removeChildren();
-    const v = new PIXI.Graphics();
-    v.rect(0, CH * 0.58, CW, CH * 0.42).fill({ color: 0x000000, alpha: 0 });
-    v.rect(0, 0, CW, CH * 0.15).fill({ color: 0x000000, alpha: 0 });
-    bgLayer.addChild(v);
+    // no-op — stone background is now drawn inside drawFrame
   }, []);
 
   // ─── Scale Canvas ─────────────────────────────────────────────
@@ -1236,6 +1289,8 @@ export function usePixiGame(
       bet_down_bg:   BASE+'/bet-down-bg.png',
       total_profit_bg: BASE+'/total-profit-bg.png',
       gcoin:           BASE+'/gcoin.png',
+      tower_border:    BASE+'/tower-border.png',
+      top_lighting:    BASE+'/top-lighting.png',
       play_btn:        VBASE + '/assets/play_btn.png',
       play_btn_empty:  VBASE + '/assets/play_btn_empty.png',
     };
@@ -1908,6 +1963,7 @@ export function usePixiGame(
     buildGrid,
     refreshGrid,
     buildVignette,
+    buildStoneBackground,
     buildMobilePanel,
     updateMobilePanel,
     loadTextures,

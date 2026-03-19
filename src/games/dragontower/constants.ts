@@ -96,6 +96,14 @@ export const DRAGON_GLOW_COLORS = [0xff4400, 0xff6600, 0x000000] as const;
 /** Dragon glow alphas [outer, middle, inner] */
 export const DRAGON_GLOW_ALPHAS = [0.08, 0.12, 0.18] as const;
 
+// ─── Top Lighting ───────────────────────────────────────────────────
+/** Top lighting width extension beyond frame width */
+export const TOP_LIGHTING_W_EXT = 180;
+/** Top lighting height extension beyond WALL_H */
+export const TOP_LIGHTING_H_EXT = 160;
+/** Top lighting y-offset from wall center-y (positive = down) */
+export const TOP_LIGHTING_Y_OFFSET = 20;
+
 // ─── Play Button ────────────────────────────────────────────────────
 /** Play button circle radius */
 export const PLAY_R = 55;
