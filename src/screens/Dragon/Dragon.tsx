@@ -11,6 +11,8 @@ import { useState, useCallback, useEffect } from "react";
 import { Button } from "../../components/ui/button";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import DragonTower from "../../games/dragontower";
+import { useGameStore } from "../../games/dragontower/store/useGameStore";
+import { usePlayerStore, DEMO_BALANCE } from "../../store/usePlayerStore";
 import {
   isFavorite as checkFavorite,
   toggleFavorite,
@@ -48,10 +50,29 @@ const navigationItems = [
   { icon: "❓", label: "FAQ", hasDropdown: false },
 ];
 
+const fmtUsd = (v: number) =>
+  "USD " + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 export const Dragon = (): JSX.Element => {
+  const globalBalance = usePlayerStore((s) => s.balance);
+  const globalMode = usePlayerStore((s) => s.mode);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>(["Casino"]);
-  const [isDemo, setIsDemo] = useState(true);
+  const isDemo = globalMode === "demo";
+  const isPlaying = usePlayerStore((s) => s.playing);
+  const canToggleMode = !isPlaying;
+  const setIsDemo = (demo: boolean) => {
+    if (!canToggleMode) return;
+    const ps = usePlayerStore.getState();
+    const gs = useGameStore.getState();
+    const newMode = demo ? 'demo' : 'real';
+    const newBalance = demo ? DEMO_BALANCE : 0;
+    ps.setMode(newMode);
+    ps.setBalance(newBalance);
+    gs.setMode(newMode);
+    gs.setTestMode(demo);
+    gs.setBalance(newBalance);
+  };
   const [isFav, setIsFav] = useState(() => checkFavorite());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -70,7 +91,7 @@ export const Dragon = (): JSX.Element => {
   }, []);
 
   const handleFullscreen = useCallback(() => {
-    const el = document.getElementById('dr-container');
+    const el = document.getElementById('dragon-app');
     if (!el) return;
     if (!document.fullscreenElement) {
       el.requestFullscreen().catch(() => {});
@@ -214,7 +235,7 @@ export const Dragon = (): JSX.Element => {
             <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-4">
               <div className="hidden sm:flex items-center gap-2 bg-[#1a191d] rounded-lg px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2">
                 <span className="text-white [font-family:'Poppins',Helvetica] text-[10px] sm:text-xs lg:text-sm">
-                  💰 USD 0.00
+                  💰 {fmtUsd(globalBalance)}
                 </span>
               </div>
 
@@ -365,7 +386,7 @@ export const Dragon = (): JSX.Element => {
             </Button>
 
             {/* Demo/Real toggle */}
-            <div className="hidden md:flex items-center gap-2 bg-[#1a191d] rounded-full px-2 sm:px-3 lg:px-4 py-1 ml-1 sm:ml-2">
+            <div className={`hidden md:flex items-center gap-2 bg-[#1a191d] rounded-full px-2 sm:px-3 lg:px-4 py-1 ml-1 sm:ml-2 transition-opacity ${canToggleMode ? "" : "opacity-50 pointer-events-none"}`}>
               <span
                 className={`text-[10px] sm:text-xs lg:text-sm [font-family:'Poppins',Helvetica] font-medium cursor-pointer ${isDemo ? "text-white" : "text-[#666]"}`}
                 onClick={() => setIsDemo(true)}

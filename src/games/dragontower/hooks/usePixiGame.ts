@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 import * as PIXI from 'pixi.js';
 import { Difficulty, GameState, TileContent, TileState } from '../types';
-import { CW, CH, CH_MOBILE, PANEL_H, PAD, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_COLS,
+import { useGameStore } from '../store/useGameStore';
+import { CW, CH, CH_MOBILE, PANEL_H, PAD, PAD_MOBILE, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_COLS, DESKTOP_SCALE,
   GRID_TOP_RESERVE, TILE_ASPECT_RATIO, TILE_ASPECT_RATIO_MOBILE, GRID_BOTTOM_MARGIN, GRID_LAYER_Y,
   DRAGON_NORMAL_MAX_W, DRAGON_NORMAL_MAX_H, DRAGON_FIRE_MAX_W, DRAGON_FIRE_MAX_H,
   WALL_OVERSHOOT_W, WALL_OVERSHOOT_H, WALL_OFFSET_X, WALL_OFFSET_Y,
@@ -14,7 +15,7 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_C
   DRAGON_SPRITE_FRAMES, DRAGON_SPRITE_SPEED,
   TOP_FLAME_W_EXT, TOP_FLAME_H, TOP_FLAME_Y_ANCHOR,
   TOP_LIGHTING_W_EXT, TOP_LIGHTING_H_EXT, TOP_LIGHTING_Y_OFFSET,
-  FLAME_BORDER_Y_OFFSET,
+  FLAME_BORDER_W, FLAME_BORDER_LEFT_OFFSET, FLAME_BORDER_RIGHT_OFFSET, FLAME_BORDER_Y_OFFSET,
   MOBILE_BREAKPOINT, PANEL_PX, PANEL_PY, PANEL_DIFF_H, PANEL_MID_H, PANEL_BOT_H,
   PANEL_ROW_GAP, PANEL_MID_GAP, PANEL_BOT_GAP, PANEL_Y_OFFSET,
   PANEL_LBL_COLOR, PANEL_GOLD_COLOR, PLAY_R, PLAY_BTN_Y_OFFSET, PLAY_LABEL_FONT, PLAY_AMT_FONT, PLAY_COIN_SIZE,
@@ -121,7 +122,8 @@ export function usePixiGame(
   // ─── Helpers ────────────────────────────────────────────────
   const calcLayout = useCallback((diff: Difficulty) => {
     const cfg = DIFF[diff];
-    const fullGridW = CW - PAD * 2;
+    const hPad = isMobileRef.current ? PAD_MOBILE : PAD;
+    const fullGridW = CW - hPad * 2;
     // Fixed grid width based on REF_COLS (Medium = 3)
     const refTileW = (fullGridW - TGAP * (REF_COLS - 1)) / REF_COLS;
     const fixedGridW = REF_COLS * refTileW + (REF_COLS - 1) * TGAP;
@@ -136,7 +138,7 @@ export function usePixiGame(
     // Center tiles within canvas
     const actualW = cfg.cols * tileW + (cfg.cols - 1) * TGAP;
     const offsetX = (fullGridW - actualW) / 2;
-    return { cols: cfg.cols, rows: cfg.rows, tileW, tileH, gridH, gridY, offsetX };
+    return { cols: cfg.cols, rows: cfg.rows, tileW, tileH, gridH, gridY, offsetX, hPad };
   }, []);
 
   const setTileSprite = useCallback((container: PIXI.Container, tex: PIXI.Texture | null, w: number, h: number) => {
@@ -332,8 +334,8 @@ export function usePixiGame(
   const drawFrame = useCallback((L: ReturnType<typeof calcLayout>) => {
     const TEX = texRef.current;
     const gridLayer = gridLayerRef.current!;
-    const fx = PAD - 13, fy = L.gridY - 13;
-    const fw = CW - fx - (PAD - 13), fh = L.gridH + 26, wcy = fy - WALL_H;
+    const fx = L.hPad - 13, fy = L.gridY - 13;
+    const fw = CW - fx - (L.hPad - 13), fh = L.gridH + 26, wcy = fy - WALL_H;
     // Stone background inside the tower frame
     buildStoneBackground(fx, fy, fw, fh);
 
@@ -465,14 +467,14 @@ export function usePixiGame(
     flameBorderLeftRef.current = null;
     flameBorderRightRef.current = null;
     if (TEX.flame_border) {
-      const fbW = 150;
+      const fbW = FLAME_BORDER_W;
       const fbH = fh + 20;
 
       // Left flame border — no flip, fire points right (into tower)
       const left = new PIXI.Sprite(TEX.flame_border);
       left.width = fbW;
       left.height = fbH;
-      left.x = fx - fbW + 115;
+      left.x = fx - fbW + FLAME_BORDER_LEFT_OFFSET;
       left.y = fy - FLAME_BORDER_Y_OFFSET;
       left.alpha = 0;
       left.visible = false;
@@ -483,7 +485,7 @@ export function usePixiGame(
       right.width = fbW;
       right.height = fbH;
       right.scale.x = -Math.abs(right.scale.x); // flip while keeping calculated scale
-      right.x = fx + fw + 35;
+      right.x = fx + fw + FLAME_BORDER_RIGHT_OFFSET;
       right.y = fy - FLAME_BORDER_Y_OFFSET;
       right.alpha = 0;
       right.visible = false;
@@ -553,12 +555,12 @@ export function usePixiGame(
       const vRow = L.rows - 1 - r;
       const rowY = L.gridY + vRow * (L.tileH + RGAP);
       for (let c = 0; c < L.cols; c++) {
-        const tile = makeTile(r, c, PAD + L.offsetX + c * (L.tileW + TGAP), rowY, L.tileW, L.tileH);
+        const tile = makeTile(r, c, L.hPad + L.offsetX + c * (L.tileW + TGAP), rowY, L.tileW, L.tileH);
         row[c] = tile;
         gridLayer.addChild(tile.root);
       }
       const ml = new PIXI.Text({ text: '', style: { fontFamily: 'Rajdhani', fontSize: 10, fill: 0x1a3050, fontWeight: '700' } });
-      ml.anchor.set(0, 0.5); ml.x = CW - PAD + 5; ml.y = rowY + L.tileH / 2;
+      ml.anchor.set(0, 0.5); ml.x = CW - L.hPad + 5; ml.y = rowY + L.tileH / 2;
       gridLayer.addChild(ml);
       row._ml = ml;
       tileObjsRef.current[r] = row;
@@ -856,7 +858,7 @@ export function usePixiGame(
     const fxLayer = fxLayerRef.current;
     if (!fxLayer) return;
     const L = calcLayout(diff);
-    const cx = PAD + L.offsetX + c * (L.tileW + TGAP) + L.tileW / 2;
+    const cx = L.hPad + L.offsetX + c * (L.tileW + TGAP) + L.tileW / 2;
     const cy = L.gridY + (L.rows - 1 - r) * (L.tileH + RGAP) + L.tileH / 2 + GRID_LAYER_Y;
     const pal = type === 'fire'
       ? [0xff2200, 0xff5500, 0xff8800, 0xffbb00]
@@ -978,7 +980,7 @@ export function usePixiGame(
     const fxLayer = fxLayerRef.current;
     if (!fxLayer) return;
     const L = calcLayout(diff);
-    const cx = PAD + L.offsetX + c * (L.tileW + TGAP) + L.tileW / 2;
+    const cx = L.hPad + L.offsetX + c * (L.tileW + TGAP) + L.tileW / 2;
     const cy = L.gridY + (L.rows - 1 - r) * (L.tileH + RGAP) + L.tileH / 2 + GRID_LAYER_Y;
     const fireColors = [0xff0000, 0xff2200, 0xff4400, 0xff6600, 0xff8800, 0xcc0000];
     const emberColors = [0xff3300, 0xff5500, 0xff7700, 0xdd2200];
@@ -1262,7 +1264,7 @@ export function usePixiGame(
       wrap.style.width = '';
       // On desktop: fit canvas to 90% of available height
       const wrapW = wrap.clientWidth;
-      const maxH = Math.min(wrap.clientHeight || window.innerHeight, window.innerHeight) * 0.9;
+      const maxH = Math.min(wrap.clientHeight || window.innerHeight, window.innerHeight) * DESKTOP_SCALE;
       const aspect = CW / CH;
       let h = maxH;
       let w = Math.round(h * aspect);
@@ -1630,8 +1632,8 @@ export function usePixiGame(
     const px = PANEL_PX;
     const contentW = pw - px * 2;
     const DIFF_OPTS: Difficulty[] = ['Easy', 'Medium', 'Hard', 'Expert', 'Master'];
-    const lblStyle = { fontFamily: 'Rajdhani', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' as const };
-    const amtStyle = { fontFamily: 'Rajdhani', fontSize: PANEL_AMT_FONT, fill: PANEL_GOLD_COLOR, fontWeight: '700' as const };
+    const lblStyle = { fontFamily: 'Poppins', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' as const };
+    const amtStyle = { fontFamily: 'Poppins', fontSize: PANEL_AMT_FONT, fill: PANEL_GOLD_COLOR, fontWeight: '700' as const };
 
     let yy = PANEL_PY;
 
@@ -1652,8 +1654,8 @@ export function usePixiGame(
     diffCard.addChild(diffLbl);
 
     // Diff value + dropdown arrow "Medium ▼"
-    const diffText = new PIXI.Text({ text: 'Medium', style: { fontFamily: 'Rajdhani', fontSize: PANEL_AMT_FONT, fill: 0xe2e8f0, fontWeight: '700' } });
-    const diffArrow = new PIXI.Text({ text: ' ▼', style: { fontFamily: 'Rajdhani', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' } });
+    const diffText = new PIXI.Text({ text: 'Medium', style: { fontFamily: 'Poppins', fontSize: PANEL_AMT_FONT, fill: 0xffffff, fontWeight: '700' } });
+    const diffArrow = new PIXI.Text({ text: ' ▼', style: { fontFamily: 'Poppins', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' } });
     diffText.anchor.set(1, 0.5); diffText.x = contentW - PANEL_DIFF_RIGHT; diffText.y = PANEL_DIFF_H / 2;
     diffArrow.anchor.set(0, 0.5); diffArrow.x = contentW - PANEL_DIFF_RIGHT + 2; diffArrow.y = PANEL_DIFF_H / 2;
     diffCard.addChild(diffText); diffCard.addChild(diffArrow);
@@ -1697,7 +1699,9 @@ export function usePixiGame(
     balLbl.x = PANEL_INNER_PX; balLbl.y = PANEL_MID_H / 2; balLbl.anchor.set(0, 0.5);
     balCard.addChild(balLbl);
 
-    const balText = new PIXI.Text({ text: '0.00', style: amtStyle });
+    const initBal = useGameStore.getState().balance;
+    const fmtBal = initBal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const balText = new PIXI.Text({ text: fmtBal, style: amtStyle });
     balText.x = PANEL_BAL_AMT_X; balText.y = PANEL_MID_H / 2; balText.anchor.set(0, 0.5);
     balCard.addChild(balText);
 
@@ -1834,18 +1838,18 @@ export function usePixiGame(
     profitLbl.x = PANEL_PROFIT_INNER_PX; profitLbl.y = PANEL_PROFIT_LBL_Y;
     profitCard.addChild(profitLbl);
 
-    const multText = new PIXI.Text({ text: '(1.00×)', style: { fontFamily: 'Rajdhani', fontSize: PANEL_LBL_FONT, fill: 0xc8a44a, fontWeight: '700' } });
+    const multText = new PIXI.Text({ text: '(1.00×)', style: { fontFamily: 'Poppins', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' } });
     multText.x = profitLbl.x + profitLbl.width + PANEL_PROFIT_MULT_GAP; multText.y = PANEL_PROFIT_LBL_Y;
     profitCard.addChild(multText);
 
     // Amount + coin left-aligned on bottom row
     const profitText = new PIXI.Text({ text: '0.00000000', style: { ...amtStyle, fontSize: PANEL_PROFIT_AMT_FONT } });
-    profitText.x = PANEL_PROFIT_INNER_PX; profitText.y = PANEL_BOT_H - PANEL_PROFIT_BOT_OFFSET; profitText.anchor.set(0, 0.5);
+    profitText.x = botSideW / 2; profitText.y = PANEL_BOT_H - PANEL_PROFIT_BOT_OFFSET; profitText.anchor.set(0.5, 0.5);
     profitCard.addChild(profitText);
 
     const profitCoin = makeCoin(PANEL_COIN_SIZE);
     const maxCoinX = botSideW - PANEL_COIN_SIZE / 2 - 6;
-    profitCoin.x = Math.min(profitText.x + profitText.width + PANEL_PROFIT_COIN_GAP, maxCoinX);
+    profitCoin.x = Math.min(profitText.x + profitText.width / 2 + PANEL_PROFIT_COIN_GAP, maxCoinX);
     profitCoin.y = PANEL_BOT_H - PANEL_PROFIT_BOT_OFFSET;
     profitCard.addChild(profitCoin);
     panelLayer.addChild(profitCard);
@@ -1952,7 +1956,7 @@ export function usePixiGame(
       t.profitText.text = state.curWin.toFixed(8);
       if (t.profitCoin) {
         const maxX = (t.profitCardW || 192) - PANEL_COIN_SIZE / 2 - 6;
-        t.profitCoin.x = Math.min(t.profitText.x + t.profitText.width + PANEL_PROFIT_COIN_GAP, maxX);
+        t.profitCoin.x = Math.min(t.profitText.x + t.profitText.width / 2 + PANEL_PROFIT_COIN_GAP, maxX);
       }
     }
 

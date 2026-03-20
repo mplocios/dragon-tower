@@ -973,7 +973,7 @@ const DragonTower: React.FC = () => {
 
   // ── Render ────────────────────────────────────────────
   return (
-    <div id="app">
+    <div id="dragon-app">
       <LeftPanel
         onDiffChange={handleDiffChange}
         onStartGame={() => startGame()}

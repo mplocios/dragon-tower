@@ -36,8 +36,8 @@ const C = {
   tabBg: "#100F13", // inactive tab area
   tabActive: "#ffffff",
   tabInactive: "#4a5568",
-  labelColor: "#4a5568",
-  valueColor: "#8a9ab0",
+  labelColor: "#B5B5B5",
+  valueColor: "#B5B5B5",
   textPrimary: "#e2e8f0",
   textDim: "#8a9ab0",
   accent: "#eaff00", // lime/yellow — bet button
@@ -96,14 +96,14 @@ const S = {
   },
 
   lbl: {
-    fontSize: 10,
+    fontSize: 13,
     color: C.labelColor,
     fontWeight: 700,
     textTransform: "uppercase" as const,
     letterSpacing: 1.2,
   },
   lblRight: {
-    fontSize: 11,
+    fontSize: 13,
     color: C.valueColor,
     fontWeight: 600,
   },
@@ -256,7 +256,7 @@ const S = {
     justifyContent: "space-between",
     alignItems: "center",
   },
-  balLbl: { fontSize: 12, color: C.labelColor, fontWeight: 700 },
+  balLbl: { fontSize: 13, color: C.labelColor, fontWeight: 700 },
   balVal: { fontSize: 13, fontWeight: 700, color: C.textPrimary },
 
   sectionBox: {
@@ -660,7 +660,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   >
                     Increase
                   </button>
-                  <span style={{ color: C.labelColor, fontSize: 12 }}>
+                  <span style={{ color: C.labelColor, fontSize: 13 }}>
                     by
                   </span>
                   <input
@@ -679,7 +679,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                       })
                     }
                   />
-                  <span style={{ color: C.labelColor, fontSize: 12 }}>
+                  <span style={{ color: C.labelColor, fontSize: 13 }}>
                     %
                   </span>
                 </div>
@@ -712,7 +712,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   >
                     Increase
                   </button>
-                  <span style={{ color: C.labelColor, fontSize: 12 }}>
+                  <span style={{ color: C.labelColor, fontSize: 13 }}>
                     by
                   </span>
                   <input
@@ -731,7 +731,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                       })
                     }
                   />
-                  <span style={{ color: C.labelColor, fontSize: 12 }}>
+                  <span style={{ color: C.labelColor, fontSize: 13 }}>
                     %
                   </span>
                 </div>

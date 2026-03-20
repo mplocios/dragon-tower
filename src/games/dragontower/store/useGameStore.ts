@@ -7,16 +7,20 @@ import {
   HistoryEntry,
   AutoSettings,
 } from "../types";
-import { INITIAL_BALANCE, INITIAL_BET } from "../constants";
+import { INITIAL_BET } from "../constants";
 import { loadHistory, saveHistoryEntry } from "../utils/session";
+import { usePlayerStore } from "../../../store/usePlayerStore";
 
 // ── Session game-ID counter ──────────────────────────────────
 let _counter = 0;
 
 // ── Store shape ──────────────────────────────────────────────
+export type GameMode = 'demo' | 'real';
+
 export interface GameStore {
   // core game state
   testMode: boolean;
+  mode: GameMode;
   balance: number;
   bet: number;
   diff: Difficulty;
@@ -43,6 +47,7 @@ export interface GameStore {
 
   // ── actions ────────────────────────────────────────────────
   setTestMode: (v: boolean) => void;
+  setMode: (v: GameMode) => void;
   setBalance: (v: number) => void;
   setBet: (v: number) => void;
   setDiff: (v: Difficulty) => void;
@@ -71,8 +76,9 @@ export interface GameStore {
 // ── Store creation ───────────────────────────────────────────
 export const useGameStore = create<GameStore>()((set) => ({
   // ── initial state ──────────────────────────────────────────
-  testMode: true,
-  balance: INITIAL_BALANCE,
+  testMode: usePlayerStore.getState().mode === 'demo',
+  mode: usePlayerStore.getState().mode,
+  balance: usePlayerStore.getState().balance,
   bet: INITIAL_BET,
   diff: "Medium",
   gstate: "idle",
@@ -108,6 +114,7 @@ export const useGameStore = create<GameStore>()((set) => ({
 
   // ── actions ────────────────────────────────────────────────
   setTestMode: (v) => set({ testMode: v }),
+  setMode: (v) => set({ mode: v }),
   setBalance: (v) => set({ balance: v }),
   setBet: (v) => set({ bet: v }),
   setDiff: (v) => set({ diff: v }),
@@ -169,5 +176,20 @@ export const useGameStore = create<GameStore>()((set) => ({
       tower: [],
     }),
 }));
+
+// ── Sync game balance → global balance store ─────────────
+useGameStore.subscribe(
+  (state, prev) => {
+    if (state.balance !== prev.balance) {
+      usePlayerStore.getState().setBalance(state.balance);
+    }
+    if (state.mode !== prev.mode) {
+      usePlayerStore.getState().setMode(state.mode);
+    }
+    if (state.gstate !== prev.gstate) {
+      usePlayerStore.getState().setPlaying(state.gstate === 'playing');
+    }
+  }
+);
 
 export default useGameStore;
