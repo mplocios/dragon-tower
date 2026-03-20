@@ -109,7 +109,7 @@ export const Dragon = (): JSX.Element => {
   }, []);
 
   return (
-    <div className="bg-[#020401] w-full min-h-screen flex flex-col lg:flex-row">
+    <div className="bg-[#020401] w-full min-h-screen max-md:h-[100dvh] max-md:overflow-hidden flex flex-col lg:flex-row">
       <aside
         className={`${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -198,7 +198,7 @@ export const Dragon = (): JSX.Element => {
         />
       )}
 
-      <main className="flex-1 flex flex-col w-full">
+      <main className="flex-1 flex flex-col w-full max-md:h-[100dvh]">
         <div className="relative shrink-0">
           <img
             className="absolute top-px right-0 w-[388px] h-[75px] hidden xl:block pointer-events-none"
@@ -424,7 +424,7 @@ export const Dragon = (): JSX.Element => {
           </div>
         </header>
 
-        <div className="flex-1 flex items-center justify-center lg:p-[15px]">
+        <div className="flex-1 flex items-center justify-center lg:p-[15px] max-md:h-full">
           <DragonTower />
         </div>
       </main>
