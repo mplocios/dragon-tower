@@ -1246,7 +1246,7 @@ export function usePixiGame(
     const isMobile = window.innerWidth <= 767;
     if (isMobile) {
       // On mobile: fit canvas within available space, maintain aspect ratio
-      const wrapW = wrap.clientWidth;
+      const wrapW = wrap.clientWidth || window.innerWidth;
       const maxH = window.innerHeight;
       const aspect = CW / CH_MOBILE;
       // Start width-constrained, then cap by viewport height
@@ -1256,6 +1256,7 @@ export function usePixiGame(
         h = maxH;
         w = Math.round(h * aspect);
       }
+      if (w <= 0 || h <= 0) return; // skip if layout not ready
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
       wrap.style.width = '100%';
@@ -1263,7 +1264,7 @@ export function usePixiGame(
       // Clear any mobile inline styles on wrap
       wrap.style.width = '';
       // On desktop: fit canvas to 90% of available height
-      const wrapW = wrap.clientWidth;
+      const wrapW = wrap.clientWidth || window.innerWidth;
       const maxH = Math.min(wrap.clientHeight || window.innerHeight, window.innerHeight) * DESKTOP_SCALE;
       const aspect = CW / CH;
       let h = maxH;
@@ -1273,6 +1274,7 @@ export function usePixiGame(
         w = wrapW;
         h = Math.round(w / aspect);
       }
+      if (w <= 0 || h <= 0) return; // skip if layout not ready
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
     }
@@ -1578,8 +1580,12 @@ export function usePixiGame(
 
       // Observe wrapper size changes (handles layout shifts after load)
       let ro: ResizeObserver | null = null;
+      let roTimer: ReturnType<typeof setTimeout> | null = null;
       if (wrap) {
-        ro = new ResizeObserver(() => scaleCanvas());
+        ro = new ResizeObserver(() => {
+          if (roTimer) clearTimeout(roTimer);
+          roTimer = setTimeout(() => scaleCanvas(), 50);
+        });
         ro.observe(wrap);
       }
 
@@ -1587,6 +1593,7 @@ export function usePixiGame(
       (app as any)._resizeCleanup = () => {
         window.removeEventListener('resize', onResize);
         if (ro) ro.disconnect();
+        if (roTimer) clearTimeout(roTimer);
       };
     })();
 

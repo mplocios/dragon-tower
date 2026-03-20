@@ -51,7 +51,11 @@ const navigationItems = [
 ];
 
 const fmtUsd = (v: number) =>
-  "USD " + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  "USD " +
+  v.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 export const Dragon = (): JSX.Element => {
   const globalBalance = usePlayerStore((s) => s.balance);
@@ -65,7 +69,7 @@ export const Dragon = (): JSX.Element => {
     if (!canToggleMode) return;
     const ps = usePlayerStore.getState();
     const gs = useGameStore.getState();
-    const newMode = demo ? 'demo' : 'real';
+    const newMode = demo ? "demo" : "real";
     const newBalance = demo ? DEMO_BALANCE : 0;
     ps.setMode(newMode);
     ps.setBalance(newBalance);
@@ -91,7 +95,7 @@ export const Dragon = (): JSX.Element => {
   }, []);
 
   const handleFullscreen = useCallback(() => {
-    const el = document.getElementById('dragon-app');
+    const el = document.getElementById("dragon-app");
     if (!el) return;
     if (!document.fullscreenElement) {
       el.requestFullscreen().catch(() => {});
@@ -109,7 +113,7 @@ export const Dragon = (): JSX.Element => {
   }, []);
 
   return (
-    <div className="bg-[#020401] w-full min-h-screen max-md:h-[100dvh] max-md:overflow-hidden flex flex-col lg:flex-row">
+    <div className="bg-[#020401] w-full min-h-screen flex flex-col lg:flex-row">
       <aside
         className={`${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -198,7 +202,7 @@ export const Dragon = (): JSX.Element => {
         />
       )}
 
-      <main className="flex-1 flex flex-col w-full max-md:h-[100dvh]">
+      <main className="flex-1 flex flex-col w-full">
         <div className="relative shrink-0">
           <img
             className="absolute top-px right-0 w-[388px] h-[75px] hidden xl:block pointer-events-none"
@@ -352,9 +356,7 @@ export const Dragon = (): JSX.Element => {
               variant="ghost"
               size="icon"
               className={`h-7 w-7 sm:h-8 sm:w-8 lg:h-9 lg:w-9 ${
-                isFav
-                  ? "text-[#eaff00]"
-                  : "text-white hover:bg-[#1a191d]"
+                isFav ? "text-[#eaff00]" : "text-white hover:bg-[#1a191d]"
               }`}
               onClick={handleFavorite}
             >
@@ -386,7 +388,9 @@ export const Dragon = (): JSX.Element => {
             </Button>
 
             {/* Demo/Real toggle */}
-            <div className={`hidden md:flex items-center gap-2 bg-[#1a191d] rounded-full px-2 sm:px-3 lg:px-4 py-1 ml-1 sm:ml-2 transition-opacity ${canToggleMode ? "" : "opacity-50 pointer-events-none"}`}>
+            <div
+              className={`hidden md:flex items-center gap-2 bg-[#1a191d] rounded-full px-2 sm:px-3 lg:px-4 py-1 ml-1 sm:ml-2 transition-opacity ${canToggleMode ? "" : "opacity-50 pointer-events-none"}`}
+            >
               <span
                 className={`text-[10px] sm:text-xs lg:text-sm [font-family:'Poppins',Helvetica] font-medium cursor-pointer ${isDemo ? "text-white" : "text-[#666]"}`}
                 onClick={() => setIsDemo(true)}
@@ -401,7 +405,9 @@ export const Dragon = (): JSX.Element => {
               >
                 <span
                   className={`inline-block h-4 sm:h-5 w-4 sm:w-5 transform rounded-full bg-[#020401] transition-transform ${
-                    isDemo ? "translate-x-0.5" : "translate-x-4 sm:translate-x-5"
+                    isDemo
+                      ? "translate-x-0.5"
+                      : "translate-x-4 sm:translate-x-5"
                   }`}
                 />
               </button>
@@ -424,7 +430,7 @@ export const Dragon = (): JSX.Element => {
           </div>
         </header>
 
-        <div className="flex-1 flex items-center justify-center lg:p-[15px] max-md:h-full">
+        <div className="flex-1 flex justify-center lg:p-[15px]">
           <DragonTower />
         </div>
       </main>
