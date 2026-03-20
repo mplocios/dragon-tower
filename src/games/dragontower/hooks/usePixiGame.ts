@@ -1553,28 +1553,26 @@ export function usePixiGame(
       // Re-scale after layout settles (fixes stale size on refresh at tablet widths)
       requestAnimationFrame(() => scaleCanvas());
 
+      let resizeTimer: ReturnType<typeof setTimeout> | null = null;
       const onResize = () => {
-        const wasMobile = isMobileRef.current;
-        const nowMobile = window.innerWidth <= MOBILE_BREAKPOINT;
-        isMobileRef.current = nowMobile;
+        scaleCanvas(); // always scale immediately
 
-        if (wasMobile !== nowMobile) {
-          // Resize the PixiJS renderer for the new mode
-          app.renderer.resize(CW, nowMobile ? CH_MOBILE : CH);
-
-          // Show/hide mobile panel layer
-          const panelLayer = panelLayerRef.current;
-          if (panelLayer) {
-            panelLayer.visible = nowMobile;
+        // Debounce the heavy work (grid rebuild on mode switch)
+        if (resizeTimer) clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          const wasMobile = isMobileRef.current;
+          const nowMobile = window.innerWidth <= MOBILE_BREAKPOINT;
+          if (wasMobile !== nowMobile) {
+            isMobileRef.current = nowMobile;
+            app.renderer.resize(CW, nowMobile ? CH_MOBILE : CH);
+            const panelLayer = panelLayerRef.current;
+            if (panelLayer) panelLayer.visible = nowMobile;
+            const st = getStateRef.current();
+            buildGrid(st.diff);
+            refreshGrid(st.diff, st.gstate, st.curRow, st.revealed);
+            scaleCanvas();
           }
-
-          // Rebuild grid with new aspect ratio
-          const st = getStateRef.current();
-          buildGrid(st.diff);
-          refreshGrid(st.diff, st.gstate, st.curRow, st.revealed);
-        }
-
-        scaleCanvas();
+        }, 150);
       };
       window.addEventListener('resize', onResize);
 
@@ -1594,6 +1592,7 @@ export function usePixiGame(
         window.removeEventListener('resize', onResize);
         if (ro) ro.disconnect();
         if (roTimer) clearTimeout(roTimer);
+        if (resizeTimer) clearTimeout(resizeTimer);
       };
     })();
 
