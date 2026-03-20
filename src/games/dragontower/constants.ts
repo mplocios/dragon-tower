@@ -45,7 +45,7 @@ export const TILE_ASPECT_RATIO_MOBILE = 0.30;
 /** Bottom margin below the grid */
 export const GRID_BOTTOM_MARGIN = 100;
 /** Grid layer y-offset applied during init */
-export const GRID_LAYER_Y = 10;
+export const GRID_LAYER_Y = 0;
 
 // ─── Frame / Border ─────────────────────────────────────────────────
 /** Padding inset from PAD for frame origin */
@@ -174,7 +174,7 @@ export const PANEL_PX = 8;
 /** Panel vertical start padding */
 export const PANEL_PY = 8;
 /** Panel layer y-offset from CH */
-export const PANEL_Y_OFFSET = 35;
+export const PANEL_Y_OFFSET = 55;
 /** Gap between panel rows */
 export const PANEL_ROW_GAP = 8;
 
