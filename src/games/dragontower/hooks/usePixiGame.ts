@@ -1584,7 +1584,7 @@ export function usePixiGame(
       if (wrap) {
         ro = new ResizeObserver(() => {
           if (roTimer) clearTimeout(roTimer);
-          roTimer = setTimeout(() => scaleCanvas(), 50);
+          roTimer = setTimeout(() => scaleCanvas(), 16);
         });
         ro.observe(wrap);
       }
