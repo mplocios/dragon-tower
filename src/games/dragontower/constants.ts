@@ -5,7 +5,7 @@ export const CW = 520;
 export const CH = 780;
 export const PAD = 40;
 /** Horizontal padding on mobile (left/right only) — lower = wider tiles */
-export const PAD_MOBILE = 20;
+export const PAD_MOBILE = 22;
 /** Desktop canvas height fill factor (0–1, fraction of viewport height) */
 export const DESKTOP_SCALE = 0.97;
 export const INITIAL_BALANCE = 100000.23;
@@ -170,7 +170,7 @@ export const MOBILE_BREAKPOINT = 767;
 export const PANEL_H = 200;
 export const CH_MOBILE = CH + PANEL_H;
 /** Panel horizontal padding */
-export const PANEL_PX = 5;
+export const PANEL_PX = 8;
 /** Panel vertical start padding */
 export const PANEL_PY = 8;
 /** Panel layer y-offset from CH */
