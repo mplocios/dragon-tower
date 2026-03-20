@@ -157,9 +157,9 @@ export const TOP_LIGHTING_Y_OFFSET = 20;
 /** Flame border sprite width */
 export const FLAME_BORDER_W = 170;
 /** Flame border left sprite x-offset inward from frame edge */
-export const FLAME_BORDER_LEFT_OFFSET = 135;
+export const FLAME_BORDER_LEFT_OFFSET = 130;
 /** Flame border right sprite x-offset outward from frame edge */
-export const FLAME_BORDER_RIGHT_OFFSET = 35;
+export const FLAME_BORDER_RIGHT_OFFSET = 40;
 /** Flame border y-offset above frame top */
 export const FLAME_BORDER_Y_OFFSET = 0;
 
