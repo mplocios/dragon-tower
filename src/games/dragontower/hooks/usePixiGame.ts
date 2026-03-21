@@ -1825,20 +1825,29 @@ export function usePixiGame(
 
     const upArrow = makeArrowBtn(PANEL_ARROW_UP_Y, '▲', PANEL_ARROW_UP_W, PANEL_ARROW_UP_H, () => {
       const cur = parseFmt(betText.text);
-      const newBet = parseFloat((cur * 2).toFixed(8));
       const bal = useGameStore.getState().balance;
+      const newBet = parseFloat((cur * 2).toFixed(8));
+
+      // If doubling would exceed MAX_BET, clamp to MAX_BET instead of blocking
       if (newBet > MAX_BET) {
-        insuffText.text = 'Max bet is ' + MAX_BET.toLocaleString() + '!';
-        insuffText.visible = true;
-        setTimeout(() => { insuffText.visible = false; }, 2000);
+        const clamped = Math.min(MAX_BET, bal);
+        if (cur >= clamped) {
+          insuffText.text = 'Already at max bet!';
+          insuffText.visible = true;
+          setTimeout(() => { insuffText.visible = false; }, 2000);
+          return;
+        }
+        onBetChangeRef.current?.(clamped);
         return;
       }
+
       if (newBet > bal) {
         insuffText.text = 'Insufficient funds';
         insuffText.visible = true;
         setTimeout(() => { insuffText.visible = false; }, 2000);
         return;
       }
+
       onBetChangeRef.current?.(newBet);
     });
     betCard.addChild(upArrow);
@@ -1949,6 +1958,88 @@ export function usePixiGame(
     panelLayer.addChild(playAmtText);
 
     // Store all refs
+    // ── Mobile bet input wiring ──
+    const mobileBetInput = document.getElementById('mobile-bet-input') as HTMLInputElement | null;
+    if (mobileBetInput) {
+      mobileBetInput.value = String(useGameStore.getState().bet);
+
+      mobileBetInput.addEventListener('input', () => {
+        const raw = mobileBetInput.value;
+        const parsed = parseFloat(raw);
+        if (!isNaN(parsed) && parsed >= MIN_BET && parsed <= MAX_BET) {
+          const bal = useGameStore.getState().balance;
+          if (parsed <= bal) {
+            onBetChangeRef.current?.(parsed);
+          }
+        }
+      });
+
+      mobileBetInput.addEventListener('blur', () => {
+        const parsed = parseFloat(mobileBetInput.value);
+        const bal = useGameStore.getState().balance;
+        if (isNaN(parsed) || parsed < MIN_BET || mobileBetInput.value.trim() === '') {
+          const minVal = MIN_BET;
+          mobileBetInput.value = minVal.toFixed(8);
+          onBetChangeRef.current?.(minVal);
+        } else {
+          const clamped = Math.min(parsed, bal, MAX_BET);
+          mobileBetInput.value = clamped.toFixed(8);
+          onBetChangeRef.current?.(clamped);
+        }
+        // Hide input after blur
+        mobileBetInput.style.opacity = '0';
+        mobileBetInput.style.pointerEvents = 'none';
+        mobileBetInput.style.width = '1px';
+        mobileBetInput.style.height = '1px';
+      });
+    }
+
+    // Make betText tappable to open input
+    betText.eventMode = 'static';
+    betText.cursor = 'pointer';
+    betCoin.eventMode = 'static';
+    betCoin.cursor = 'pointer';
+
+    const openBetInput = () => {
+      const input = document.getElementById('mobile-bet-input') as HTMLInputElement | null;
+      if (!input) return;
+      const gs = useGameStore.getState();
+      if (gs.gstate === 'playing') return;
+
+      // Position input over the bet text area
+      const canvas = appRef.current?.canvas as HTMLCanvasElement | null;
+      if (!canvas) return;
+      const canvasRect = canvas.getBoundingClientRect();
+      const scaleX = canvasRect.width / CW;
+      const scaleY = canvasRect.height / (isMobileRef.current ? CH_MOBILE : CH);
+
+      // Get betText world position
+      const betCardScreenX = canvasRect.left + (px + PANEL_PX) * scaleX;
+      const betCardScreenY = canvasRect.top + (CH - PANEL_Y_OFFSET + yy) * scaleY;
+
+      input.style.position = 'fixed';
+      input.style.left = `${betCardScreenX}px`;
+      input.style.top = `${betCardScreenY}px`;
+      input.style.width = `${botSideW * scaleX * 0.7}px`;
+      input.style.height = `${PANEL_BET_AMT_FONT * 2 * scaleY}px`;
+      input.style.opacity = '1';
+      input.style.pointerEvents = 'auto';
+      input.style.background = 'rgba(0,0,0,0.8)';
+      input.style.color = '#fff';
+      input.style.fontSize = '16px';
+      input.style.border = '1px solid rgba(255,255,255,0.3)';
+      input.style.borderRadius = '6px';
+      input.style.padding = '4px 8px';
+      input.style.zIndex = '9999';
+      input.style.outline = 'none';
+      input.value = gs.bet.toFixed(8);
+      input.focus();
+      input.select();
+    };
+
+    betText.on('pointerdown', openBetInput);
+    betCoin.on('pointerdown', openBetInput);
+
     panelTextsRef.current = {
       ...panelTextsRef.current,
       balanceText: balText,
@@ -1987,6 +2078,13 @@ export function usePixiGame(
       // Reposition coin after amount text
       if (t.balanceCoin) t.balanceCoin.x = t.balanceText.x + t.balanceText.width + PANEL_COIN_GAP;
     }
+
+    // Keep hidden input in sync
+    const mobileInput = document.getElementById('mobile-bet-input') as HTMLInputElement | null;
+    if (mobileInput && mobileInput.style.opacity !== '1') {
+      mobileInput.value = state.bet.toFixed(8);
+    }
+
     if (t.betText) {
       const formatted = state.bet < 0.001
         ? state.bet.toFixed(8)
