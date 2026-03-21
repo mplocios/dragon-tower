@@ -1116,20 +1116,29 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   <span style={{ color: C.labelColor, fontSize: 13 }}>by</span>
                   <input
                     type="number"
-                    value={auto.winInc}
+                    value={auto.winInc === 0 ? "" : auto.winInc}
                     min={0}
                     step={1}
+                    placeholder="0"
                     style={{
                       ...S.smallInput,
                       opacity:
                         autoRunning || auto.onWinMode === "reset" ? 0.35 : 1,
                     }}
                     disabled={autoRunning || auto.onWinMode === "reset"}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (!/^\d*\.?\d*$/.test(raw)) return;
                       onAutoSettingsChange({
-                        winInc: parseFloat(e.target.value) || 0,
-                      })
-                    }
+                        winInc: raw === "" ? 0 : parseFloat(raw) || 0,
+                      });
+                    }}
+                    onBlur={(e) => {
+                      const parsed = parseFloat(e.target.value);
+                      onAutoSettingsChange({
+                        winInc: isNaN(parsed) ? 0 : Math.max(0, parsed),
+                      });
+                    }}
                   />
                   <span style={{ color: C.labelColor, fontSize: 13 }}>%</span>
                 </div>
@@ -1175,20 +1184,29 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   <span style={{ color: C.labelColor, fontSize: 13 }}>by</span>
                   <input
                     type="number"
-                    value={auto.lossInc}
+                    value={auto.lossInc === 0 ? "" : auto.lossInc}
                     min={0}
                     step={1}
+                    placeholder="0"
                     style={{
                       ...S.smallInput,
                       opacity:
                         autoRunning || auto.onLossMode === "reset" ? 0.35 : 1,
                     }}
                     disabled={autoRunning || auto.onLossMode === "reset"}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (!/^\d*\.?\d*$/.test(raw)) return;
                       onAutoSettingsChange({
-                        lossInc: parseFloat(e.target.value) || 0,
-                      })
-                    }
+                        lossInc: raw === "" ? 0 : parseFloat(raw) || 0,
+                      });
+                    }}
+                    onBlur={(e) => {
+                      const parsed = parseFloat(e.target.value);
+                      onAutoSettingsChange({
+                        lossInc: isNaN(parsed) ? 0 : Math.max(0, parsed),
+                      });
+                    }}
                   />
                   <span style={{ color: C.labelColor, fontSize: 13 }}>%</span>
                 </div>
@@ -1208,20 +1226,29 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   <div style={{ ...S.inputBox(), height: 38 }}>
                     <input
                       type="number"
-                      value={auto.stopProfit}
+                      value={auto.stopProfit === 0 ? "" : auto.stopProfit}
                       min={0}
                       step={1}
                       disabled={autoRunning}
+                      placeholder="0"
                       style={{
                         ...S.input,
                         fontSize: 13,
                         opacity: autoRunning ? 0.4 : 1,
                       }}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (!/^\d*\.?\d*$/.test(raw)) return;
                         onAutoSettingsChange({
-                          stopProfit: parseFloat(e.target.value) || 0,
-                        })
-                      }
+                          stopProfit: raw === "" ? 0 : parseFloat(raw) || 0,
+                        });
+                      }}
+                      onBlur={(e) => {
+                        const parsed = parseFloat(e.target.value);
+                        onAutoSettingsChange({
+                          stopProfit: isNaN(parsed) ? 0 : Math.max(0, parsed),
+                        });
+                      }}
                     />
                   </div>
                 </div>
@@ -1237,20 +1264,29 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   <div style={{ ...S.inputBox(), height: 38 }}>
                     <input
                       type="number"
-                      value={auto.stopLoss}
+                      value={auto.stopLoss === 0 ? "" : auto.stopLoss}
                       min={0}
                       step={1}
                       disabled={autoRunning}
+                      placeholder="0"
                       style={{
                         ...S.input,
                         fontSize: 13,
                         opacity: autoRunning ? 0.4 : 1,
                       }}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (!/^\d*\.?\d*$/.test(raw)) return;
                         onAutoSettingsChange({
-                          stopLoss: parseFloat(e.target.value) || 0,
-                        })
-                      }
+                          stopLoss: raw === "" ? 0 : parseFloat(raw) || 0,
+                        });
+                      }}
+                      onBlur={(e) => {
+                        const parsed = parseFloat(e.target.value);
+                        onAutoSettingsChange({
+                          stopLoss: isNaN(parsed) ? 0 : Math.max(0, parsed),
+                        });
+                      }}
                     />
                   </div>
                 </div>
