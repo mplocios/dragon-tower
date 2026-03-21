@@ -450,6 +450,8 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 style={{
                   ...S.inputBox(),
                   flex: 1,
+                  minWidth: 0,
+                  overflow: "hidden",
                   border: "none",
                   borderColor:
                     betExceedsBalance || betInvalid || betExceedsMax
@@ -538,9 +540,11 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 disabled={playing || autoRunning}
                 onClick={() => {
                   const next = parseFloat((bet * 2).toFixed(8));
-                  const exceeds = next > balance;
-                  setBetExceedsBalance(exceeds);
-                  if (!exceeds) {
+                  const exceedsBalance = next > balance;
+                  const exceedsMax = next > MAX_BET;
+                  setBetExceedsBalance(exceedsBalance);
+                  setBetExceedsMax(exceedsMax);
+                  if (!exceedsBalance && !exceedsMax) {
                     onBetChange(next);
                     setBetInputVal(next.toFixed(8));
                   }
@@ -740,6 +744,8 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 style={{
                   ...S.inputBox(),
                   flex: 1,
+                  minWidth: 0,
+                  overflow: "hidden",
                   border: "none",
                   borderColor:
                     autoBetExceedsBalance || autoBetInvalid || autoBetExceedsMax
@@ -830,9 +836,11 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 disabled={autoRunning}
                 onClick={() => {
                   const next = parseFloat((auto.autoBet * 2).toFixed(8));
-                  const exceeds = next > balance;
-                  setAutoBetExceedsBalance(exceeds);
-                  if (!exceeds) {
+                  const exceedsBalance = next > balance;
+                  const exceedsMax = next > MAX_BET;
+                  setAutoBetExceedsBalance(exceedsBalance);
+                  setAutoBetExceedsMax(exceedsMax);
+                  if (!exceedsBalance && !exceedsMax) {
                     setAuto({ autoBet: next });
                     setAutoBetInputVal(next.toFixed(8));
                   }

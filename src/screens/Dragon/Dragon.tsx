@@ -488,14 +488,14 @@ export const Dragon = (): JSX.Element => {
                   {/* Max Bet */}
                   <button
                     className={`flex items-center gap-3 w-full px-4 py-3 border-b border-[#222] transition-colors ${maxBet ? "bg-[#252525] text-[#eaff00]" : "text-white hover:bg-[#222]"}`}
-                    // onClick={() => {
-                    //   if (!maxBet) {
-                    //     setShowSettings(false);
-                    //     setShowMaxBetConfirm(true);
-                    //   } else {
-                    //     setMaxBet(false);
-                    //   }
-                    // }}
+                    onClick={() => {
+                      if (!maxBet) {
+                        setShowSettings(false);
+                        setShowMaxBetConfirm(true);
+                      } else {
+                        setMaxBet(false);
+                      }
+                    }}
                   >
                     <span className="text-lg">🔥</span>
                     <span className="[font-family:'Poppins',Helvetica] text-sm font-medium">
