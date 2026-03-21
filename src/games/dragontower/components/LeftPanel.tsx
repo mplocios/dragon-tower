@@ -519,10 +519,13 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 style={S.modBtn(playing || autoRunning)}
                 disabled={playing || autoRunning}
                 onClick={() => {
-                  const next = Math.max(
-                    0.01,
-                    parseFloat((bet * 0.5).toFixed(8)),
-                  );
+                  if (bet <= 0) return;
+
+                  const next = parseFloat((bet * 0.5).toFixed(8));
+
+                  if (next < MIN_BET) return;
+                  if (next > balance) return;
+
                   onBetChange(next);
                   setBetInputVal(next.toFixed(8));
                   setBetExceedsBalance(false);
@@ -808,10 +811,13 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 style={S.modBtn(autoRunning)}
                 disabled={autoRunning}
                 onClick={() => {
-                  const next = Math.max(
-                    0.01,
-                    parseFloat((auto.autoBet * 0.5).toFixed(8)),
-                  );
+                  if (auto.autoBet <= 0) return;
+
+                  const next = parseFloat((auto.autoBet * 0.5).toFixed(8));
+
+                  if (next < MIN_BET) return;
+                  if (next > balance) return;
+
                   setAuto({ autoBet: next });
                   setAutoBetInputVal(next.toFixed(8));
                   setAutoBetExceedsBalance(false);
