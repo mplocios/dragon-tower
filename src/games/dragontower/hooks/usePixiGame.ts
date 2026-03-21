@@ -740,22 +740,21 @@ export function usePixiGame(
     container.addChild(div);
 
     const amtText = new PIXI.Text({
-      text: `$${amount.toFixed(8)}`,
+      text: `$${type === 'lose' ? '0.00' : amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       style: { fontFamily: 'Rajdhani', fontSize: 13, fontWeight: '600', fill: 0xb0b8c4 },
     });
     amtText.anchor.set(0.5, 0);
     amtText.x = CW / 2 - 12; amtText.y = cardY + 92;
     container.addChild(amtText);
 
-    const coinX = cardX + cardW - 28;
-    const coinY = cardY + 92 + 10;
     if (TEX.gcoin) {
-      const coin = new PIXI.Sprite(TEX.gcoin);
-      coin.width = 20; coin.height = 20;
-      coin.anchor.set(0.5);
-      coin.x = coinX; coin.y = coinY;
-      container.addChild(coin);
-    }
+  const coin = new PIXI.Sprite(TEX.gcoin);
+  coin.width = 20; coin.height = 20;
+  coin.anchor.set(0.5);
+  coin.x = amtText.x + amtText.width / 2 + 14;
+  coin.y = amtText.y + amtText.height / 2;
+  container.addChild(coin);
+}
 
     // Set pivot to center so scale animation pops from middle
     container.pivot.set(CW / 2, CH / 2);
@@ -1293,7 +1292,7 @@ export function usePixiGame(
       wall:          BASE+'/wall.png',
       egg:           BASE+'/dragon-egg-3.png',
       dragon_sprite: BASE+'/dragon-icon-2-sprite.png',
-      tile_dark:     BASE+'/black-tile.png',
+      tile_dark:     BASE+'/black-tile-2.png',
       tile_green:    BASE+'/green-tile.png',
       result_bg:     BASE+'/result_background.png',
       flame_border:  BASE+'/flame-border.png',

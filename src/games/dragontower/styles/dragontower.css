@@ -15,7 +15,8 @@ body { margin: 0; padding: 0; }
 }
 
 #left-panel {
-  min-width: 300px; flex-shrink: 0;
+  /* min-width: 300px;  */
+  flex-shrink: 0;
   background: #1a191d;
   backdrop-filter: blur(10px);
   border-right: none;
@@ -346,12 +347,12 @@ body { margin: 0; padding: 0; }
 /* ── Auto / toggle ── */
 .auto-toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
 .auto-toggle input { opacity: 0; width: 0; height: 0; }
-.auto-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #1e3a54; border-radius: 12px; transition: .3s; }
+.auto-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #100f13; border: none; border-radius: 12px; transition: .3s; }
 .auto-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #c8d8e8; border-radius: 50%; transition: .3s; }
-.auto-toggle input:checked + .auto-slider { background: #1a7fd4; }
+.auto-toggle input:checked + .auto-slider { background: rgb(51, 51, 58); }
 .auto-toggle input:checked + .auto-slider:before { transform: translateX(20px); }
-.auto-mode-btn { background: #0d1e2f; border: 1px solid #1e3a54; color: #c8d8e8; padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; transition: .2s; }
-.auto-mode-btn.on { background: #1a7fd4; border-color: #1a7fd4; color: #fff; }
+.auto-mode-btn { background: #0d1e2f; border: none; color: #c8d8e8; padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; transition: .2s; }
+.auto-mode-btn.on { background: rgb(51, 51, 58); border: none; color: #c8d8e8; }
 .auto-cond-row { background: rgba(10,25,40,.5); border: 1px solid #1a3050; border-radius: 8px; padding: 10px; }
 
 select option { background: #0d1e30; color: #c8d8e8; }

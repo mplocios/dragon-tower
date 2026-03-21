@@ -105,6 +105,7 @@ export const useGameStore = create<GameStore>()((set) => ({
     stopProfit: 0,
     stopLoss: 0,
     autoDiff: "Medium",
+  autoCashoutRow: 0,
   },
   autoRunning: false,
   autoLastRoundWon: false,

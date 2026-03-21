@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Difficulty } from "../types";
 import { useGameStore } from "../store/useGameStore";
+import { MIN_BET, MAX_BET, DIFF } from "../constants";
 
 interface LeftPanelProps {
   onDiffChange: (v: Difficulty) => void;
@@ -17,7 +18,24 @@ const fmt = (v: number) =>
     maximumFractionDigits: 2,
   });
 
-const fmtBtc = (v: number) => v.toFixed(8);
+const normalizeBet = (
+  raw: string,
+): { value: number; display: string; valid: boolean } => {
+  const stripped = raw.replace(/^0+(\d)/, "$1");
+  const parsed = parseFloat(stripped);
+  if (isNaN(parsed) || stripped.trim() === "" || parsed < MIN_BET) {
+    return { value: 0, display: "0.00000000", valid: false };
+  }
+  const clamped = Math.min(parsed, MAX_BET);
+  const fixed = parseFloat(clamped.toFixed(8));
+  return { value: fixed, display: fixed.toFixed(8), valid: true };
+};
+
+const fmtBtc = (v: number) =>
+  v.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 const DIFF_OPTIONS: { value: Difficulty; label: string }[] = [
   { value: "Easy", label: "Easy" },
@@ -51,17 +69,19 @@ const C = {
 const S = {
   panel: {
     // width: 300,
-    minWidth: 270,
+    minWidth: 300,
+    maxWidth: 341,
     flexShrink: 0,
     background: C.bg,
     flexDirection: "column" as const,
     borderRadius: "18px 0 0 18px",
-    // borderRight: `1px solid ${C.border}`,
     fontFamily: "'Rajdhani', sans-serif",
     color: C.textPrimary,
     padding: "14px 14px 20px",
     gap: 11,
     overflowY: "auto" as const,
+    boxSizing: "border-box" as const,
+    overflow: "hidden auto" as any,
   },
 
   // ── Tabs ──
@@ -72,7 +92,7 @@ const S = {
     padding: 3,
     gap: 3,
   },
-  tab: (active: boolean): React.CSSProperties => ({
+  tab: (active: boolean, disabled = false): React.CSSProperties => ({
     flex: 1,
     padding: "8px 0",
     border: "none",
@@ -80,11 +100,12 @@ const S = {
     fontFamily: "'Rajdhani', sans-serif",
     fontSize: 14,
     fontWeight: 700,
-    cursor: "pointer",
+    cursor: disabled ? "not-allowed" : "pointer",
     transition: "all .18s",
     background: active ? C.tabActive : "transparent",
-    color: active ? C.accentDark : C.tabInactive,
+    color: active ? C.accentDark : disabled ? "#2a2e36" : C.tabInactive,
     letterSpacing: 0.5,
+    opacity: disabled ? 0.4 : 1,
   }),
 
   // ── Generic ──
@@ -157,14 +178,21 @@ const S = {
     fontFamily: "'Rajdhani', sans-serif",
     fontSize: 13,
     fontWeight: 700,
-    padding: "0 11px",
+    padding: "0 8px",
     height: 44,
+    width: 36,
     cursor: disabled ? "not-allowed" : "pointer",
     whiteSpace: "nowrap" as const,
     transition: "all .15s",
     flexShrink: 0,
+    textAlign: "center" as const,
   }),
-  betRow: { display: "flex", gap: 5 },
+  betRow: {
+    display: "flex",
+    gap: 5,
+    width: "100%",
+    boxSizing: "border-box" as const,
+  },
 
   // ── Select ──
   selectWrap: { position: "relative" as const },
@@ -267,6 +295,9 @@ const S = {
     display: "flex",
     flexDirection: "column" as const,
     gap: 7,
+    width: "100%",
+    boxSizing: "border-box" as const,
+    overflow: "hidden",
   },
   smallInput: {
     width: 50,
@@ -280,9 +311,9 @@ const S = {
     outline: "none",
   },
   modeBtn: (active: boolean): React.CSSProperties => ({
-    background: active ? "#1a4a7a" : C.bg,
-    border: `1px solid ${active ? "#2a6aaa" : C.border}`,
-    color: active ? "#90c8f0" : C.valueColor,
+    background: active ? "rgb(51, 51, 58)" : C.bg,
+    border: "none",
+    color: C.textPrimary,
     padding: "5px 11px",
     borderRadius: 6,
     fontSize: 12,
@@ -316,10 +347,20 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
 
   const [activeTab, setActiveTab] = useState<"manual" | "auto">("manual");
   const [cooldown, setCooldown] = useState(false);
+  const [betInputVal, setBetInputVal] = useState("0.00000000");
+  const [betExceedsBalance, setBetExceedsBalance] = useState(false);
+  const [autoBetInputVal, setAutoBetInputVal] = useState("0.00000000");
+  const [autoBetExceedsBalance, setAutoBetExceedsBalance] = useState(false);
+  const [betInvalid, setBetInvalid] = useState(false);
+  const [autoBetInvalid, setAutoBetInvalid] = useState(false);
+  const [betExceedsMax, setBetExceedsMax] = useState(false);
+  const [autoBetExceedsMax, setAutoBetExceedsMax] = useState(false);
 
   const playing = gstate === "playing";
   const canCash = playing && curMult > 1;
   const isInfinite = auto.autoCount === 0;
+  const [autoCashoutInput, setAutoCashoutInput] = useState("");
+  const [autoCountInput, setAutoCountInput] = useState("");
 
   useEffect(() => {
     if (gstate !== "playing") {
@@ -331,6 +372,32 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
     }
   }, [gstate]);
 
+  useEffect(() => {
+    setBetInputVal((v) => {
+      const parsed = parseFloat(v);
+      if (isNaN(parsed) || parsed === bet) return v;
+      return bet === 0 ? "0.00000000" : bet.toFixed(8);
+    });
+  }, [bet]);
+
+  useEffect(() => {
+    setAutoBetInputVal((v) => {
+      const parsed = parseFloat(v);
+      if (isNaN(parsed) || parsed === auto.autoBet) return v;
+      return auto.autoBet === 0 ? "0.00000000" : auto.autoBet.toFixed(8);
+    });
+  }, [auto.autoBet]);
+
+  useEffect(() => {
+    setAutoCashoutInput(
+      auto.autoCashoutRow === 0 ? "" : String(auto.autoCashoutRow),
+    );
+  }, [auto.autoCashoutRow]);
+
+  useEffect(() => {
+    setAutoCountInput(auto.autoCount === 0 ? "" : String(auto.autoCount));
+  }, [auto.autoCount]);
+
   const onBetChange = (v: number) => setBet(v);
   const onAutoSettingsChange = (s: Record<string, unknown>) =>
     setAuto(s as Record<string, never>);
@@ -340,14 +407,22 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
       {/* ── Tabs ── */}
       <div style={S.tabRow}>
         <button
-          style={S.tab(activeTab === "manual")}
-          onClick={() => setActiveTab("manual")}
+          style={S.tab(activeTab === "manual", autoRunning)}
+          disabled={autoRunning}
+          onClick={() => {
+            if (!autoRunning) setActiveTab("manual");
+          }}
+          title={autoRunning ? "Stop autoplay first" : undefined}
         >
           Manual
         </button>
         <button
-          style={S.tab(activeTab === "auto")}
-          onClick={() => setActiveTab("auto")}
+          style={S.tab(activeTab === "auto", playing)}
+          disabled={playing}
+          onClick={() => {
+            if (!playing) setActiveTab("auto");
+          }}
+          title={playing ? "Finish the current manual round first" : undefined}
         >
           Auto
         </button>
@@ -363,43 +438,179 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               <span style={S.lblRight}>{fmt(bet)}</span>
             </div>
             <div style={S.betRow}>
-              <div style={{ ...S.inputBox(), flex: 1 }}>
+              <div
+                style={{
+                  ...S.inputBox(),
+                  flex: 1,
+                  borderColor:
+                    betExceedsBalance || betInvalid || betExceedsMax
+                      ? "#e84040"
+                      : undefined,
+                }}
+              >
                 <input
                   style={S.input}
                   type="number"
-                  value={bet}
+                  value={betInputVal}
                   min={0.01}
                   step={0.01}
-                  disabled={playing}
-                  onChange={(e) =>
-                    onBetChange(parseFloat(e.target.value) || 0)
-                  }
+                  disabled={playing || autoRunning}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setBetInputVal(raw);
+                    const parsed = parseFloat(raw);
+                    if (!isNaN(parsed) && parsed >= MIN_BET) {
+                      const exceedsBalance =
+                        parseFloat(parsed.toFixed(8)) >
+                        parseFloat(balance.toFixed(8));
+                      const exceedsMax = parsed > MAX_BET;
+                      setBetExceedsBalance(exceedsBalance);
+                      setBetExceedsMax(exceedsMax);
+                      setBetInvalid(false);
+                      if (!exceedsBalance && !exceedsMax) onBetChange(parsed);
+                    } else {
+                      setBetExceedsBalance(false);
+                      setBetExceedsMax(false);
+                      setBetInvalid(false);
+                    }
+                  }}
+                  onBlur={() => {
+                    const { value, display, valid } = normalizeBet(betInputVal);
+                    if (!valid) {
+                      setBetInputVal("0.00000000");
+                      setBetExceedsBalance(false);
+                      setBetExceedsMax(false);
+                      setBetInvalid(false);
+                      onBetChange(0);
+                    } else {
+                      const clamped = Math.min(
+                        parseFloat(value.toFixed(8)) <=
+                          parseFloat(balance.toFixed(8))
+                          ? value
+                          : balance,
+                        MAX_BET,
+                      );
+                      setBetInputVal(clamped.toFixed(8));
+                      setBetExceedsBalance(false);
+                      setBetExceedsMax(false);
+                      setBetInvalid(false);
+                      onBetChange(clamped);
+                    }
+                  }}
                 />
                 <div style={S.coinIcon}>₿</div>
               </div>
               <button
-                style={S.modBtn(playing)}
-                disabled={playing}
-                onClick={() =>
-                  onBetChange(
-                    Math.max(0.01, parseFloat((bet * 0.5).toFixed(2))),
-                  )
-                }
+                style={S.modBtn(playing || autoRunning)}
+                disabled={playing || autoRunning}
+                onClick={() => {
+                  const next = Math.max(
+                    0.01,
+                    parseFloat((bet * 0.5).toFixed(8)),
+                  );
+                  onBetChange(next);
+                  setBetInputVal(next.toFixed(8));
+                  setBetExceedsBalance(false);
+                }}
               >
                 ½
               </button>
               <button
-                style={S.modBtn(playing)}
-                disabled={playing}
-                onClick={() =>
-                  onBetChange(
-                    Math.max(0.01, parseFloat((bet * 2).toFixed(2))),
-                  )
-                }
+                style={S.modBtn(playing || autoRunning)}
+                disabled={playing || autoRunning}
+                onClick={() => {
+                  const next = parseFloat((bet * 2).toFixed(8));
+                  const exceeds = next > balance;
+                  setBetExceedsBalance(exceeds);
+                  if (!exceeds) {
+                    onBetChange(next);
+                    setBetInputVal(next.toFixed(8));
+                  }
+                }}
               >
                 2×
               </button>
             </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: 4,
+              }}
+            >
+              <span style={{ fontSize: 11, color: C.textDim }}>
+                Min: {MIN_BET.toFixed(8)}
+              </span>
+              <span style={{ fontSize: 11, color: C.textDim }}>
+                Max: {MAX_BET.toLocaleString()}
+              </span>
+            </div>
+            {betExceedsBalance && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  marginTop: 2,
+                }}
+              >
+                <span style={{ color: "#e84040", fontSize: 12 }}>⚠</span>
+                <span
+                  style={{
+                    color: "#e84040",
+                    fontSize: 12,
+                    fontFamily: "'Rajdhani', sans-serif",
+                    fontWeight: 600,
+                  }}
+                >
+                  Can't bet more than your balance!
+                </span>
+              </div>
+            )}
+            {betExceedsMax && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  marginTop: 2,
+                }}
+              >
+                <span style={{ color: "#e84040", fontSize: 12 }}>⚠</span>
+                <span
+                  style={{
+                    color: "#e84040",
+                    fontSize: 12,
+                    fontFamily: "'Rajdhani', sans-serif",
+                    fontWeight: 600,
+                  }}
+                >
+                  Max bet is {MAX_BET.toLocaleString()}!
+                </span>
+              </div>
+            )}
+            {betInvalid && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  marginTop: 2,
+                }}
+              >
+                <span style={{ color: "#e84040", fontSize: 12 }}>⚠</span>
+                <span
+                  style={{
+                    color: "#e84040",
+                    fontSize: 12,
+                    fontFamily: "'Rajdhani', sans-serif",
+                    fontWeight: 600,
+                  }}
+                >
+                  Enter a valid bet amount!
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Difficulty */}
@@ -453,9 +664,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           {/* Profit */}
           <div style={S.fieldWrap}>
             <div style={S.rowBetween}>
-              <span style={S.lbl}>
-                Total Profit ({curMult.toFixed(2)}×)
-              </span>
+              <span style={S.lbl}>Total Profit ({curMult.toFixed(2)}×)</span>
               <span
                 style={{
                   ...S.lblRight,
@@ -465,9 +674,11 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 {fmt(curWin)}
               </span>
             </div>
-            <div style={{ ...S.inputBox(), background: "#33333A", border: "none" }}>
+            <div
+              style={{ ...S.inputBox(), background: "#33333A", border: "none" }}
+            >
               <span style={{ ...S.input, cursor: "default" }}>
-                {fmtBtc(curWin)}
+                {fmt(curWin)}
               </span>
               <div style={S.coinIcon}>₿</div>
             </div>
@@ -492,49 +703,181 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               <span style={S.lblRight}>{fmt(auto.autoBet)}</span>
             </div>
             <div style={S.betRow}>
-              <div style={{ ...S.inputBox(), flex: 1 }}>
+              <div
+                style={{
+                  ...S.inputBox(),
+                  flex: 1,
+                  borderColor:
+                    autoBetExceedsBalance || autoBetInvalid || autoBetExceedsMax
+                      ? "#e84040"
+                      : undefined,
+                }}
+              >
                 <input
                   style={S.input}
                   type="number"
-                  value={auto.autoBet}
+                  value={autoBetInputVal}
                   min={0.01}
                   step={0.01}
                   disabled={autoRunning}
-                  onChange={(e) =>
-                    setAuto({ autoBet: parseFloat(e.target.value) || 0 })
-                  }
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setAutoBetInputVal(raw);
+                    const parsed = parseFloat(raw);
+                    if (!isNaN(parsed) && parsed >= MIN_BET) {
+                      const exceedsBalance =
+                        parseFloat(parsed.toFixed(8)) >
+                        parseFloat(balance.toFixed(8));
+                      const exceedsMax = parsed > MAX_BET;
+                      setAutoBetExceedsBalance(exceedsBalance);
+                      setAutoBetExceedsMax(exceedsMax);
+                      setAutoBetInvalid(false);
+                      if (!exceedsBalance && !exceedsMax)
+                        setAuto({ autoBet: parsed });
+                    } else {
+                      setAutoBetExceedsBalance(false);
+                      setAutoBetExceedsMax(false);
+                      setAutoBetInvalid(false);
+                    }
+                  }}
+                  onBlur={() => {
+                    const { value, display, valid } =
+                      normalizeBet(autoBetInputVal);
+                    if (!valid) {
+                      setAutoBetInputVal("0.00000000");
+                      setAutoBetExceedsBalance(false);
+                      setAutoBetExceedsMax(false);
+                      setAutoBetInvalid(false);
+                      setAuto({ autoBet: 0 });
+                    } else {
+                      const clamped = Math.min(
+                        parseFloat(value.toFixed(8)) <=
+                          parseFloat(balance.toFixed(8))
+                          ? value
+                          : balance,
+                        MAX_BET,
+                      );
+                      setAutoBetInputVal(clamped.toFixed(8));
+                      setAutoBetExceedsBalance(false);
+                      setAutoBetExceedsMax(false);
+                      setAutoBetInvalid(false);
+                      setAuto({ autoBet: clamped });
+                    }
+                  }}
                 />
                 <div style={S.coinIcon}>₿</div>
               </div>
               <button
                 style={S.modBtn(autoRunning)}
                 disabled={autoRunning}
-                onClick={() =>
-                  setAuto({
-                    autoBet: Math.max(
-                      0.01,
-                      parseFloat((auto.autoBet * 0.5).toFixed(2)),
-                    ),
-                  })
-                }
+                onClick={() => {
+                  const next = Math.max(
+                    0.01,
+                    parseFloat((auto.autoBet * 0.5).toFixed(8)),
+                  );
+                  setAuto({ autoBet: next });
+                  setAutoBetInputVal(next.toFixed(8));
+                  setAutoBetExceedsBalance(false);
+                }}
               >
                 ½
               </button>
               <button
                 style={S.modBtn(autoRunning)}
                 disabled={autoRunning}
-                onClick={() =>
-                  setAuto({
-                    autoBet: Math.max(
-                      0.01,
-                      parseFloat((auto.autoBet * 2).toFixed(2)),
-                    ),
-                  })
-                }
+                onClick={() => {
+                  const next = parseFloat((auto.autoBet * 2).toFixed(8));
+                  const exceeds = next > balance;
+                  setAutoBetExceedsBalance(exceeds);
+                  if (!exceeds) {
+                    setAuto({ autoBet: next });
+                    setAutoBetInputVal(next.toFixed(8));
+                  }
+                }}
               >
                 2×
               </button>
             </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: 4,
+              }}
+            >
+              <span style={{ fontSize: 11, color: C.textDim }}>
+                Min: {MIN_BET.toFixed(8)}
+              </span>
+              <span style={{ fontSize: 11, color: C.textDim }}>
+                Max: {MAX_BET.toLocaleString()}
+              </span>
+            </div>
+            {autoBetExceedsBalance && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  marginTop: 2,
+                }}
+              >
+                <span style={{ color: "#e84040", fontSize: 12 }}>⚠</span>
+                <span
+                  style={{
+                    color: "#e84040",
+                    fontSize: 12,
+                    fontFamily: "'Rajdhani', sans-serif",
+                    fontWeight: 600,
+                  }}
+                >
+                  Can't bet more than your balance!
+                </span>
+              </div>
+            )}
+            {autoBetExceedsMax && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  marginTop: 2,
+                }}
+              >
+                <span style={{ color: "#e84040", fontSize: 12 }}>⚠</span>
+                <span
+                  style={{
+                    color: "#e84040",
+                    fontSize: 12,
+                    fontFamily: "'Rajdhani', sans-serif",
+                    fontWeight: 600,
+                  }}
+                >
+                  Max bet is {MAX_BET.toLocaleString()}!
+                </span>
+              </div>
+            )}
+            {autoBetInvalid && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  marginTop: 2,
+                }}
+              >
+                <span style={{ color: "#e84040", fontSize: 12 }}>⚠</span>
+                <span
+                  style={{
+                    color: "#e84040",
+                    fontSize: 12,
+                    fontFamily: "'Rajdhani', sans-serif",
+                    fontWeight: 600,
+                  }}
+                >
+                  Enter a valid bet amount!
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Difficulty */}
@@ -545,9 +888,11 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 style={S.select}
                 value={auto.autoDiff}
                 disabled={autoRunning}
-                onChange={(e) =>
-                  setAuto({ autoDiff: e.target.value as Difficulty })
-                }
+                onChange={(e) => {
+                  const v = e.target.value as Difficulty;
+                  setAuto({ autoDiff: v });
+                  onDiffChange(v);
+                }}
               >
                 {DIFF_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -559,6 +904,74 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             </div>
           </div>
 
+          {/* Auto Cashout Row */}
+          {(() => {
+            const maxRow = DIFF[auto.autoDiff]?.rows ?? 9;
+            return (
+              <div style={S.fieldWrap}>
+                <div style={S.rowBetween}>
+                  <span style={S.lbl}>Auto Cashout At Row</span>
+                  <span
+                    style={{
+                      ...S.lblRight,
+                      color: auto.autoCashoutRow === 0 ? C.textDim : C.gold,
+                    }}
+                  >
+                    {auto.autoCashoutRow === 0
+                      ? "Disabled"
+                      : `Row ${auto.autoCashoutRow} / ${maxRow}`}
+                  </span>
+                </div>
+                <div style={S.inputBox()}>
+                  <input
+                    style={S.input}
+                    type="number"
+                    value={autoCashoutInput}
+                    min={0}
+                    max={maxRow}
+                    step={1}
+                    disabled={autoRunning}
+                    placeholder={`0 = disabled (max ${maxRow})`}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === "" || raw === "0") {
+                        setAutoCashoutInput(raw);
+                        onAutoSettingsChange({ autoCashoutRow: 0 });
+                        return;
+                      }
+                      if (!/^\d+$/.test(raw)) return;
+                      const parsed = parseInt(raw, 10);
+                      if (isNaN(parsed)) return;
+                      const clamped = Math.min(parsed, maxRow);
+                      setAutoCashoutInput(String(clamped));
+                      onAutoSettingsChange({ autoCashoutRow: clamped });
+                    }}
+                    onBlur={() => {
+                      if (autoCashoutInput === "" || autoCashoutInput === "0") {
+                        setAutoCashoutInput("");
+                        onAutoSettingsChange({ autoCashoutRow: 0 });
+                      } else {
+                        const parsed = parseInt(autoCashoutInput, 10);
+                        const clamped = isNaN(parsed)
+                          ? 0
+                          : Math.min(Math.max(0, parsed), maxRow);
+                        setAutoCashoutInput(
+                          clamped === 0 ? "" : String(clamped),
+                        );
+                        onAutoSettingsChange({ autoCashoutRow: clamped });
+                      }
+                    }}
+                  />
+                  <span
+                    style={{ fontSize: 11, color: C.labelColor, flexShrink: 0 }}
+                  >
+                    / {maxRow}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Number of bets */}
           <div style={S.fieldWrap}>
             <div style={S.rowBetween}>
@@ -569,28 +982,47 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   color: isInfinite ? C.gold : C.valueColor,
                 }}
               >
-                {isInfinite ? "∞ Infinite" : `${auto.autoCount} rounds`}
+                {isInfinite
+                  ? "∞ Infinite"
+                  : `${auto.autoCount} ${auto.autoCount === 1 ? "round" : "rounds"}`}
               </span>
             </div>
             <div style={S.inputBox()}>
               <input
                 style={S.input}
                 type="number"
-                value={auto.autoCount}
+                value={autoCountInput}
                 min={0}
                 step={1}
                 disabled={autoRunning}
                 placeholder="0 = infinite"
-                onChange={(e) =>
-                  onAutoSettingsChange({
-                    autoCount: parseInt(e.target.value) || 0,
-                  })
-                }
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "" || raw === "0") {
+                    setAutoCountInput(raw);
+                    onAutoSettingsChange({ autoCount: 0 });
+                    return;
+                  }
+                  if (!/^\d+$/.test(raw)) return;
+                  const parsed = parseInt(raw, 10);
+                  if (isNaN(parsed)) return;
+                  setAutoCountInput(String(parsed));
+                  onAutoSettingsChange({ autoCount: parsed });
+                }}
+                onBlur={() => {
+                  if (autoCountInput === "" || autoCountInput === "0") {
+                    setAutoCountInput("");
+                    onAutoSettingsChange({ autoCount: 0 });
+                  } else {
+                    const parsed = parseInt(autoCountInput, 10);
+                    const val = isNaN(parsed) ? 0 : Math.max(0, parsed);
+                    setAutoCountInput(val === 0 ? "" : String(val));
+                    onAutoSettingsChange({ autoCount: val });
+                  }
+                }}
               />
               {isInfinite ? (
-                <span
-                  style={{ fontSize: 20, color: C.gold, flexShrink: 0 }}
-                >
+                <span style={{ fontSize: 20, color: C.gold, flexShrink: 0 }}>
                   ∞
                 </span>
               ) : (
@@ -617,10 +1049,17 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             }}
           >
             <span style={S.lbl}>Advanced Settings</span>
-            <label className="auto-toggle">
+            <label
+              className="auto-toggle"
+              style={{
+                opacity: autoRunning ? 0.4 : 1,
+                pointerEvents: autoRunning ? "none" : "auto",
+              }}
+            >
               <input
                 type="checkbox"
                 checked={auto.autoAdvanced}
+                disabled={autoRunning}
                 onChange={(e) =>
                   onAutoSettingsChange({ autoAdvanced: e.target.checked })
                 }
@@ -631,7 +1070,13 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
 
           {auto.autoAdvanced && (
             <div
-              style={{ display: "flex", flexDirection: "column", gap: 7 }}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 7,
+                width: "100%",
+                boxSizing: "border-box",
+              }}
             >
               {/* On Win */}
               <div style={S.sectionBox}>
@@ -642,27 +1087,33 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                     gap: 5,
                     alignItems: "center",
                     flexWrap: "wrap" as const,
+                    width: "100%",
+                    boxSizing: "border-box" as const,
                   }}
                 >
                   <button
-                    style={S.modeBtn(auto.onWinMode === "reset")}
-                    onClick={() =>
-                      onAutoSettingsChange({ onWinMode: "reset" })
-                    }
+                    style={{
+                      ...S.modeBtn(auto.onWinMode === "reset"),
+                      opacity: autoRunning ? 0.4 : 1,
+                    }}
+                    disabled={autoRunning}
+                    onClick={() => onAutoSettingsChange({ onWinMode: "reset" })}
                   >
                     Reset
                   </button>
                   <button
-                    style={S.modeBtn(auto.onWinMode === "increase")}
+                    style={{
+                      ...S.modeBtn(auto.onWinMode === "increase"),
+                      opacity: autoRunning ? 0.4 : 1,
+                    }}
+                    disabled={autoRunning}
                     onClick={() =>
                       onAutoSettingsChange({ onWinMode: "increase" })
                     }
                   >
                     Increase
                   </button>
-                  <span style={{ color: C.labelColor, fontSize: 13 }}>
-                    by
-                  </span>
+                  <span style={{ color: C.labelColor, fontSize: 13 }}>by</span>
                   <input
                     type="number"
                     value={auto.winInc}
@@ -670,18 +1121,17 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                     step={1}
                     style={{
                       ...S.smallInput,
-                      opacity: auto.onWinMode === "reset" ? 0.35 : 1,
+                      opacity:
+                        autoRunning || auto.onWinMode === "reset" ? 0.35 : 1,
                     }}
-                    disabled={auto.onWinMode === "reset"}
+                    disabled={autoRunning || auto.onWinMode === "reset"}
                     onChange={(e) =>
                       onAutoSettingsChange({
                         winInc: parseFloat(e.target.value) || 0,
                       })
                     }
                   />
-                  <span style={{ color: C.labelColor, fontSize: 13 }}>
-                    %
-                  </span>
+                  <span style={{ color: C.labelColor, fontSize: 13 }}>%</span>
                 </div>
               </div>
 
@@ -694,10 +1144,16 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                     gap: 5,
                     alignItems: "center",
                     flexWrap: "wrap" as const,
+                    width: "100%",
+                    boxSizing: "border-box" as const,
                   }}
                 >
                   <button
-                    style={S.modeBtn(auto.onLossMode === "reset")}
+                    style={{
+                      ...S.modeBtn(auto.onLossMode === "reset"),
+                      opacity: autoRunning ? 0.4 : 1,
+                    }}
+                    disabled={autoRunning}
                     onClick={() =>
                       onAutoSettingsChange({ onLossMode: "reset" })
                     }
@@ -705,16 +1161,18 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                     Reset
                   </button>
                   <button
-                    style={S.modeBtn(auto.onLossMode === "increase")}
+                    style={{
+                      ...S.modeBtn(auto.onLossMode === "increase"),
+                      opacity: autoRunning ? 0.4 : 1,
+                    }}
+                    disabled={autoRunning}
                     onClick={() =>
                       onAutoSettingsChange({ onLossMode: "increase" })
                     }
                   >
                     Increase
                   </button>
-                  <span style={{ color: C.labelColor, fontSize: 13 }}>
-                    by
-                  </span>
+                  <span style={{ color: C.labelColor, fontSize: 13 }}>by</span>
                   <input
                     type="number"
                     value={auto.lossInc}
@@ -722,18 +1180,17 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                     step={1}
                     style={{
                       ...S.smallInput,
-                      opacity: auto.onLossMode === "reset" ? 0.35 : 1,
+                      opacity:
+                        autoRunning || auto.onLossMode === "reset" ? 0.35 : 1,
                     }}
-                    disabled={auto.onLossMode === "reset"}
+                    disabled={autoRunning || auto.onLossMode === "reset"}
                     onChange={(e) =>
                       onAutoSettingsChange({
                         lossInc: parseFloat(e.target.value) || 0,
                       })
                     }
                   />
-                  <span style={{ color: C.labelColor, fontSize: 13 }}>
-                    %
-                  </span>
+                  <span style={{ color: C.labelColor, fontSize: 13 }}>%</span>
                 </div>
               </div>
 
@@ -754,7 +1211,12 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                       value={auto.stopProfit}
                       min={0}
                       step={1}
-                      style={{ ...S.input, fontSize: 13 }}
+                      disabled={autoRunning}
+                      style={{
+                        ...S.input,
+                        fontSize: 13,
+                        opacity: autoRunning ? 0.4 : 1,
+                      }}
                       onChange={(e) =>
                         onAutoSettingsChange({
                           stopProfit: parseFloat(e.target.value) || 0,
@@ -778,7 +1240,12 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                       value={auto.stopLoss}
                       min={0}
                       step={1}
-                      style={{ ...S.input, fontSize: 13 }}
+                      disabled={autoRunning}
+                      style={{
+                        ...S.input,
+                        fontSize: 13,
+                        opacity: autoRunning ? 0.4 : 1,
+                      }}
                       onChange={(e) =>
                         onAutoSettingsChange({
                           stopLoss: parseFloat(e.target.value) || 0,
@@ -788,6 +1255,23 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Stop condition warning */}
+          {!autoRunning && !auto.autoAdvanced && auto.autoCount === 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ color: "#c8a44a", fontSize: 11 }}>⚠</span>
+              <span
+                style={{
+                  color: "#c8a44a",
+                  fontSize: 11,
+                  fontFamily: "'Rajdhani', sans-serif",
+                  fontWeight: 600,
+                }}
+              >
+                No stop condition set — will run infinitely.
+              </span>
             </div>
           )}
 
@@ -801,18 +1285,57 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               fontSize: 14,
               fontWeight: 900,
               padding: 13,
-              cursor: "pointer",
+              cursor:
+                playing || autoRunning
+                  ? autoRunning
+                    ? "pointer"
+                    : "not-allowed"
+                  : "pointer",
               letterSpacing: 0.8,
               marginTop: 2,
               background: autoRunning
                 ? "linear-gradient(135deg, #7a1414, #4a0a0a)"
-                : `linear-gradient(135deg, #a8c000, ${C.accent})`,
-              color: autoRunning ? "#ffaaaa" : C.accentDark,
+                : playing
+                  ? "#161e06"
+                  : `linear-gradient(135deg, #a8c000, ${C.accent})`,
+              color: autoRunning
+                ? "#ffaaaa"
+                : playing
+                  ? "#2a3208"
+                  : C.accentDark,
               boxShadow: autoRunning
                 ? "0 3px 14px rgba(160,20,0,.3)"
-                : "0 3px 18px rgba(200,216,0,.28)",
+                : playing
+                  ? "none"
+                  : "0 3px 18px rgba(200,216,0,.28)",
+              opacity: playing && !autoRunning ? 0.5 : 1,
             }}
-            onClick={onAutoToggle}
+            disabled={
+              (playing && !autoRunning) ||
+              (!autoRunning &&
+                (auto.autoBet < MIN_BET ||
+                  autoBetExceedsBalance ||
+                  autoBetInvalid))
+            }
+            onClick={() => {
+              if (
+                !autoRunning &&
+                (auto.autoBet < MIN_BET ||
+                  autoBetExceedsBalance ||
+                  autoBetInvalid)
+              )
+                return;
+              onAutoToggle();
+            }}
+            title={
+              playing && !autoRunning
+                ? "Finish the current manual round first"
+                : !autoRunning && auto.autoBet < MIN_BET
+                  ? "Enter a valid bet amount to start autoplay"
+                  : autoRunning
+                    ? "Stops after current round resolves"
+                    : undefined
+            }
           >
             {autoRunning ? "⏹ Stop Autobet" : "▶ Start Autobet"}
           </button>
@@ -823,20 +1346,22 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             <span style={S.balLbl}>Balance</span>
             <span style={S.balVal}>{fmt(balance)}</span>
           </div>
-          <div style={S.balRow}>
-            <span style={{ ...S.balLbl, color: "#3a6a8a" }}>
-              Session Profit
-            </span>
-            <span
-              style={{
-                ...S.balVal,
-                color: autoTotalProfit >= 0 ? C.green : C.red,
-              }}
-            >
-              {autoTotalProfit >= 0 ? "+" : ""}
-              {fmt(autoTotalProfit)}
-            </span>
-          </div>
+          {autoRunning && (
+            <div style={S.balRow}>
+              <span style={{ ...S.balLbl, color: "#3a6a8a" }}>
+                Session Profit
+              </span>
+              <span
+                style={{
+                  ...S.balVal,
+                  color: autoTotalProfit >= 0 ? C.green : C.red,
+                }}
+              >
+                {autoTotalProfit >= 0 ? "+" : ""}
+                {fmt(autoTotalProfit)}
+              </span>
+            </div>
+          )}
 
           {/* Live rounds indicator */}
           {autoRunning && (
@@ -852,9 +1377,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               }}
             >
               <span style={S.balLbl}>Rounds Left</span>
-              <span
-                style={{ fontSize: 15, fontWeight: 700, color: C.gold }}
-              >
+              <span style={{ fontSize: 15, fontWeight: 700, color: C.gold }}>
                 {isInfinite ? "∞" : autoCount}
               </span>
             </div>

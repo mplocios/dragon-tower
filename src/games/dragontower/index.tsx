@@ -176,6 +176,14 @@ const DragonTower: React.FC = () => {
         gs().setRgstate("endgame");
         gs().setPlayLock(true);
         pixiGame.panelCooldownRef.current = true;
+        // Update autobet session profit immediately on lose
+        if (gs().autoRunning) {
+          const roundProfit = parseFloat((-s.bet).toFixed(2));
+          const newTotalProfit = parseFloat(
+            (gs().autoTotalProfit + roundProfit).toFixed(2),
+          );
+          gs().setAutoTotalProfit(newTotalProfit);
+        }
         pixiGame.stopNormalBgSound();
         pixiGame.playLoseSound();
         pixiGame.spawnLoseExplosion(r, c, s.diff);
@@ -477,6 +485,14 @@ const DragonTower: React.FC = () => {
     gs().setRgstate("endgame");
     gs().setPlayLock(true);
     pixiGame.panelCooldownRef.current = true;
+    // Update autobet session profit immediately on cashout/win
+    if (gs().autoRunning) {
+      const roundProfit = parseFloat((win - s.bet).toFixed(2));
+      const newTotalProfit = parseFloat(
+        (gs().autoTotalProfit + roundProfit).toFixed(2),
+      );
+      gs().setAutoTotalProfit(newTotalProfit);
+    }
     pixiGame.stopNormalBgSound();
     pixiGame.swapDragonSprite(true);
     pixiGame.showFlameEffects(true, true);
@@ -680,12 +696,27 @@ const DragonTower: React.FC = () => {
     if (autoTimeoutRef.current) clearTimeout(autoTimeoutRef.current);
     autoTimeoutRef.current = null;
 
-    if (s.gstate === "playing" && s.curRow > 0) cashOut();
-    else if (s.gstate === "playing") {
-      gs().setGstate("ended");
-      pixiGame.refreshGrid(s.diff, "ended", s.curRow, s.revealed);
+    if (s.gstate === "playing" && s.curRow > 0) {
+      // Has progress — cash out safely
+      cashOut();
+    } else if (s.gstate === "playing" && s.curRow === 0) {
+      // No progress yet — refund bet and reset cleanly
+      const refunded = s.balance + s.bet;
+      gs().setBalance(refunded);
+      clearPendingTimers();
+      clearSession();
+      gs().resetRound();
+      gs().setGstate("idle");
+      pixiGame.resetAnimationState();
+      pixiGame.swapDragonSprite(false);
+      pixiGame.showFlameEffects(false);
+      pixiGame.stopLoseSound();
+      pixiGame.stopNormalBgSound();
+      pixiGame.buildGrid(s.diff);
+      pixiGame.refreshGrid(s.diff, "idle", 0, {});
+      showToast("Autobet stopped — bet refunded.");
     }
-  }, [cashOut, pixiGame]);
+  }, [cashOut, pixiGame, clearPendingTimers, showToast]);
 
   const autoPlayRows = useCallback(() => {
     const s = gs();
@@ -695,11 +726,16 @@ const DragonTower: React.FC = () => {
 
       const settings = s.auto;
       const roundWon = s.autoLastRoundWon;
-      const roundProfit = roundWon
-        ? s.curWin - settings.autoBet
-        : -settings.autoBet;
 
-      gs().setAutoTotalProfit(s.autoTotalProfit + roundProfit);
+      console.log(`${roundWon ? "✅" : "❌"} [AUTO:ROUND_END] Round finished`, {
+        gameId: s.gameId,
+        timestamp: new Date().toISOString(),
+        result: roundWon ? "win" : "lose",
+        totalProfit: gs().autoTotalProfit,
+        roundsLeft: gs().autoCount,
+        balance: gs().balance,
+        difficulty: settings.autoDiff,
+      });
 
       let newBet = settings.autoBet;
       if (settings.autoAdvanced) {
@@ -718,19 +754,6 @@ const DragonTower: React.FC = () => {
                 )
               : settings.autoBet;
       }
-
-      console.log(`${roundWon ? "✅" : "❌"} [AUTO:ROUND_END] Round finished`, {
-        gameId: s.gameId,
-        timestamp: new Date().toISOString(),
-        result: roundWon ? "win" : "lose",
-        roundProfit,
-        roundBet: settings.autoBet,
-        nextBet: newBet,
-        totalProfit: gs().autoTotalProfit,
-        roundsLeft: gs().autoCount,
-        balance: gs().balance,
-        difficulty: settings.autoDiff,
-      });
 
       gs().setAuto({ autoBet: newBet });
 
@@ -755,13 +778,28 @@ const DragonTower: React.FC = () => {
         autoPlayRows();
         return;
       }
+
+      // Auto-cashout row check
+      const cashoutRow = cur.auto.autoCashoutRow ?? 0;
+      if (cashoutRow > 0 && cur.curRow >= cashoutRow && cur.curMult > 1) {
+        console.log(
+          "💰 [AUTO:CASHOUT] Auto-cashout triggered at row",
+          cur.curRow,
+        );
+        cashOut();
+        autoTimeoutRef.current = setTimeout(() => {
+          runNextAutoRoundRef.current();
+        }, 3000);
+        return;
+      }
+
       const col = avail[Math.floor(Math.random() * avail.length)];
       handleTileClick(cur.curRow, col);
       autoTimeoutRef.current = setTimeout(() => {
         autoPlayRows();
       }, 150);
     }, delay);
-  }, [handleTileClick]);
+  }, [handleTileClick, cashOut]);
 
   const runNextAutoRound = useCallback(() => {
     const s = gs();

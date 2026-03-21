@@ -53,4 +53,5 @@ export interface AutoSettings {
   stopProfit: number;
   stopLoss: number;
   autoDiff: Difficulty;
+  autoCashoutRow: number;
 }
