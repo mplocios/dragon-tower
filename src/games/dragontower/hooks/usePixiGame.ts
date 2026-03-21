@@ -25,7 +25,8 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, PAD_MOBILE, TGAP, RGAP, WALL_H, DIFF, 
   PANEL_BET_LBL_Y, PANEL_BET_BOT_OFFSET,
   PANEL_ARROW_UP_W, PANEL_ARROW_UP_H, PANEL_ARROW_DOWN_W, PANEL_ARROW_DOWN_H, PANEL_ARROW_RIGHT, PANEL_ARROW_UP_Y, PANEL_ARROW_DOWN_Y,
   PANEL_PROFIT_LBL_Y, PANEL_PROFIT_MULT_GAP, PANEL_PROFIT_AMT_FONT, PANEL_PROFIT_BOT_OFFSET, PANEL_PROFIT_COIN_GAP,
-  PANEL_RANDOM_INNER_PX, PANEL_PROFIT_INNER_PX,
+PANEL_RANDOM_INNER_PX, PANEL_PROFIT_INNER_PX,
+  MIN_BET, MAX_BET,
 } from '../constants';
 
 interface TileObj {
@@ -1783,6 +1784,7 @@ export function usePixiGame(
     betCard.addChild(betCoin);
 
     const betText = new PIXI.Text({ text: '5', style: { ...amtStyle, fontSize: PANEL_BET_AMT_FONT } });
+    (betText as any)._baseFont = PANEL_BET_AMT_FONT;
     betText.x = PANEL_BET_AMT_X; betText.y = PANEL_BOT_H - PANEL_BET_BOT_OFFSET; betText.anchor.set(0, 0.5);
     betCard.addChild(betText);
 
@@ -1823,21 +1825,35 @@ export function usePixiGame(
 
     const upArrow = makeArrowBtn(PANEL_ARROW_UP_Y, '▲', PANEL_ARROW_UP_W, PANEL_ARROW_UP_H, () => {
       const cur = parseFmt(betText.text);
-      const newBet = parseFloat((cur * 2).toFixed(2));
-      const bal = parseFmt(balText.text);
-      if (newBet > bal) {
+      const newBet = parseFloat((cur * 2).toFixed(8));
+      const bal = useGameStore.getState().balance;
+      if (newBet > MAX_BET) {
+        insuffText.text = 'Max bet is ' + MAX_BET.toLocaleString() + '!';
         insuffText.visible = true;
         setTimeout(() => { insuffText.visible = false; }, 2000);
         return;
       }
-      onBetChangeRef.current?.(Math.max(0.01, newBet));
+      if (newBet > bal) {
+        insuffText.text = 'Insufficient funds';
+        insuffText.visible = true;
+        setTimeout(() => { insuffText.visible = false; }, 2000);
+        return;
+      }
+      onBetChangeRef.current?.(newBet);
     });
     betCard.addChild(upArrow);
     panelTextsRef.current.upArrow = upArrow;
 
     const downArrow = makeArrowBtn(PANEL_ARROW_DOWN_Y, '▼', PANEL_ARROW_DOWN_W, PANEL_ARROW_DOWN_H, () => {
       const cur = parseFmt(betText.text);
-      onBetChangeRef.current?.(Math.max(0.01, parseFloat((cur * 0.5).toFixed(2))));
+      const newBet = parseFloat((cur * 0.5).toFixed(8));
+      if (newBet < MIN_BET) {
+        insuffText.text = 'Min bet is ' + MIN_BET.toFixed(8) + '!';
+        insuffText.visible = true;
+        setTimeout(() => { insuffText.visible = false; }, 2000);
+        return;
+      }
+      onBetChangeRef.current?.(newBet);
     });
     betCard.addChild(downArrow);
     panelTextsRef.current.downArrow = downArrow;
@@ -1971,7 +1987,25 @@ export function usePixiGame(
       // Reposition coin after amount text
       if (t.balanceCoin) t.balanceCoin.x = t.balanceText.x + t.balanceText.width + PANEL_COIN_GAP;
     }
-    if (t.betText) t.betText.text = String(state.bet);
+    if (t.betText) {
+      const formatted = state.bet < 0.001
+        ? state.bet.toFixed(8)
+        : state.bet.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+      const baseFont = (t.betText as any)._baseFont ?? PANEL_BET_AMT_FONT;
+      const newSize = formatted.length > 10
+        ? baseFont * 0.65
+        : formatted.length > 7
+        ? baseFont * 0.8
+        : baseFont;
+      // Reassign full style object to force PixiJS re-render
+      t.betText.style = new PIXI.TextStyle({
+        fontFamily: 'Poppins',
+        fontSize: newSize,
+        fill: PANEL_GOLD_COLOR,
+        fontWeight: '700',
+      });
+      t.betText.text = formatted;
+    }
     if (t.diffText) t.diffText.text = state.diff;
     if (t.multText) t.multText.text = `(${state.curMult.toFixed(2)}×)`;
     if (t.profitText) {
