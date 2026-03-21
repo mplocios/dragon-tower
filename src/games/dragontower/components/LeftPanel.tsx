@@ -69,7 +69,7 @@ const C = {
 const S = {
   panel: {
     // width: 300,
-    minWidth: 300,
+    minWidth: 341,
     maxWidth: 341,
     flexShrink: 0,
     background: C.bg,
@@ -172,26 +172,31 @@ const S = {
   // ── ½ / 2× buttons ──
   modBtn: (disabled: boolean): React.CSSProperties => ({
     background: C.surface,
-    border: `1.5px solid ${C.border}`,
-    borderRadius: 8,
+    border: "none",
+    borderLeft: `1px solid ${C.border}`,
+    borderRadius: 0,
     color: C.valueColor,
     fontFamily: "'Rajdhani', sans-serif",
     fontSize: 13,
     fontWeight: 700,
-    padding: "0 8px",
+    padding: "0 10px",
     height: 44,
-    width: 36,
     cursor: disabled ? "not-allowed" : "pointer",
     whiteSpace: "nowrap" as const,
     transition: "all .15s",
     flexShrink: 0,
     textAlign: "center" as const,
+    opacity: disabled ? 0.4 : 1,
   }),
   betRow: {
     display: "flex",
-    gap: 5,
+    gap: 0,
     width: "100%",
     boxSizing: "border-box" as const,
+    background: C.surface,
+    borderRadius: 9,
+    border: `1.5px solid ${C.border}`,
+    overflow: "hidden",
   },
 
   // ── Select ──
@@ -340,10 +345,13 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   const curWin = useGameStore((s) => s.curWin);
   const auto = useGameStore((s) => s.auto);
   const autoRunning = useGameStore((s) => s.autoRunning);
+  const maxBetActive = useGameStore((s) => s.maxBet);
   const autoTotalProfit = useGameStore((s) => s.autoTotalProfit);
   const autoCount = useGameStore((s) => s.autoCount);
 
-  const { setBet, setDiff, setAuto } = useGameStore.getState();
+  const setBet = useGameStore((s) => s.setBet);
+  const setDiff = useGameStore((s) => s.setDiff);
+  const setAuto = useGameStore((s) => s.setAuto);
 
   const [activeTab, setActiveTab] = useState<"manual" | "auto">("manual");
   const [cooldown, setCooldown] = useState(false);
@@ -442,10 +450,17 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 style={{
                   ...S.inputBox(),
                   flex: 1,
+                  border: "none",
                   borderColor:
                     betExceedsBalance || betInvalid || betExceedsMax
                       ? "#e84040"
                       : undefined,
+                  outline:
+                    betExceedsBalance || betInvalid || betExceedsMax
+                      ? "1.5px solid #e84040"
+                      : "none",
+                  borderRadius: 0,
+                  background: "transparent",
                 }}
               >
                 <input
@@ -530,6 +545,21 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               >
                 2×
               </button>
+              {maxBetActive && (
+                <button
+                  style={S.modBtn(playing || autoRunning)}
+                  disabled={playing || autoRunning}
+                  onClick={() => {
+                    const maxVal = Math.min(balance, MAX_BET);
+                    onBetChange(maxVal);
+                    setBetInputVal(maxVal.toFixed(8));
+                    setBetExceedsBalance(false);
+                    setBetExceedsMax(false);
+                  }}
+                >
+                  Max
+                </button>
+              )}
             </div>
             <div
               style={{
@@ -707,10 +737,17 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 style={{
                   ...S.inputBox(),
                   flex: 1,
+                  border: "none",
                   borderColor:
                     autoBetExceedsBalance || autoBetInvalid || autoBetExceedsMax
                       ? "#e84040"
                       : undefined,
+                  outline:
+                    autoBetExceedsBalance || autoBetInvalid || autoBetExceedsMax
+                      ? "1.5px solid #e84040"
+                      : "none",
+                  borderRadius: 0,
+                  background: "transparent",
                 }}
               >
                 <input
@@ -797,6 +834,21 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               >
                 2×
               </button>
+              {maxBetActive && (
+                <button
+                  style={S.modBtn(autoRunning)}
+                  disabled={autoRunning}
+                  onClick={() => {
+                    const maxVal = Math.min(balance, MAX_BET);
+                    setAuto({ autoBet: maxVal });
+                    setAutoBetInputVal(maxVal.toFixed(8));
+                    setAutoBetExceedsBalance(false);
+                    setAutoBetExceedsMax(false);
+                  }}
+                >
+                  Max
+                </button>
+              )}
             </div>
             <div
               style={{

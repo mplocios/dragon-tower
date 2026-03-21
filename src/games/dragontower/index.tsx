@@ -976,6 +976,12 @@ const DragonTower: React.FC = () => {
     return () => clearTimeout(tid);
   }, []); // eslint-disable-line
 
+  // ── Sync volume changes to active sounds ──────────────
+  const storeVolume = useGameStore((s) => s.volume);
+  useEffect(() => {
+    pixiGame.updateAllSoundVolumes?.(storeVolume);
+  }, [storeVolume, pixiGame]);
+
   // ── Update PixiJS mobile panel on state changes ────────
   useEffect(() => {
     pixiGame.updateMobilePanel?.({

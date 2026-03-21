@@ -1131,13 +1131,30 @@ export function usePixiGame(
 
   const playSound = useCallback((file: string, opts?: { loop?: boolean; volume?: number }): HTMLAudioElement => {
     const cache = soundCacheRef.current;
-    // Clone from preloaded source for instant playback
     const src = cache[file];
     const audio = src ? src.cloneNode(true) as HTMLAudioElement : new Audio(`${SOUND_BASE}/${file}`);
     audio.loop = opts?.loop ?? false;
-    audio.volume = opts?.volume ?? 0.8;
+    const globalVol = useGameStore.getState().volume / 100;
+    audio.volume = (opts?.volume ?? 0.8) * globalVol;
     audio.play().catch(() => {});
     return audio;
+  }, []);
+
+  const updateAllSoundVolumes = useCallback((vol: number) => {
+    const scale = vol / 100;
+    const refs = [
+      checkoutSoundRef,
+      bgSoundRef,
+      normalBgSoundRef,
+      loseSoundRef,
+      brickSoundRef,
+      eggSoundRef,
+    ];
+    refs.forEach((ref) => {
+      if (ref.current) {
+        ref.current.volume = Math.min(1, 0.8 * scale);
+      }
+    });
   }, []);
 
   const showFlameEffects = useCallback((show: boolean, winOnly?: boolean) => {
@@ -2026,6 +2043,7 @@ export function usePixiGame(
     showResultOverlay,
     hideResultOverlay,
     resetAnimationState,
+    updateAllSoundVolumes,
     texRef,
     panelCooldownRef,
     appReady: !!appRef.current,

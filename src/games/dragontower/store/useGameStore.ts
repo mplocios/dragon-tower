@@ -37,6 +37,11 @@ export interface GameStore {
   history: HistoryEntry[];
   playLock: boolean;
 
+  volume: number;
+  setVolume: (v: number) => void;
+  maxBet: boolean;
+  setMaxBet: (v: boolean) => void;
+
   // auto-bet state
   auto: AutoSettings;
   autoRunning: boolean;
@@ -93,6 +98,8 @@ export const useGameStore = create<GameStore>()((set) => ({
   gameStartTime: 0,
   history: loadHistory(),
   playLock: false,
+  volume: 80,
+  maxBet: false,
 
   auto: {
     autoBet: 5,
@@ -147,6 +154,8 @@ export const useGameStore = create<GameStore>()((set) => ({
     }),
 
   setPlayLock: (v) => set({ playLock: v }),
+  setVolume: (v) => set({ volume: v }),
+  setMaxBet: (v) => set({ maxBet: v }),
 
   setHistory: (entries) => set({ history: entries }),
 
@@ -192,5 +201,11 @@ useGameStore.subscribe(
     }
   }
 );
+
+useGameStore.subscribe((state) => {
+  if (typeof state.setMaxBet !== "function") {
+    console.log("💀 STORE BROKEN:", state);
+  }
+});
 
 export default useGameStore;

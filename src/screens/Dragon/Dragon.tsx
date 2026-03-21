@@ -12,6 +12,7 @@ import { Button } from "../../components/ui/button";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import DragonTower from "../../games/dragontower";
 import { useGameStore } from "../../games/dragontower/store/useGameStore";
+import { MAX_BET } from "../../games/dragontower/constants";
 import { usePlayerStore, DEMO_BALANCE } from "../../store/usePlayerStore";
 import {
   isFavorite as checkFavorite,
@@ -83,6 +84,15 @@ export const Dragon = (): JSX.Element => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeNav, setActiveNav] = useState("Casino");
   const [showNotif, setShowNotif] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [instantBet, setInstantBet] = useState(false);
+  const [showMaxBetConfirm, setShowMaxBetConfirm] = useState(false);
+  const volume = useGameStore((s) => s.volume);
+  const setVolume = useGameStore((s) => s.setVolume);
+  const [animations, setAnimations] = useState(true);
+  const maxBet = useGameStore((s) => s.maxBet);
+  const setMaxBet = useGameStore((s) => s.setMaxBet);
+  const [activeHotkeys, setActiveHotkeys] = useState(false);
   const [notifications] = useState([
     { id: 1, text: "Welcome to Dragon Tower!", time: "Just now" },
     { id: 2, text: "Your balance has been updated", time: "2m ago" },
@@ -420,13 +430,113 @@ export const Dragon = (): JSX.Element => {
             </div>
 
             {/* Settings */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-[#1a191d] h-7 w-7 sm:h-8 sm:w-8 lg:h-9 lg:w-9"
-            >
-              <SettingsIcon className="w-4 h-4 lg:w-5 lg:h-5" />
-            </Button>
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-7 w-7 sm:h-8 sm:w-8 lg:h-9 lg:w-9 ${showSettings ? "text-[#eaff00]" : "text-white hover:bg-[#1a191d]"}`}
+                onClick={() => setShowSettings(!showSettings)}
+              >
+                <SettingsIcon className="w-4 h-4 lg:w-5 lg:h-5" />
+              </Button>
+
+              {showSettings && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-[#1a191d] border border-[#333] rounded-xl shadow-2xl z-50 overflow-hidden">
+                  {/* Volume */}
+                  <div className="px-4 py-3 border-b border-[#222]">
+                    <div className="flex items-center gap-3">
+                      <span className="text-white text-sm">🔊</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={volume}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setVolume(v);
+                        }}
+                        className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
+                        style={{
+                          background: `linear-gradient(to right, #4a9eff ${volume}%, #333 ${volume}%)`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Instant Bet */}
+                  <button
+                    className={`flex items-center gap-3 w-full px-4 py-3 border-b border-[#222] transition-colors ${instantBet ? "bg-[#252525] text-[#eaff00]" : "text-white hover:bg-[#222]"}`}
+                    onClick={() => setInstantBet(!instantBet)}
+                  >
+                    <span className="text-lg">⚡</span>
+                    <span className="[font-family:'Poppins',Helvetica] text-sm font-medium">
+                      Instant Bet
+                    </span>
+                  </button>
+
+                  {/* Animations */}
+                  <button
+                    className={`flex items-center gap-3 w-full px-4 py-3 border-b border-[#222] transition-colors ${animations ? "bg-[#252525] text-[#eaff00]" : "text-white hover:bg-[#222]"}`}
+                    onClick={() => setAnimations(!animations)}
+                  >
+                    <span className="text-lg">✨</span>
+                    <span className="[font-family:'Poppins',Helvetica] text-sm font-medium">
+                      Animations
+                    </span>
+                  </button>
+
+                  {/* Max Bet */}
+                  <button
+                    className={`flex items-center gap-3 w-full px-4 py-3 border-b border-[#222] transition-colors ${maxBet ? "bg-[#252525] text-[#eaff00]" : "text-white hover:bg-[#222]"}`}
+                    // onClick={() => {
+                    //   if (!maxBet) {
+                    //     setShowSettings(false);
+                    //     setShowMaxBetConfirm(true);
+                    //   } else {
+                    //     setMaxBet(false);
+                    //   }
+                    // }}
+                  >
+                    <span className="text-lg">🔥</span>
+                    <span className="[font-family:'Poppins',Helvetica] text-sm font-medium">
+                      Max Bet
+                    </span>
+                    {maxBet && (
+                      <span className="ml-auto text-xs font-bold bg-[#eaff00] text-black px-2 py-0.5 rounded">
+                        MAX
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Game Info */}
+                  <button
+                    className="flex items-center gap-3 w-full px-4 py-3 border-b border-[#222] text-white hover:bg-[#222] transition-colors"
+                    onClick={() => {
+                      // TODO: implement game info
+                    }}
+                  >
+                    <span className="text-lg">📋</span>
+                    <span className="[font-family:'Poppins',Helvetica] text-sm font-medium">
+                      Game Info
+                    </span>
+                  </button>
+
+                  {/* Hotkeys */}
+                  <button
+                    className={`flex items-center gap-3 w-full px-4 py-3 transition-colors ${activeHotkeys ? "bg-[#252525] text-[#eaff00]" : "text-white hover:bg-[#222]"}`}
+                    onClick={() => {
+                      setActiveHotkeys(!activeHotkeys);
+                      // TODO: implement hotkeys toggle
+                    }}
+                  >
+                    <span className="text-lg">⌨️</span>
+                    <span className="[font-family:'Poppins',Helvetica] text-sm font-medium">
+                      Hotkeys
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -442,6 +552,141 @@ export const Dragon = (): JSX.Element => {
           onClick={() => setShowNotif(false)}
         />
       )}
+
+      {/* Close settings on outside click */}
+      {showSettings && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowSettings(false)}
+        />
+      )}
+
+      {/* Max Bet Confirm Overlay */}
+      {showMaxBetConfirm &&
+        (() => {
+          const dragonApp = document.getElementById("dragon-app");
+          const rect = dragonApp?.getBoundingClientRect();
+          return (
+            <div
+              style={{
+                position: "fixed",
+                top: rect?.top ?? 0,
+                left: rect?.left ?? 0,
+                width: rect?.width ?? "100%",
+                height: rect?.height ?? "100%",
+                background: "rgba(0,0,0,0.7)",
+                zIndex: 9999,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div
+                style={{
+                  background: "#0d1520",
+                  borderRadius: 16,
+                  padding: "28px 32px",
+                  width: 420,
+                  maxWidth: "90%",
+                  boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+                }}
+              >
+                {/* Header */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 16,
+                  }}
+                >
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 10 }}
+                  >
+                    <span style={{ fontSize: 20 }}>🔥</span>
+                    <span
+                      style={{
+                        color: "#fff",
+                        fontFamily: "Poppins, sans-serif",
+                        fontWeight: 700,
+                        fontSize: 16,
+                      }}
+                    >
+                      Max Bet
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowMaxBetConfirm(false)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#666",
+                      cursor: "pointer",
+                      fontSize: 18,
+                      lineHeight: 1,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Body */}
+                <p
+                  style={{
+                    color: "#aaa",
+                    fontFamily: "Poppins, sans-serif",
+                    fontSize: 14,
+                    marginBottom: 28,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Are you sure you want to enable the max bet button?
+                </p>
+
+                {/* Buttons */}
+                <div style={{ display: "flex", gap: 12 }}>
+                  <button
+                    onClick={() => setShowMaxBetConfirm(false)}
+                    style={{
+                      flex: 1,
+                      padding: "12px 0",
+                      borderRadius: 8,
+                      border: "none",
+                      background: "#1e2d3d",
+                      color: "#fff",
+                      fontFamily: "Poppins, sans-serif",
+                      fontWeight: 600,
+                      fontSize: 14,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMaxBet(true);
+                      setShowMaxBetConfirm(false);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "12px 0",
+                      borderRadius: 8,
+                      border: "none",
+                      background: "#1a7fd4",
+                      color: "#fff",
+                      fontFamily: "Poppins, sans-serif",
+                      fontWeight: 600,
+                      fontSize: 14,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Enable
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 };
