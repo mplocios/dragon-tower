@@ -68,10 +68,8 @@ const C = {
 
 const S = {
   panel: {
-    // width: 300,
-    minWidth: 341,
-    maxWidth: 341,
-    flexShrink: 0,
+    width: "100%",
+    height: "100%",
     background: C.bg,
     flexDirection: "column" as const,
     borderRadius: "18px 0 0 18px",

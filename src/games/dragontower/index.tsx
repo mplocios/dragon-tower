@@ -2,7 +2,7 @@ import React, { useRef, useCallback, useEffect } from "react";
 import { Difficulty, GameState, TileContent, HistoryEntry } from "./types";
 import { DIFF, MULTS } from "./constants";
 import { usePixiGame } from "./hooks/usePixiGame";
-import LeftPanel from "./components/LeftPanel";
+// LeftPanel is now rendered inside PixiJS canvas (useDesktopPanel.ts)
 import { Toast } from "./components/ResultOverlay";
 import { useGameStore } from "./store/useGameStore";
 import {
@@ -43,6 +43,12 @@ const DragonTower: React.FC = () => {
   const curWin = useGameStore((s) => s.curWin);
   const toast = useGameStore((s) => s.toast);
   const rgstate = useGameStore((s) => s.rgstate);
+  const autoRunning = useGameStore((s) => s.autoRunning);
+  const autoTotalProfit = useGameStore((s) => s.autoTotalProfit);
+  const autoCount = useGameStore((s) => s.autoCount);
+  const auto = useGameStore((s) => s.auto);
+  const maxBetActive = useGameStore((s) => s.maxBet);
+  const playLock = useGameStore((s) => s.playLock);
 
   // ── Remaining refs (non-state, timers, callbacks) ─────────
   const mountedRef = useRef(false);
@@ -56,6 +62,7 @@ const DragonTower: React.FC = () => {
   const diffChangeCbRef = useRef<(v: Difficulty) => void>(() => {});
   const playActionCbRef = useRef<() => void>(() => {});
   const randomCbRef = useRef<() => void>(() => {});
+  const autoToggleCbRef = useRef<() => void>(() => {});
   const canvasWrapRef = useRef<HTMLDivElement>(null);
 
   // ── Persist balance to localStorage on change ─────────────
@@ -361,6 +368,7 @@ const DragonTower: React.FC = () => {
     onDiffChange: (v) => diffChangeCbRef.current(v),
     onPlayAction: () => playActionCbRef.current(),
     onRandom: () => randomCbRef.current(),
+    onAutoToggle: () => autoToggleCbRef.current(),
   });
 
   // ─────────────────────────────────────────────────────────
@@ -898,6 +906,10 @@ const DragonTower: React.FC = () => {
     else startAutobet();
   }, [startAutobet, stopAutobet]);
 
+  useEffect(() => {
+    autoToggleCbRef.current = toggleAutobet;
+  }, [toggleAutobet]);
+
   // ── Init grid on mount ─────────────────────────────────
   useEffect(() => {
     console.log("🚀 [GAME:INIT] DragonTower mounted", {
@@ -994,6 +1006,24 @@ const DragonTower: React.FC = () => {
     });
   }, [balance, bet, diff, gstate, curMult, curWin, pixiGame]);
 
+  // ── Update PixiJS desktop panel on state changes ───────
+  useEffect(() => {
+    pixiGame.updateDesktopPanel?.({
+      balance,
+      bet,
+      diff,
+      gstate,
+      curMult,
+      curWin,
+      autoRunning,
+      autoTotalProfit,
+      autoCount,
+      auto,
+      maxBetActive,
+      playLock,
+    });
+  }, [balance, bet, diff, gstate, curMult, curWin, autoRunning, autoTotalProfit, autoCount, auto, maxBetActive, playLock, pixiGame]);
+
   // ── Keyboard shortcuts ─────────────────────────────────
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -1018,21 +1048,7 @@ const DragonTower: React.FC = () => {
   // ── Render ────────────────────────────────────────────
   return (
     <div id="dragon-app">
-      <LeftPanel
-        onDiffChange={handleDiffChange}
-        onStartGame={() => startGame()}
-        onCashOut={cashOut}
-        onRandom={doRandom}
-        onAutoToggle={toggleAutobet}
-      />
-
-      <div id="game-panel-outer">
-        <div id="game-panel">
-          <div id="dragon-bg"></div>
-          <div id="canvas-wrap" ref={canvasWrapRef}></div>
-        </div>
-      </div>
-
+      <div id="canvas-wrap" ref={canvasWrapRef}></div>
       <Toast message={toast} />
     </div>
   );

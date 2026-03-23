@@ -1,8 +1,16 @@
 import { Difficulty, DiffConfig } from './types';
 
 // ─── Canvas & Core ──────────────────────────────────────────────────
+/** Full canvas width (16:9 ratio) */
+export const APP_W = 1280;
+/** Full canvas height (16:9 ratio) */
+export const APP_H = 720;
+/** Width reserved for the left panel in canvas logical pixels */
+export const LEFT_PANEL_W = 340;
+/** Grid-internal logical width (used for tile layout calculations) */
 export const CW = 520;
-export const CH = 780;
+/** Grid-internal logical height (used for tile layout calculations) */
+export const CH = 680;
 export const PAD = 40;
 /** Horizontal padding on mobile (left/right only) — lower = wider tiles */
 export const PAD_MOBILE = 22;
@@ -45,7 +53,7 @@ export const TILE_ASPECT_RATIO = 0.31;
 /** Tile height-to-width aspect ratio cap (mobile) */
 export const TILE_ASPECT_RATIO_MOBILE = 0.30;
 /** Bottom margin below the grid */
-export const GRID_BOTTOM_MARGIN = 100;
+export const GRID_BOTTOM_MARGIN = 70;
 /** Grid layer y-offset applied during init */
 export const GRID_LAYER_Y = 0;
 

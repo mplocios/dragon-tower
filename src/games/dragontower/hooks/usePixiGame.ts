@@ -2,7 +2,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import * as PIXI from 'pixi.js';
 import { Difficulty, GameState, TileContent, TileState } from '../types';
 import { useGameStore } from '../store/useGameStore';
-import { CW, CH, CH_MOBILE, PANEL_H, PAD, PAD_MOBILE, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_COLS, DESKTOP_SCALE,
+import { buildDesktopPanel, DesktopPanelRefs, DesktopPanelState } from './useDesktopPanel';
+import { APP_W, APP_H, LEFT_PANEL_W, CW, CH, CH_MOBILE, PANEL_H, PAD, PAD_MOBILE, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_COLS,
   GRID_TOP_RESERVE, TILE_ASPECT_RATIO, TILE_ASPECT_RATIO_MOBILE, GRID_BOTTOM_MARGIN, GRID_LAYER_Y,
   DRAGON_NORMAL_MAX_W, DRAGON_NORMAL_MAX_H, DRAGON_FIRE_MAX_W, DRAGON_FIRE_MAX_H,
   WALL_OVERSHOOT_W, WALL_OVERSHOOT_H, WALL_OFFSET_X, WALL_OFFSET_Y,
@@ -57,6 +58,7 @@ interface UsePixiGameOptions {
   onDiffChange?: (v: Difficulty) => void;
   onPlayAction?: () => void;
   onRandom?: () => void;
+  onAutoToggle?: () => void;
 }
 
 export function usePixiGame(
@@ -104,6 +106,7 @@ export function usePixiGame(
   const panelCooldownRef = useRef(false);
   const dragonGlowRef = useRef<PIXI.Graphics | null>(null);
   const stoneBgRef = useRef<PIXI.Container | null>(null);
+  const desktopPanelRef = useRef<DesktopPanelRefs | null>(null);
 
   const onTileClickRef = useRef(options.onTileClick);
   const onPlayAgainRef = useRef(options.onPlayAgain);
@@ -119,6 +122,8 @@ export function usePixiGame(
   useEffect(() => { onDiffChangeRef.current = options.onDiffChange; }, [options.onDiffChange]);
   useEffect(() => { onPlayActionRef.current = options.onPlayAction; }, [options.onPlayAction]);
   useEffect(() => { onRandomRef.current = options.onRandom; }, [options.onRandom]);
+  const onAutoToggleRef = useRef(options.onAutoToggle);
+  useEffect(() => { onAutoToggleRef.current = options.onAutoToggle; }, [options.onAutoToggle]);
 
   // ─── Helpers ────────────────────────────────────────────────
   const calcLayout = useCallback((diff: Difficulty) => {
@@ -1266,34 +1271,21 @@ export function usePixiGame(
       const wrapW = wrap.clientWidth || window.innerWidth;
       const maxH = window.innerHeight;
       const aspect = CW / CH_MOBILE;
-      // Start width-constrained, then cap by viewport height
       let w = wrapW;
       let h = Math.round(w / aspect);
       if (h > maxH) {
         h = maxH;
         w = Math.round(h * aspect);
       }
-      if (w <= 0 || h <= 0) return; // skip if layout not ready
+      if (w <= 0 || h <= 0) return;
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
       wrap.style.width = '100%';
     } else {
-      // Clear any mobile inline styles on wrap
+      // Desktop: canvas fills entire #dragon-app (16:9 via CSS aspect-ratio)
       wrap.style.width = '';
-      // On desktop: fit canvas to 90% of available height
-      const wrapW = wrap.clientWidth || window.innerWidth;
-      const maxH = Math.min(wrap.clientHeight || window.innerHeight, window.innerHeight) * DESKTOP_SCALE;
-      const aspect = CW / CH;
-      let h = maxH;
-      let w = Math.round(h * aspect);
-      // If wider than wrapper, constrain by width instead
-      if (w > wrapW) {
-        w = wrapW;
-        h = Math.round(w / aspect);
-      }
-      if (w <= 0 || h <= 0) return; // skip if layout not ready
-      canvas.style.width = `${w}px`;
-      canvas.style.height = `${h}px`;
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
     }
   }, [canvasWrapRef]);
 
@@ -1374,9 +1366,10 @@ export function usePixiGame(
       isMobileRef.current = mobile;
       const app = new PIXI.Application();
       await app.init({
-        width: CW,
-        height: mobile ? CH_MOBILE : CH,
-        backgroundAlpha: 0,
+        width: mobile ? CW : APP_W,
+        height: mobile ? CH_MOBILE : APP_H,
+        backgroundAlpha: mobile ? 0 : 1,
+        backgroundColor: mobile ? 0x000000 : 0x1a191d,
         resolution: Math.min(window.devicePixelRatio ?? 1, 2),
         autoDensity: true,
         antialias: true,
@@ -1402,6 +1395,70 @@ export function usePixiGame(
       fxLayerRef.current = fxLayer;
       uiLayerRef.current = uiLayer;
       app.stage.addChild(bgLayer, gridLayer, fxLayer, uiLayer);
+
+      // ── Desktop: offset grid/fx/ui to right side (past left panel area) ──
+      if (!mobile) {
+        const gameAreaX = LEFT_PANEL_W;
+        const gameAreaW = APP_W - LEFT_PANEL_W;
+        const gridOffsetX = gameAreaX + (gameAreaW - CW) / 2;
+        const gridOffsetY = (APP_H - CH) / 2;
+        gridLayer.x = gridOffsetX;
+        gridLayer.y = gridOffsetY + GRID_LAYER_Y;
+        fxLayer.x = gridOffsetX;
+        fxLayer.y = gridOffsetY;
+        uiLayer.x = gridOffsetX;
+        uiLayer.y = gridOffsetY;
+      }
+
+      // ── Render background image in canvas ──
+      if (!mobile) {
+        const VBASE = import.meta.env.VITE_BASE || '/dragon-tower';
+        const bgTexture = await PIXI.Assets.load(VBASE + '/assets/dragontower/images/dragon-background-2.png');
+        if (bgTexture && !destroyed) {
+          const bgSprite = new PIXI.Sprite(bgTexture);
+          bgSprite.width = APP_W;
+          bgSprite.height = APP_H;
+          bgSprite.x = 0;
+          bgSprite.y = 0;
+          bgLayer.addChild(bgSprite);
+
+          // Dark overlay on left panel area so panel text is readable
+          const panelOverlay = new PIXI.Graphics();
+          panelOverlay.rect(0, 0, LEFT_PANEL_W, APP_H).fill({ color: 0x1a191d, alpha: 0.92 });
+          bgLayer.addChild(panelOverlay);
+
+          // Inner shadow/border for game area
+          const gameAreaBorder = new PIXI.Graphics();
+          const gx = LEFT_PANEL_W - 5;
+          const gy = 8;
+          const gw = APP_W - LEFT_PANEL_W - 3;
+          const gh = APP_H - 16;
+          gameAreaBorder.roundRect(gx, gy, gw, gh, 18)
+            .stroke({ width: 8, color: 0xffffff, alpha: 0.28 });
+          bgLayer.addChild(gameAreaBorder);
+        }
+
+        // ── Build desktop panel in PixiJS ──
+        const dPanel = buildDesktopPanel(app, {
+          onBetChange: (v) => onBetChangeRef.current?.(v),
+          onDiffChange: (v) => onDiffChangeRef.current?.(v),
+          onStartGame: () => onPlayActionRef.current?.(),
+          onCashOut: () => onPlayActionRef.current?.(),
+          onRandom: () => onRandomRef.current?.(),
+          onAutoToggle: () => onAutoToggleRef.current?.(),
+          onAutoSettingsChange: (s) => {
+            const store = useGameStore.getState();
+            store.setAuto(s as any);
+          },
+          getCanvasRect: () => {
+            const canvas = app.canvas as HTMLCanvasElement;
+            return canvas?.getBoundingClientRect() ?? null;
+          },
+        });
+        desktopPanelRef.current = dPanel;
+        // Add above all other layers
+        app.stage.addChild(dPanel.container);
+      }
 
       app.ticker.add(() => {
         frameRef.current++;
@@ -1581,9 +1638,27 @@ export function usePixiGame(
           const nowMobile = window.innerWidth <= MOBILE_BREAKPOINT;
           if (wasMobile !== nowMobile) {
             isMobileRef.current = nowMobile;
-            app.renderer.resize(CW, nowMobile ? CH_MOBILE : CH);
+            app.renderer.resize(nowMobile ? CW : APP_W, nowMobile ? CH_MOBILE : APP_H);
             const panelLayer = panelLayerRef.current;
             if (panelLayer) panelLayer.visible = nowMobile;
+            if (desktopPanelRef.current) desktopPanelRef.current.container.visible = !nowMobile;
+            // Reposition grid layers for desktop vs mobile
+            const gl = gridLayerRef.current;
+            const fl = fxLayerRef.current;
+            const ul = uiLayerRef.current;
+            if (!nowMobile && gl && fl && ul) {
+              const gameAreaX = LEFT_PANEL_W;
+              const gameAreaW = APP_W - LEFT_PANEL_W;
+              const gridOffsetX = gameAreaX + (gameAreaW - CW) / 2;
+              const gridOffsetY = (APP_H - CH) / 2;
+              gl.x = gridOffsetX; gl.y = gridOffsetY + GRID_LAYER_Y;
+              fl.x = gridOffsetX; fl.y = gridOffsetY;
+              ul.x = gridOffsetX; ul.y = gridOffsetY;
+            } else if (gl && fl && ul) {
+              gl.x = 0; gl.y = GRID_LAYER_Y;
+              fl.x = 0; fl.y = 0;
+              ul.x = 0; ul.y = 0;
+            }
             const st = getStateRef.current();
             buildGrid(st.diff);
             refreshGrid(st.diff, st.gstate, st.curRow, st.revealed);
@@ -1615,6 +1690,10 @@ export function usePixiGame(
 
     return () => {
       destroyed = true;
+      if (desktopPanelRef.current) {
+        desktopPanelRef.current.destroy();
+        desktopPanelRef.current = null;
+      }
       const app = appRef.current;
       if (app) {
         if ((app as any)._resizeCleanup) (app as any)._resizeCleanup();
@@ -2151,6 +2230,10 @@ export function usePixiGame(
     if (t.randomBtn) t.randomBtn.alpha = playing ? 1 : 0.4;
   }, []);
 
+  const updateDesktopPanel = useCallback((state: DesktopPanelState) => {
+    desktopPanelRef.current?.update(state);
+  }, []);
+
   return {
     buildGrid,
     refreshGrid,
@@ -2158,6 +2241,7 @@ export function usePixiGame(
     buildStoneBackground,
     buildMobilePanel,
     updateMobilePanel,
+    updateDesktopPanel,
     loadTextures,
     preloadSounds,
     spawnFX,

@@ -5,79 +5,34 @@
 body { margin: 0; padding: 0; }
 
 #dragon-app {
-  display: flex;
+  position: relative;
   width: 100%;
-  height: 100%;
+  aspect-ratio: 16 / 9;
   max-height: 100%;
   overflow: hidden;
   border-radius: 20px;
   border: none;
   background: #1a191d;
   box-shadow: 0 8px 60px rgba(0,0,0,.85);
-  align-items: stretch;
-  position: relative;
 }
 
-#left-panel {
-  flex-shrink: 0;
-  background: #1a191d;
-  backdrop-filter: blur(10px);
-  border-right: none;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-  border-radius: 18px 0 0 18px;
-  font-family: 'Poppins', sans-serif;
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-}
-#game-panel-outer {
-  flex: 1;
-  padding: 10px 15px 10px 0;
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  margin-left: 343px;
-}
-
-#game-panel {
-  flex: 1;
-  position: relative;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-end;
-  border: none;
-  box-shadow: inset 0 0 0 8px rgba(255, 255, 255, 0.281);
-  overflow: hidden;
-  border-radius: 22px;
-  background-image: url("/assets/dragontower/images/dragon-background-2.png");
-  background-size: cover;
-  background-position: center;
-}
-
+/* Left panel is now rendered inside PixiJS canvas */
 #canvas-wrap {
-  position: relative;
-  z-index: 1;
-  height: 100%;
-  max-width: 100%;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: 10px;
-  background: transparent;
-  box-sizing: border-box;
-  margin-right: 10%;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 20px;
 }
 
 #canvas-wrap canvas {
   display: block;
-  max-height: 100%;
-  max-width: 100%;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 20px;
 }
 
 /* #dragon-bg {
@@ -367,9 +322,7 @@ body { margin: 0; padding: 0; }
 .auto-cond-row { background: rgba(10,25,40,.5); border: 1px solid #1a3050; border-radius: 8px; padding: 10px; }
 
 select option { background: #0d1e30; color: #c8d8e8; }
-#left-panel::-webkit-scrollbar { width: 2px; }
-#left-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
-#left-panel::-webkit-scrollbar-track { background: transparent; }
+/* Panel scrollbar styles no longer needed — panel is in PixiJS */
 input[type=number]::-webkit-inner-spin-button { opacity: 0; }
 
 /* ══════════════════════════════════════════
@@ -378,6 +331,12 @@ input[type=number]::-webkit-inner-spin-button { opacity: 0; }
 #dragon-app:fullscreen {
   width: 100vw;
   height: 100vh;
+  max-height: 100vh;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+#dragon-app:fullscreen #canvas-wrap,
+#dragon-app:fullscreen #canvas-wrap canvas {
   border-radius: 0;
 }
 
@@ -388,66 +347,23 @@ input[type=number]::-webkit-inner-spin-button { opacity: 0; }
 @media (max-width: 767px) {
 
   #dragon-app {
-    flex-direction: column;
+    aspect-ratio: auto;
     height: 100dvh;
     border-radius: 0;
     border: none;
   }
-  #left-panel,#head-1,#sub-head-1 { display: none !important; }
+  #head-1,#sub-head-1 { display: none !important; }
 
-  #game-panel-outer {
-    padding: 0 !important;
-    flex: 1 1 0;
-    min-height: 0;
-    scale: 1 !important;
-    margin-left: 0!important;
-  }
-
-  #game-panel {
-    flex: 1 1 0;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    justify-content: flex-start !important;
-    position: relative;
-    display: flex !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-  }
-  #game-panel {
-
-  background-image: url("/assets/dragontower/images/dragontower-bg-2.png");
-  }
-  #dragon-bg { background-position: center 30%; }
-
-  /* Canvas fills all space above the panel */
   #canvas-wrap {
-    flex: 1 1 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    max-height: none !important;
-    padding: 0 !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto;
-    /* margin-right: 0 !important; */
+    border-radius: 0;
   }
 
   #canvas-wrap canvas {
-    max-height: 100%;
-    max-width: 100%;
-    width: auto;
-    height: auto;
-    margin: 0 !important;
-    object-fit: contain;
+    border-radius: 0;
+    width: 100% !important;
+    height: 100% !important;
   }
 
 }
 
-@media (min-width: 768px) and (max-width: 1024px) {
-  #canvas-wrap {
-    margin-right: 0;
-    justify-content: center;
-  }
-}
+/* Tablet: no special adjustments needed — panel is inside PixiJS */
