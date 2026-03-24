@@ -6,7 +6,7 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, PAD_MOBILE, TGAP, RGAP, WALL_H, DIFF, 
   GRID_TOP_RESERVE, TILE_ASPECT_RATIO, TILE_ASPECT_RATIO_MOBILE, GRID_BOTTOM_MARGIN, GRID_LAYER_Y,
   DRAGON_NORMAL_MAX_W, DRAGON_NORMAL_MAX_H, DRAGON_FIRE_MAX_W, DRAGON_FIRE_MAX_H,
   WALL_OVERSHOOT_W, WALL_OVERSHOOT_H, WALL_OFFSET_X, WALL_OFFSET_Y, WALL_BOTTOM_OVERSHOOT_W, WALL_BOTTOM_OFFSET_Y, WALL_BOTTOM_H,
-  DRAGON_BREATH_AMPLITUDE, DRAGON_BREATH_FREQ, DRAGON_Y_OFFSET,
+  DRAGON_BREATH_AMPLITUDE, DRAGON_BREATH_FREQ, DRAGON_Y_OFFSET, DRAGON_FIRE_Y_OFFSET,
   DRAGON_GLOW_RADII, DRAGON_GLOW_X_OFFSET, DRAGON_GLOW_Y_OFFSET, DRAGON_GLOW_COLORS, DRAGON_GLOW_ALPHAS,
   DRAGON_GLOW_STEPS, DRAGON_GLOW_GRADIENT_COLOR, DRAGON_GLOW_ALPHA_MIN, DRAGON_GLOW_ALPHA_MAX,
   EGG_SCALE_W, EGG_SCALE_H, EGG_Y_OFFSET, DRAGON_ICON_SCALE_W, DRAGON_ICON_SCALE_H,
@@ -16,7 +16,7 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, PAD_MOBILE, TGAP, RGAP, WALL_H, DIFF, 
   TOP_FLAME_W_EXT, TOP_FLAME_H, TOP_FLAME_Y_ANCHOR,
   TOP_LIGHTING_W_EXT, TOP_LIGHTING_H_EXT, TOP_LIGHTING_Y_OFFSET,
   FLAME_BORDER_W, FLAME_BORDER_LEFT_OFFSET, FLAME_BORDER_RIGHT_OFFSET, FLAME_BORDER_Y_OFFSET,
-  MOBILE_BREAKPOINT, PANEL_PX, PANEL_PY, PANEL_DIFF_H, PANEL_MID_H, PANEL_BOT_H,
+  MOBILE_BREAKPOINT, PANEL_PX, PANEL_PY, PANEL_TAB_H, PANEL_TAB_W, PANEL_TAB_Y_OFFSET, PANEL_DIFF_H, PANEL_MID_H, PANEL_BOT_H,
   PANEL_ROW_GAP, PANEL_MID_GAP, PANEL_BOT_GAP, PANEL_Y_OFFSET,
   PANEL_LBL_COLOR, PANEL_GOLD_COLOR, PLAY_R, PLAY_BTN_Y_OFFSET, PLAY_LABEL_FONT, PLAY_AMT_FONT, PLAY_COIN_SIZE,
   PANEL_LBL_FONT, PANEL_AMT_FONT, PANEL_INNER_PX, PANEL_CARD_RADIUS, PANEL_CARD_BG,
@@ -92,6 +92,7 @@ export function usePixiGame(
   const multFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const frameRef = useRef(0);
   const dragonBaseScaleRef = useRef(1);
+  const dragonBaseYRef = useRef(0);
   const revealedSetRef = useRef<Set<string>>(new Set());
   const tileAnimsRef = useRef<{ root: PIXI.Container; progress: number }[]>([]);
   const activeTickersRef = useRef<Set<(...args: any[]) => void>>(new Set());
@@ -426,6 +427,7 @@ export function usePixiGame(
       ds.label = 'wallDragon';
       ds.zIndex = 20;
       dragonBaseScaleRef.current = sc;
+      dragonBaseYRef.current = wcy;
       gridLayer.addChild(ds);
     }
 
@@ -1169,6 +1171,7 @@ export function usePixiGame(
           ? Math.min(DRAGON_FIRE_MAX_W / tex.width, DRAGON_FIRE_MAX_H / tex.height)
           : Math.min(DRAGON_NORMAL_MAX_W / tex.width, DRAGON_NORMAL_MAX_H / tex.height);
         ch.scale.set(sc);
+        ch.y = dragonBaseYRef.current + (win ? DRAGON_FIRE_Y_OFFSET : DRAGON_Y_OFFSET);
         dragonBaseScaleRef.current = sc;
         break;
       }
@@ -1469,6 +1472,8 @@ export function usePixiGame(
       const uiLayer = new PIXI.Container();
       bgLayerRef.current = bgLayer;
       gridLayer.y = GRID_LAYER_Y;
+      fxLayer.y = GRID_LAYER_Y;
+      uiLayer.y = GRID_LAYER_Y;
       gridLayer.sortableChildren = true;
       gridLayerRef.current = gridLayer;
       fxLayerRef.current = fxLayer;
@@ -1759,7 +1764,61 @@ export function usePixiGame(
     const lblStyle = { fontFamily: 'Poppins', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' as const };
     const amtStyle = { fontFamily: 'Poppins', fontSize: PANEL_AMT_FONT, fill: PANEL_GOLD_COLOR, fontWeight: '700' as const };
 
-    let yy = PANEL_PY;
+    let yy = PANEL_PY + PANEL_TAB_Y_OFFSET;
+
+    // ── Row 0: Manual / Auto tabs ──────────────────────────────
+    const tabCard = new PIXI.Container();
+    const tabW = PANEL_TAB_W > 0 ? PANEL_TAB_W : contentW;
+    const tabX = PANEL_TAB_W > 0 ? (CW - PANEL_TAB_W) / 2 : px;
+    tabCard.x = tabX; tabCard.y = yy;
+    if (TEX.dif_bg) {
+      const bg = new PIXI.Sprite(TEX.dif_bg);
+      bg.width = tabW; bg.height = PANEL_TAB_H;
+      tabCard.addChild(bg);
+    } else {
+      const bg = new PIXI.Graphics();
+      bg.roundRect(0, 0, tabW, PANEL_TAB_H, PANEL_CARD_RADIUS).fill({ color: PANEL_CARD_BG, alpha: 0.9 });
+      tabCard.addChild(bg);
+    }
+
+    // Active tab highlight (left half = Manual)
+    const tabHighlight = new PIXI.Graphics();
+    tabHighlight.roundRect(4, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+    tabCard.addChild(tabHighlight);
+
+    const manualLbl = new PIXI.Text({ text: 'Manual', style: { fontFamily: 'Poppins', fontSize: 15, fill: 0xffffff, fontWeight: '700' } });
+    manualLbl.anchor.set(0.5); manualLbl.x = tabW / 4; manualLbl.y = PANEL_TAB_H / 2;
+    tabCard.addChild(manualLbl);
+
+    const autoLbl = new PIXI.Text({ text: 'Auto', style: { fontFamily: 'Poppins', fontSize: 15, fill: 0x8899aa, fontWeight: '700' } });
+    autoLbl.anchor.set(0.5); autoLbl.x = tabW * 3 / 4; autoLbl.y = PANEL_TAB_H / 2;
+    tabCard.addChild(autoLbl);
+
+    // Tab hit areas
+    const manualHit = new PIXI.Graphics();
+    manualHit.rect(0, 0, tabW / 2, PANEL_TAB_H).fill({ color: 0x000000, alpha: 0.001 });
+    manualHit.eventMode = 'static'; manualHit.cursor = 'pointer';
+    manualHit.on('pointerdown', () => {
+      tabHighlight.clear();
+      tabHighlight.roundRect(4, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+      manualLbl.style.fill = 0xffffff;
+      autoLbl.style.fill = 0x8899aa;
+    });
+    tabCard.addChild(manualHit);
+
+    const autoHit = new PIXI.Graphics();
+    autoHit.rect(tabW / 2, 0, tabW / 2, PANEL_TAB_H).fill({ color: 0x000000, alpha: 0.001 });
+    autoHit.eventMode = 'static'; autoHit.cursor = 'pointer';
+    autoHit.on('pointerdown', () => {
+      tabHighlight.clear();
+      tabHighlight.roundRect(tabW / 2, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+      manualLbl.style.fill = 0x8899aa;
+      autoLbl.style.fill = 0xffffff;
+    });
+    tabCard.addChild(autoHit);
+
+    panelLayer.addChild(tabCard);
+    yy += PANEL_TAB_H + PANEL_ROW_GAP;
 
     // ── Row 1: Difficulty ──────────────────────────────────────
     const diffCard = new PIXI.Container();

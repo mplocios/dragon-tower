@@ -47,7 +47,7 @@ export const TILE_ASPECT_RATIO_MOBILE = 0.30;
 /** Bottom margin below the grid */
 export const GRID_BOTTOM_MARGIN = 100;
 /** Grid layer y-offset applied during init */
-export const GRID_LAYER_Y = 0;
+export const GRID_LAYER_Y = -20;
 
 // ─── Frame / Border ─────────────────────────────────────────────────
 /** Padding inset from PAD for frame origin */
@@ -87,15 +87,17 @@ export const TOP_FLAME_H = 450;
 /** Top flame y-anchor offset from wall center-y */
 export const TOP_FLAME_Y_ANCHOR = 118;
 /** Dragon normal sprite max width */
-export const DRAGON_NORMAL_MAX_W = 270;
+export const DRAGON_NORMAL_MAX_W = 250;
 /** Dragon normal sprite max height */
-export const DRAGON_NORMAL_MAX_H = 170;
+export const DRAGON_NORMAL_MAX_H = 150;
 /** Dragon fire sprite max width */
-export const DRAGON_FIRE_MAX_W = 400;
+export const DRAGON_FIRE_MAX_W = 380;
 /** Dragon fire sprite max height */
-export const DRAGON_FIRE_MAX_H = 470;
+export const DRAGON_FIRE_MAX_H = 450;
 /** Dragon sprite y-offset from wall center-y */
 export const DRAGON_Y_OFFSET = 40;
+/** Dragon fire sprite y-offset from wall center-y (win state) */
+export const DRAGON_FIRE_Y_OFFSET = 50;
 /** Dragon sprite frame count */
 export const DRAGON_SPRITE_FRAMES = 29;
 /** Dragon sprite animation speed */
@@ -167,7 +169,7 @@ export const FLAME_BORDER_LEFT_OFFSET = 130;
 /** Flame border right sprite x-offset outward from frame edge */
 export const FLAME_BORDER_RIGHT_OFFSET = 40;
 /** Flame border y-offset above frame top */
-export const FLAME_BORDER_Y_OFFSET = 0;
+export const FLAME_BORDER_Y_OFFSET = -10;
 
 // ─── Mobile Panel — Layout ──────────────────────────────────────────
 /** Mobile breakpoint width */
@@ -180,9 +182,17 @@ export const PANEL_PX = 8;
 /** Panel vertical start padding */
 export const PANEL_PY = 8;
 /** Panel layer y-offset from CH */
-export const PANEL_Y_OFFSET = 55;
+export const PANEL_Y_OFFSET = 80;
 /** Gap between panel rows */
 export const PANEL_ROW_GAP = 8;
+
+// ─── Mobile Panel — Tab Row ─────────────────────────────────────────
+/** Tab row card height */
+export const PANEL_TAB_H = 50;
+/** Tab row width (0 = same as contentW) */
+export const PANEL_TAB_W = 0;
+/** Tab row y-offset adjustment */
+export const PANEL_TAB_Y_OFFSET = 0;
 
 // ─── Mobile Panel — Card Sizes ──────────────────────────────────────
 /** Difficulty row card height */

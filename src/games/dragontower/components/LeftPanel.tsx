@@ -113,6 +113,14 @@ const S = {
 
   // ── Generic ──
   fieldWrap: { display: "flex", flexDirection: "column" as const, gap: 5 },
+  fieldWrapDisabled: (disabled: boolean): React.CSSProperties => ({
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 5,
+    opacity: disabled ? 0.35 : 1,
+    pointerEvents: disabled ? "none" as const : "auto" as const,
+    transition: "opacity .15s",
+  }),
   rowBetween: {
     display: "flex",
     justifyContent: "space-between",
@@ -584,7 +592,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
       {activeTab === "manual" && (
         <>
           {/* Bet */}
-          <div style={S.fieldWrap}>
+          <div style={S.fieldWrapDisabled(playing || autoRunning)}>
             <div style={S.rowBetween}>
               <span style={S.lbl}>Bet</span>
               <span style={S.lblRight}>Balance: {fmt(balance)}</span>
@@ -789,7 +797,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           </div>
 
           {/* Difficulty */}
-          <div style={S.fieldWrap}>
+          <div style={S.fieldWrapDisabled(playing)}>
             <span style={S.lbl}>Difficulty</span>
             <div style={S.selectWrap}>
               <select
@@ -865,7 +873,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
       {activeTab === "auto" && (
         <>
           {/* Bet */}
-          <div style={S.fieldWrap}>
+          <div style={S.fieldWrapDisabled(autoRunning)}>
             <div style={S.rowBetween}>
               <span style={S.lbl}>Bet Amount</span>
               <span style={S.lblRight}>{fmt(auto.autoBet)}</span>
@@ -1072,7 +1080,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           </div>
 
           {/* Difficulty */}
-          <div style={S.fieldWrap}>
+          <div style={S.fieldWrapDisabled(autoRunning)}>
             <span style={S.lbl}>Difficulty</span>
             <div style={S.selectWrap}>
               <select
@@ -1101,7 +1109,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               const maxRow = DIFF[auto.autoDiff]?.rows ?? 9;
               const hasPattern = autoPattern.some((c) => c !== null);
               return (
-                <div style={{ ...S.fieldWrap, opacity: hasPattern ? 0.4 : 1 }}>
+                <div style={{ ...S.fieldWrapDisabled(autoRunning || hasPattern) }}>
                   <div style={S.rowBetween}>
                     <span style={S.lbl}>Auto Cashout At Row</span>
                     <span
@@ -1176,7 +1184,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             })()}
 
           {/* Number of bets */}
-          <div style={S.fieldWrap}>
+          <div style={S.fieldWrapDisabled(autoRunning)}>
             <div style={S.rowBetween}>
               <span style={S.lbl}>Number of Bets</span>
               <span
@@ -1277,6 +1285,9 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 gap: 7,
                 width: "100%",
                 boxSizing: "border-box",
+                opacity: autoRunning ? 0.35 : 1,
+                pointerEvents: autoRunning ? "none" : "auto",
+                transition: "opacity .15s",
               }}
             >
               {/* On Win */}
