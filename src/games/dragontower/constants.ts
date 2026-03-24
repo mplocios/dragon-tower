@@ -10,7 +10,7 @@ export const PAD_MOBILE = 22;
 export const DESKTOP_SCALE = 0.97;
 export const INITIAL_BALANCE = 0.20;
 export const INITIAL_BET = 5;
-export const MIN_BET = 0.00000001;
+export const MIN_BET = 0.10;
 export const MAX_BET = 1000;
 
 // ─── Difficulty & Multipliers ───────────────────────────────────────

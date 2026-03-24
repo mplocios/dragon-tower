@@ -41,6 +41,10 @@ export interface GameStore {
   setVolume: (v: number) => void;
   maxBet: boolean;
   setMaxBet: (v: boolean) => void;
+  instantBet: boolean;
+  setInstantBet: (v: boolean) => void;
+  hotkeysEnabled: boolean;
+  setHotkeysEnabled: (v: boolean) => void;
 
   // auto-bet state
   auto: AutoSettings;
@@ -49,6 +53,7 @@ export interface GameStore {
   autoTotalProfit: number;
   autoCount: number;
   autoIsInfinite: boolean;
+  autoPattern: (number | null)[];
 
   // ── actions ────────────────────────────────────────────────
   setTestMode: (v: boolean) => void;
@@ -75,6 +80,8 @@ export interface GameStore {
   setAutoTotalProfit: (v: number) => void;
   setAutoCount: (v: number) => void;
   setAutoIsInfinite: (v: boolean) => void;
+  setAutoPattern: (row: number, col: number | null) => void;
+  clearAutoPattern: () => void;
   resetRound: () => void;
 }
 
@@ -100,6 +107,8 @@ export const useGameStore = create<GameStore>()((set) => ({
   playLock: false,
   volume: 80,
   maxBet: false,
+  instantBet: false,
+  hotkeysEnabled: false,
 
   auto: {
     autoBet: 5,
@@ -119,6 +128,7 @@ export const useGameStore = create<GameStore>()((set) => ({
   autoTotalProfit: 0,
   autoCount: 10,
   autoIsInfinite: false,
+  autoPattern: Array(9).fill(null),
 
   // ── actions ────────────────────────────────────────────────
   setTestMode: (v) => set({ testMode: v }),
@@ -156,6 +166,8 @@ export const useGameStore = create<GameStore>()((set) => ({
   setPlayLock: (v) => set({ playLock: v }),
   setVolume: (v) => set({ volume: v }),
   setMaxBet: (v) => set({ maxBet: v }),
+  setInstantBet: (v) => set({ instantBet: v }),
+  setHotkeysEnabled: (v) => set({ hotkeysEnabled: v }),
 
   setHistory: (entries) => set({ history: entries }),
 
@@ -176,6 +188,22 @@ export const useGameStore = create<GameStore>()((set) => ({
   setAutoTotalProfit: (v) => set({ autoTotalProfit: v }),
   setAutoCount: (v) => set({ autoCount: v }),
   setAutoIsInfinite: (v) => set({ autoIsInfinite: v }),
+
+  setAutoPattern: (row, col) =>
+    set((state) => {
+      const newPattern = [...state.autoPattern];
+      if (col === null) {
+        // Deselect this row and all rows above it
+        for (let r = row; r < newPattern.length; r++) {
+          newPattern[r] = null;
+        }
+      } else {
+        newPattern[row] = col;
+      }
+      return { autoPattern: newPattern };
+    }),
+
+  clearAutoPattern: () => set({ autoPattern: Array(9).fill(null) }),
 
   resetRound: () =>
     set({

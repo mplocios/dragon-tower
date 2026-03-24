@@ -112,6 +112,7 @@ export function usePixiGame(
   const onDiffChangeRef = useRef(options.onDiffChange);
   const onPlayActionRef = useRef(options.onPlayAction);
   const onRandomRef = useRef(options.onRandom);
+  const autoTabActiveRef = useRef(false);
   useEffect(() => { onTileClickRef.current = options.onTileClick; }, [options.onTileClick]);
   useEffect(() => { onPlayAgainRef.current = options.onPlayAgain; }, [options.onPlayAgain]);
   useEffect(() => { getStateRef.current = options.getState; }, [options.getState]);
@@ -184,6 +185,12 @@ export function usePixiGame(
       } else {
         g.roundRect(0, 0, w, h, R).stroke({ width: 2, color: 0x222222, alpha: 0.9 });
       }
+    } else if (state === 'pattern') {
+      g.roundRect(-2, -2, w + 4, h + 4, R + 2).fill({ color: 0x9933ff, alpha: 0.15 });
+      setTileSprite(ts, null, w, h);
+      g.roundRect(0, 0, w, h, R).fill({ color: 0x7c3aed, alpha: 0.85 });
+      g.roundRect(0, 0, w, h, R).stroke({ width: 2, color: 0xb366ff, alpha: 0.6 });
+      if (ttex) ttex.alpha = 0;
     } else if (state === 'dragon') {
       setTileSprite(ts, null, w, h);
       const DR = 2.56;
@@ -210,6 +217,7 @@ export function usePixiGame(
 
   const setIcon = useCallback((tile: TileObj, type: TileContent, animate?: boolean) => {
     const TEX = texRef.current;
+    const shouldAnimate = animate && !useGameStore.getState().instantBet;
     tile.icons.removeChildren();
     const { w, h } = tile;
     if (type === 'egg') {
@@ -221,7 +229,7 @@ export function usePixiGame(
       }
       tile.root.alpha = 1;
       tile.root.zIndex = 5;
-      if (animate) {
+      if (shouldAnimate) {
         tile.root.scale.set(0.4);
         tileAnimsRef.current.push({ root: tile.root, progress: 0 });
       }
@@ -267,7 +275,7 @@ export function usePixiGame(
       }
       tile.root.zIndex = 10;
       tile.root.alpha = 1;
-      if (animate) {
+      if (shouldAnimate) {
         tile.root.scale.set(0.4);
         tileAnimsRef.current.push({ root: tile.root, progress: 0 });
       }
@@ -514,15 +522,50 @@ export function usePixiGame(
     hit.roundRect(0, 0, w, h, 6).fill({ color: 0xffffff, alpha: 0.001 });
     hit.eventMode = 'static'; hit.cursor = 'pointer';
 
-    hit.on('pointerdown', () => onTileClickRef.current(r, c));
+    hit.on('pointerdown', () => {
+      const st = getStateRef.current();
+      const store = useGameStore.getState();
+      // Pattern selection mode: auto tab active, game idle, not running
+      if (autoTabActiveRef.current && st.gstate === 'idle' && !store.autoRunning) {
+        const pattern = store.autoPattern;
+        if (pattern[r] === c) {
+          // Deselect this row and all above
+          store.setAutoPattern(r, null);
+        } else {
+          // Can only select if all rows below are already selected
+          let canSelect = true;
+          for (let below = 0; below < r; below++) {
+            if (pattern[below] === null) { canSelect = false; break; }
+          }
+          if (canSelect) {
+            store.setAutoPattern(r, c);
+          }
+        }
+        // Refresh grid to show pattern
+        const diff = store.auto.autoDiff || store.diff;
+        refreshGrid(diff, st.gstate, st.curRow, st.revealed);
+        return;
+      }
+      onTileClickRef.current(r, c);
+    });
     hit.on('pointerover', () => {
       const st = getStateRef.current();
+      const store = useGameStore.getState();
+      if (autoTabActiveRef.current) {
+        // No hover effect in auto tab
+        return;
+      }
       if (st.gstate === 'playing' && st.curRow === r && !(st.revealed[r] ?? {})[c]) {
         paintBg(bg, tsprite, ttex, w, h, 'hover');
       }
     });
     hit.on('pointerout', () => {
       const st = getStateRef.current();
+      const store = useGameStore.getState();
+      if (autoTabActiveRef.current) {
+        // No hover effect in auto tab
+        return;
+      }
       if (st.gstate === 'playing' && st.curRow === r && !(st.revealed[r] ?? {})[c]) {
         paintBg(bg, tsprite, ttex, w, h, 'active');
       }
@@ -611,17 +654,23 @@ export function usePixiGame(
         const tile = tileObjs[r][c];
         if (!tile) continue;
         const rv = revRow[c] ?? null;
+        const pattern = useGameStore.getState().autoPattern;
+        const isPatternTile = autoTabActiveRef.current && gstate !== 'ended' && pattern[r] === c && !rv;
         let state: TileState = rv
           ? (rv as TileState)
+          : isPatternTile
+          ? 'pattern'
           : gstate === 'idle'
           ? 'idle'
-          : isCur
+          : isCur && !useGameStore.getState().autoRunning
           ? 'active'
           : isPast
           ? 'idle'
           : 'inactive';
         paintBg(tile.bg, tile.tsprite, tile.ttex, tile.w, tile.h, state);
-        const clickable = gstate === 'playing' && isCur && !rv;
+        // In pattern mode, all tiles should be clickable for selection
+        const patternClickable = autoTabActiveRef.current && gstate === 'idle' && !useGameStore.getState().autoRunning && !rv;
+        const clickable = patternClickable || (gstate === 'playing' && isCur && !rv);
         tile.hit.eventMode = clickable ? 'static' : 'none';
         tile.hit.cursor = clickable ? 'pointer' : 'default';
         if (rv) {
@@ -698,6 +747,7 @@ export function usePixiGame(
 
   // ─── Result Overlay ──────────────────────────────────────────
   const showResultOverlay = useCallback((type: 'win' | 'lose', mult: number, amount: number) => {
+    if (useGameStore.getState().autoRunning) return;
     const uiLayer = uiLayerRef.current;
     if (!uiLayer) return;
 
@@ -1504,8 +1554,8 @@ export function usePixiGame(
           }
         }
 
-        // ── Active row pulse ──────────────────────────────────────
-        if (st.gstate === 'playing') {
+// ── Active row pulse (manual only) ───────────────────────
+        if (st.gstate === 'playing' && !useGameStore.getState().autoRunning) {
           const pulseAlpha = 0.86 + 0.14 * Math.sin(frameRef.current * 0.06);
           const row = tileObjsRef.current[st.curRow];
           if (row) {
@@ -1826,7 +1876,7 @@ export function usePixiGame(
     const upArrow = makeArrowBtn(PANEL_ARROW_UP_Y, '▲', PANEL_ARROW_UP_W, PANEL_ARROW_UP_H, () => {
       const cur = parseFmt(betText.text);
       const bal = useGameStore.getState().balance;
-      const newBet = parseFloat((cur * 2).toFixed(8));
+      const newBet = parseFloat((cur * 2).toFixed(2));
 
       // If doubling would exceed MAX_BET, clamp to MAX_BET instead of blocking
       if (newBet > MAX_BET) {
@@ -1855,9 +1905,9 @@ export function usePixiGame(
 
     const downArrow = makeArrowBtn(PANEL_ARROW_DOWN_Y, '▼', PANEL_ARROW_DOWN_W, PANEL_ARROW_DOWN_H, () => {
       const cur = parseFmt(betText.text);
-      const newBet = parseFloat((cur * 0.5).toFixed(8));
+      const newBet = parseFloat((cur * 0.5).toFixed(2));
       if (newBet < MIN_BET) {
-        insuffText.text = 'Min bet is ' + MIN_BET.toFixed(8) + '!';
+        insuffText.text = 'Min bet is ' + MIN_BET.toFixed(2) + '!';
         insuffText.visible = true;
         setTimeout(() => { insuffText.visible = false; }, 2000);
         return;
@@ -1979,11 +2029,11 @@ export function usePixiGame(
         const bal = useGameStore.getState().balance;
         if (isNaN(parsed) || parsed < MIN_BET || mobileBetInput.value.trim() === '') {
           const minVal = MIN_BET;
-          mobileBetInput.value = minVal.toFixed(8);
+          mobileBetInput.value = minVal.toFixed(2);
           onBetChangeRef.current?.(minVal);
         } else {
           const clamped = Math.min(parsed, bal, MAX_BET);
-          mobileBetInput.value = clamped.toFixed(8);
+          mobileBetInput.value = clamped.toFixed(2);
           onBetChangeRef.current?.(clamped);
         }
         // Hide input after blur
@@ -2032,7 +2082,7 @@ export function usePixiGame(
       input.style.padding = '4px 8px';
       input.style.zIndex = '9999';
       input.style.outline = 'none';
-      input.value = gs.bet.toFixed(8);
+      input.value = gs.bet.toFixed(2);
       input.focus();
       input.select();
     };
@@ -2082,13 +2132,13 @@ export function usePixiGame(
     // Keep hidden input in sync
     const mobileInput = document.getElementById('mobile-bet-input') as HTMLInputElement | null;
     if (mobileInput && mobileInput.style.opacity !== '1') {
-      mobileInput.value = state.bet.toFixed(8);
+      mobileInput.value = state.bet.toFixed(2);
     }
 
     if (t.betText) {
       const formatted = state.bet < 0.001
-        ? state.bet.toFixed(8)
-        : state.bet.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+        ? state.bet.toFixed(2)
+        : state.bet.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const baseFont = (t.betText as any)._baseFont ?? PANEL_BET_AMT_FONT;
       const newSize = formatted.length > 10
         ? baseFont * 0.65
@@ -2107,7 +2157,7 @@ export function usePixiGame(
     if (t.diffText) t.diffText.text = state.diff;
     if (t.multText) t.multText.text = `(${state.curMult.toFixed(2)}×)`;
     if (t.profitText) {
-      t.profitText.text = state.curWin.toFixed(8);
+      t.profitText.text = state.curWin.toFixed(2);
       if (t.profitCoin) {
         const maxX = (t.profitCardW || 192) - PANEL_COIN_SIZE / 2 - 6;
         t.profitCoin.x = Math.min(t.profitText.x + t.profitText.width / 2 + PANEL_PROFIT_COIN_GAP, maxX);
@@ -2178,6 +2228,7 @@ export function usePixiGame(
     updateAllSoundVolumes,
     texRef,
     panelCooldownRef,
+    autoTabActiveRef,
     appReady: !!appRef.current,
   };
 }

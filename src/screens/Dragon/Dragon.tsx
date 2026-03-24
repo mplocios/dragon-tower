@@ -12,7 +12,7 @@ import { Button } from "../../components/ui/button";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import DragonTower from "../../games/dragontower";
 import { useGameStore } from "../../games/dragontower/store/useGameStore";
-import { MAX_BET } from "../../games/dragontower/constants";
+import { MIN_BET, MAX_BET } from "../../games/dragontower/constants";
 import { usePlayerStore, DEMO_BALANCE } from "../../store/usePlayerStore";
 import {
   isFavorite as checkFavorite,
@@ -85,14 +85,19 @@ export const Dragon = (): JSX.Element => {
   const [activeNav, setActiveNav] = useState("Casino");
   const [showNotif, setShowNotif] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [instantBet, setInstantBet] = useState(false);
+  const instantBet = useGameStore((s) => s.instantBet);
+  const setInstantBet = useGameStore((s) => s.setInstantBet);
   const [showMaxBetConfirm, setShowMaxBetConfirm] = useState(false);
   const volume = useGameStore((s) => s.volume);
   const setVolume = useGameStore((s) => s.setVolume);
   const [animations, setAnimations] = useState(true);
   const maxBet = useGameStore((s) => s.maxBet);
   const setMaxBet = useGameStore((s) => s.setMaxBet);
-  const [activeHotkeys, setActiveHotkeys] = useState(false);
+  const hotkeysEnabled = useGameStore((s) => s.hotkeysEnabled);
+  const setHotkeysEnabled = useGameStore((s) => s.setHotkeysEnabled);
+  const [showHotkeysModal, setShowHotkeysModal] = useState(false);
+  const [showGameInfo, setShowGameInfo] = useState(false);
+  const [gameInfoTab, setGameInfoTab] = useState<"rules" | "limits">("rules");
   const [notifications] = useState([
     { id: 1, text: "Welcome to Dragon Tower!", time: "Just now" },
     { id: 2, text: "Your balance has been updated", time: "2m ago" },
@@ -512,7 +517,9 @@ export const Dragon = (): JSX.Element => {
                   <button
                     className="flex items-center gap-3 w-full px-4 py-3 border-b border-[#222] text-white hover:bg-[#222] transition-colors"
                     onClick={() => {
-                      // TODO: implement game info
+                      setShowSettings(false);
+                      setShowGameInfo(true);
+                      setGameInfoTab("rules");
                     }}
                   >
                     <span className="text-lg">📋</span>
@@ -523,11 +530,8 @@ export const Dragon = (): JSX.Element => {
 
                   {/* Hotkeys */}
                   <button
-                    className={`flex items-center gap-3 w-full px-4 py-3 transition-colors ${activeHotkeys ? "bg-[#252525] text-[#eaff00]" : "text-white hover:bg-[#222]"}`}
-                    onClick={() => {
-                      setActiveHotkeys(!activeHotkeys);
-                      // TODO: implement hotkeys toggle
-                    }}
+                    className={`flex items-center gap-3 w-full px-4 py-3 transition-colors ${hotkeysEnabled ? "bg-[#252525] text-[#eaff00]" : "text-white hover:bg-[#222]"}`}
+                    onClick={() => setShowHotkeysModal(true)}
                   >
                     <span className="text-lg">⌨️</span>
                     <span className="[font-family:'Poppins',Helvetica] text-sm font-medium">
@@ -583,7 +587,7 @@ export const Dragon = (): JSX.Element => {
             >
               <div
                 style={{
-                  background: "#0d1520",
+                  background: "#1A191D",
                   borderRadius: 16,
                   padding: "28px 32px",
                   width: 420,
@@ -633,10 +637,10 @@ export const Dragon = (): JSX.Element => {
                 {/* Body */}
                 <p
                   style={{
-                    color: "#aaa",
+                    color: "#9ca3af",
                     fontFamily: "Poppins, sans-serif",
                     fontSize: 14,
-                    marginBottom: 28,
+                    marginBottom: 20,
                     lineHeight: 1.6,
                   }}
                 >
@@ -652,12 +656,13 @@ export const Dragon = (): JSX.Element => {
                       padding: "12px 0",
                       borderRadius: 8,
                       border: "none",
-                      background: "#1e2d3d",
-                      color: "#fff",
+                      background: "#100F13",
+                      color: "#9ca3af",
                       fontFamily: "Poppins, sans-serif",
-                      fontWeight: 600,
+                      fontWeight: 700,
                       fontSize: 14,
                       cursor: "pointer",
+                      letterSpacing: 0.5,
                     }}
                   >
                     Cancel
@@ -675,9 +680,10 @@ export const Dragon = (): JSX.Element => {
                       background: "#1a7fd4",
                       color: "#fff",
                       fontFamily: "Poppins, sans-serif",
-                      fontWeight: 600,
+                      fontWeight: 700,
                       fontSize: 14,
                       cursor: "pointer",
+                      letterSpacing: 0.5,
                     }}
                   >
                     Enable
@@ -687,6 +693,428 @@ export const Dragon = (): JSX.Element => {
             </div>
           );
         })()}
+
+      {/* ── Game Info Modal ── */}
+      {showGameInfo && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={() => setShowGameInfo(false)}
+        >
+          <div
+            style={{
+              background: "#1A191D",
+              borderRadius: 16,
+              padding: "28px 32px",
+              width: 420,
+              maxWidth: "90%",
+              boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 20,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 20 }}>📋</span>
+                <span
+                  style={{
+                    color: "#fff",
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: 700,
+                    fontSize: 16,
+                  }}
+                >
+                  Game Info
+                </span>
+              </div>
+              <button
+                onClick={() => setShowGameInfo(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#666",
+                  cursor: "pointer",
+                  fontSize: 18,
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div
+              style={{
+                display: "flex",
+                background: "#100F13",
+                borderRadius: 99,
+                padding: 3,
+                gap: 3,
+                marginBottom: 20,
+              }}
+            >
+              {(["rules", "limits"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setGameInfoTab(tab)}
+                  style={{
+                    flex: 1,
+                    padding: "8px 0",
+                    border: "none",
+                    borderRadius: 99,
+                    fontFamily: "Poppins, sans-serif",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    background: gameInfoTab === tab ? "#ffffff" : "transparent",
+                    color: gameInfoTab === tab ? "#111200" : "#9ca3af",
+                    transition: "all .18s",
+                  }}
+                >
+                  {tab === "rules" ? "Rules" : "Max Betting Limits"}
+                </button>
+              ))}
+            </div>
+
+            {/* Rules Tab */}
+            {gameInfoTab === "rules" && (
+              <ol
+                style={{
+                  paddingLeft: 0,
+                  margin: 0,
+                  listStyle: "none",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}
+              >
+                {[
+                  "Your selected difficulty level determines how the payout multiplier increases throughout the game.",
+                  "Reveal tiles (eggs) to progressively increase your multiplier.",
+                  "You can cash out at any time after revealing at least one safe tile to secure your winnings.",
+                  "Selecting a losing tile will end the game immediately, and your bet will be forfeited.",
+                  "The game consists of 9 rounds. Successfully completing all rounds yields the maximum possible payout.",
+                ].map((rule, i) => (
+                  <li
+                    key={i}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 10,
+                      listStyle: "none",
+                    }}
+                  >
+                    <span
+                      style={{
+                        color: "#eaff00",
+                        fontFamily: "Poppins, sans-serif",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        flexShrink: 0,
+                        minWidth: 18,
+                      }}
+                    >
+                      {i + 1}.
+                    </span>
+                    <span
+                      style={{
+                        color: "#9ca3af",
+                        fontFamily: "Poppins, sans-serif",
+                        fontSize: 13,
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {rule}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+
+            {/* Limits Tab */}
+            {gameInfoTab === "limits" && (
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 12 }}
+              >
+                {[
+                  { label: "Minimum Bet", value: `$${MIN_BET.toFixed(2)}` },
+                  {
+                    label: "Maximum Bet",
+                    value: `$${MAX_BET.toLocaleString()}`,
+                  },
+                ].map(({ label, value }) => (
+                  <div
+                    key={label}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      background: "#100F13",
+                      borderRadius: 9,
+                      padding: "12px 16px",
+                      border: "1.5px solid rgba(255,255,255,0.07)",
+                    }}
+                  >
+                    <span
+                      style={{
+                        color: "#9ca3af",
+                        fontFamily: "Poppins, sans-serif",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {label}
+                    </span>
+                    <span
+                      style={{
+                        color: "#eaff00",
+                        fontFamily: "Poppins, sans-serif",
+                        fontSize: 14,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Close button */}
+            <button
+              onClick={() => setShowGameInfo(false)}
+              style={{
+                width: "100%",
+                marginTop: 24,
+                padding: "12px 0",
+                borderRadius: 8,
+                border: "none",
+                background: "#100F13",
+                color: "#9ca3af",
+                fontFamily: "Poppins, sans-serif",
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: "pointer",
+                letterSpacing: 0.5,
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Hotkeys Modal ── */}
+      {showHotkeysModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={() => setShowHotkeysModal(false)}
+        >
+          <div
+            style={{
+              background: "#1A191D",
+              borderRadius: 16,
+              padding: "28px 32px",
+              width: 420,
+              maxWidth: "90%",
+              boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 20,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 20 }}>⌨️</span>
+                <span
+                  style={{
+                    color: "#fff",
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: 700,
+                    fontSize: 16,
+                  }}
+                >
+                  Hotkeys
+                </span>
+              </div>
+              <button
+                onClick={() => setShowHotkeysModal(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#666",
+                  cursor: "pointer",
+                  fontSize: 18,
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Warning */}
+            <div
+              style={{
+                background: "#1A191D",
+                border: "1px solid rgba(234, 179, 8, 0.3)",
+                borderRadius: 8,
+                padding: "10px 14px",
+                marginBottom: 16,
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 16, lineHeight: 1.4 }}>⚠️</span>
+              <span
+                style={{
+                  color: "#eab308",
+                  fontFamily: "Poppins, sans-serif",
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                }}
+              >
+                Enabling keyboard shortcuts may cause conflicts with browser
+                shortcuts or other extensions. Use at your own discretion.
+              </span>
+            </div>
+
+            {/* Keybindings list */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                marginBottom: 24,
+              }}
+            >
+              {[
+                { key: "1", desc: "Pick tile number 1 in current row" },
+                { key: "2", desc: "Pick tile number 2 in current row" },
+                { key: "3", desc: "Pick tile number 3 in current row" },
+                { key: "4", desc: "Pick tile number 4 in current row" },
+                { key: "space", desc: "Make a bet" },
+                { key: "s", desc: "Double bet amount" },
+                { key: "a", desc: "Halve bet amount" },
+                { key: "d", desc: "Zero bet amount" },
+                { key: "q", desc: "Random Pick" },
+                { key: "w", desc: "Cashout" },
+                {
+                  key: "r",
+                  desc: "undo tile selection the current round (autobetting only)",
+                },
+              ].map(({ key, desc }) => (
+                <div
+                  key={key}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span
+                    style={{
+                      color: "#aaa",
+                      fontFamily: "Poppins, sans-serif",
+                      fontSize: 13,
+                    }}
+                  >
+                    {desc}
+                  </span>
+                  <span
+                    style={{
+                      background: "#33333A",
+                      color: "#e0e0e0",
+                      fontFamily: "Poppins, sans-serif",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      padding: "4px 12px",
+                      borderRadius: 6,
+                      minWidth: 40,
+                      textAlign: "center",
+                    }}
+                  >
+                    {key}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Buttons */}
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                onClick={() => setShowHotkeysModal(false)}
+                style={{
+                  flex: 1,
+                  padding: "12px 0",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#100F13",
+                  color: "#9ca3af",
+                  fontFamily: "Poppins, sans-serif",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  letterSpacing: 0.5,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setHotkeysEnabled(!hotkeysEnabled);
+                  setShowHotkeysModal(false);
+                }}
+                style={{
+                  flex: 1,
+                  padding: "12px 0",
+                  borderRadius: 8,
+                  border: "none",
+                  background: hotkeysEnabled
+                    ? "linear-gradient(135deg, #7a1414, #4a0a0a)"
+                    : "linear-gradient(135deg, #a8c000, #eaff00)",
+                  color: hotkeysEnabled ? "#ffaaaa" : "#111200",
+                  fontFamily: "Poppins, sans-serif",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  letterSpacing: 0.5,
+                }}
+              >
+                {hotkeysEnabled ? "Disable" : "Enable"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

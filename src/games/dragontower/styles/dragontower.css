@@ -367,11 +367,33 @@ body { margin: 0; padding: 0; }
 .auto-cond-row { background: rgba(10,25,40,.5); border: 1px solid #1a3050; border-radius: 8px; padding: 10px; }
 
 select option { background: #0d1e30; color: #c8d8e8; }
-#left-panel::-webkit-scrollbar { width: 2px; }
-#left-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+#left-panel { scrollbar-gutter: stable; }
+#left-panel::-webkit-scrollbar { width: 4px; }
+#left-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
 #left-panel::-webkit-scrollbar-track { background: transparent; }
 input[type=number]::-webkit-inner-spin-button { opacity: 0; }
+input[type=number]:hover::-webkit-inner-spin-button,
+input[type=number]:focus::-webkit-inner-spin-button { opacity: 1; }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+.number-input-arrows {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
 
+.number-input-wrap:hover .number-input-arrows,
+.number-input-wrap:focus-within .number-input-arrows {
+  opacity: 1;
+  pointer-events: auto;
+}
 /* ══════════════════════════════════════════
    FULLSCREEN
    ══════════════════════════════════════════ */

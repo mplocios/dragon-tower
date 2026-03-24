@@ -1,6 +1,6 @@
 import React, { useRef, useCallback, useEffect } from "react";
 import { Difficulty, GameState, TileContent, HistoryEntry } from "./types";
-import { DIFF, MULTS } from "./constants";
+import { DIFF, MULTS, MIN_BET } from "./constants";
 import { usePixiGame } from "./hooks/usePixiGame";
 import LeftPanel from "./components/LeftPanel";
 import { Toast } from "./components/ResultOverlay";
@@ -49,6 +49,7 @@ const DragonTower: React.FC = () => {
   const pendingTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoInitialBetRef = useRef<number>(0);
   const lockTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const runNextAutoRoundRef = useRef<() => void>(() => {});
   const resetGameRef = useRef<() => void>(() => {});
@@ -66,10 +67,6 @@ const DragonTower: React.FC = () => {
         timestamp: new Date().toISOString(),
         balance,
         testMode: false,
-        // 🔌 API: POST /api/user/balance (or rely on game/result endpoint for server-side balance)
-        // Payload: { balance }
-        // NOTE: In production, balance is SERVER-AUTHORITATIVE — don't trust client balance.
-        //       This log is for debugging only. Real balance updates happen via game/start, game/result, game/cashout.
       });
     }
   }, [balance]);
@@ -143,11 +140,13 @@ const DragonTower: React.FC = () => {
       const type = s.tower[r]?.[c];
       if (!type) return;
 
+      const instant = gs().instantBet;
+
       gs().revealTile(r, c, type);
 
       // ── HIT DRAGON ──────────────────────────────────────
       if (type === "dragon") {
-        engageLockRef.current(1500);
+        if (!instant) engageLockRef.current(1500);
         gs().setGstate("ended");
         clearSession();
         gs().setAutoLastRoundWon(false);
@@ -168,15 +167,11 @@ const DragonTower: React.FC = () => {
           balanceAfter: s.balance,
           difficulty: s.diff,
           diffConfig: DIFF[s.diff],
-          // 🔌 API: POST /api/game/result
-          // Payload: { gameId, result: "lose", row: r, col: c, bet, payout: 0, profit: -bet, balanceAfter }
-          // Response: { newBalance, serverSeed } — server reveals seed for verification
         });
 
         gs().setRgstate("endgame");
         gs().setPlayLock(true);
         pixiGame.panelCooldownRef.current = true;
-        // Update autobet session profit immediately on lose
         if (gs().autoRunning) {
           const roundProfit = parseFloat((-s.bet).toFixed(2));
           const newTotalProfit = parseFloat(
@@ -184,14 +179,36 @@ const DragonTower: React.FC = () => {
           );
           gs().setAutoTotalProfit(newTotalProfit);
         }
-        pixiGame.stopNormalBgSound();
-        pixiGame.playLoseSound();
-        pixiGame.spawnLoseExplosion(r, c, s.diff);
-        pixiGame.screenShake();
 
-        const revealed = gs().revealed;
-        pixiGame.refreshGrid(s.diff, "ended", s.curRow, revealed);
-        pixiGame.swapDragonSprite(false);
+        if (instant) {
+          pixiGame.stopNormalBgSound();
+          pixiGame.playLoseSound();
+          const revealed = gs().revealed;
+          pixiGame.refreshGrid(s.diff, "ended", s.curRow, revealed);
+          const rev = revealUnselectedEggs();
+          pixiGame.refreshGrid(s.diff, "ended", s.curRow, rev);
+          pixiGame.showResultOverlay("lose", 0, s.bet);
+          engageLockRef.current(500);
+        } else {
+          pixiGame.stopNormalBgSound();
+          pixiGame.playLoseSound();
+          pixiGame.spawnLoseExplosion(r, c, s.diff);
+          pixiGame.screenShake();
+
+          const revealed = gs().revealed;
+          pixiGame.refreshGrid(s.diff, "ended", s.curRow, revealed);
+          pixiGame.swapDragonSprite(false);
+
+          scheduleTimer(() => {
+            const rev = revealUnselectedEggs();
+            pixiGame.refreshGrid(s.diff, "ended", s.curRow, rev);
+          }, 500);
+
+          scheduleTimer(() => {
+            if (!gs().autoRunning) pixiGame.showResultOverlay("lose", 0, s.bet);
+            engageLockRef.current(2000);
+          }, 900);
+        }
 
         // Save history entry
         const loseEntry: HistoryEntry = {
@@ -206,23 +223,13 @@ const DragonTower: React.FC = () => {
           rowsCleared: r,
         };
         gs().addHistoryEntry(loseEntry);
-        console.log("📝 [HISTORY:SAVE] Game result saved", loseEntry);
-        // 🔌 API: History is saved server-side via POST /api/game/result above
-
-        scheduleTimer(() => {
-          const rev = revealUnselectedEggs();
-          pixiGame.refreshGrid(s.diff, "ended", s.curRow, rev);
-        }, 500);
-
-        scheduleTimer(() => {
-          pixiGame.showResultOverlay("lose", 0, s.bet);
-          engageLockRef.current(2000);
-        }, 900);
 
         // ── HIT EGG ─────────────────────────────────────────
       } else {
-        pixiGame.spawnFX(r, c, "sparkle", s.diff);
         pixiGame.playEggSound();
+        if (!instant) {
+          pixiGame.spawnFX(r, c, "sparkle", s.diff);
+        }
         const m = MULTS[s.diff][r] ?? MULTS[s.diff][MULTS[s.diff].length - 1];
         const newMult = m;
         const newWin = parseFloat((s.bet * m).toFixed(2));
@@ -240,10 +247,6 @@ const DragonTower: React.FC = () => {
           potentialProfit: parseFloat((newWin - s.bet).toFixed(2)),
           bet: s.bet,
           difficulty: s.diff,
-          // 🔌 API: POST /api/game/tile
-          // Payload: { gameId, row: r, col: c }
-          // Response: { tileContent: "egg"|"dragon", multiplier, nextRow }
-          // NOTE: In production, tile content comes from SERVER (not client genRow)
         });
 
         const revealed = gs().revealed;
@@ -290,17 +293,34 @@ const DragonTower: React.FC = () => {
               difficulty: s.diff,
               diffConfig: DIFF[s.diff],
               rowsCompleted: nextRow,
-              // 🔌 API: POST /api/game/result
-              // Payload: { gameId, result: "win", multiplier: newMult, payout: newWin, profit, balanceAfter: newBal, rowsCompleted }
-              // Response: { newBalance, serverSeed }
             });
 
-            pixiGame.stopNormalBgSound();
-            pixiGame.swapDragonSprite(true);
-            pixiGame.showFlameEffects(true, true);
+            if (instant) {
+              pixiGame.stopNormalBgSound();
+              const rev = gs().revealed;
+              pixiGame.refreshGrid(s.diff, "ended", nextRow, rev);
+              const dimRev = revealUnselectedEggs();
+              pixiGame.refreshGrid(s.diff, "ended", nextRow, dimRev);
+              pixiGame.showResultOverlay("win", newMult, newWin);
+              engageLockRef.current(500);
+            } else {
+              pixiGame.stopNormalBgSound();
+              pixiGame.swapDragonSprite(true);
+              pixiGame.showFlameEffects(true, true);
 
-            const rev = gs().revealed;
-            pixiGame.refreshGrid(s.diff, "ended", nextRow, rev);
+              const rev = gs().revealed;
+              pixiGame.refreshGrid(s.diff, "ended", nextRow, rev);
+
+              scheduleTimer(() => {
+                const dimRev = revealUnselectedEggs();
+                pixiGame.refreshGrid(s.diff, "ended", nextRow, dimRev);
+              }, 500);
+              scheduleTimer(() => {
+                if (!gs().autoRunning)
+                  pixiGame.showResultOverlay("win", newMult, newWin);
+                engageLockRef.current(2000);
+              }, 500);
+            }
 
             // Save history entry
             const winEntry: HistoryEntry = {
@@ -315,17 +335,6 @@ const DragonTower: React.FC = () => {
               rowsCleared: nextRow,
             };
             gs().addHistoryEntry(winEntry);
-            console.log("📝 [HISTORY:SAVE] Game result saved", winEntry);
-            // 🔌 API: History is saved server-side via POST /api/game/result above
-
-            scheduleTimer(() => {
-              const dimRev = revealUnselectedEggs();
-              pixiGame.refreshGrid(s.diff, "ended", nextRow, dimRev);
-            }, 500);
-            scheduleTimer(() => {
-              pixiGame.showResultOverlay("win", newMult, newWin);
-              engageLockRef.current(2000);
-            }, 500);
           } else {
             pixiGame.refreshGrid(s.diff, gs().gstate, nextRow, gs().revealed);
           }
@@ -345,7 +354,6 @@ const DragonTower: React.FC = () => {
       from: prev,
       to: v,
       balance: gs().balance,
-      // 🔌 API: POST /api/user/settings { bet }
     });
   }, []);
 
@@ -384,7 +392,6 @@ const DragonTower: React.FC = () => {
       const newBal = s.balance - currentBet;
       gs().setBalance(newBal);
 
-      // Assign new game ID + start time
       gs().newGameId();
       const gameId = gs().gameId;
 
@@ -398,9 +405,6 @@ const DragonTower: React.FC = () => {
         balanceAfter: newBal,
         isAutobet: gs().autoRunning,
         autoRoundsLeft: gs().autoRunning ? gs().autoCount : null,
-        // 🔌 API: POST /api/game/start
-        // Payload: { gameId, bet: currentBet, difficulty: currentDiff, balanceAfter: newBal, isAutobet }
-        // Response: { serverSeed, gameId } — server generates tower & returns hashed seed for provably fair
       });
 
       gs().setRgstate("newgame");
@@ -430,12 +434,10 @@ const DragonTower: React.FC = () => {
       gs().setAutoLastRoundWon(false);
 
       clearPendingTimers();
-      // Clear any lingering lock timeout from previous game
       if (lockTimeoutRef.current) {
         clearTimeout(lockTimeoutRef.current);
         lockTimeoutRef.current = null;
       }
-      // Kill all running animations/particles/timers from previous game
       pixiGame.resetAnimationState();
       pixiGame.buildGrid(currentDiff);
       pixiGame.showFlameEffects(false);
@@ -477,15 +479,11 @@ const DragonTower: React.FC = () => {
       totalRows: DIFF[s.diff].rows,
       rowsRemainingAtCashout: DIFF[s.diff].rows - s.curRow,
       isAutobet: gs().autoRunning,
-      // 🔌 API: POST /api/game/cashout
-      // Payload: { gameId, multiplier: mult, payout: win, profit, balanceAfter: newBal, rowsCompleted }
-      // Response: { newBalance, serverSeed }
     });
 
     gs().setRgstate("endgame");
     gs().setPlayLock(true);
     pixiGame.panelCooldownRef.current = true;
-    // Update autobet session profit immediately on cashout/win
     if (gs().autoRunning) {
       const roundProfit = parseFloat((win - s.bet).toFixed(2));
       const newTotalProfit = parseFloat(
@@ -512,13 +510,12 @@ const DragonTower: React.FC = () => {
     };
     gs().addHistoryEntry(cashEntry);
     console.log("📝 [HISTORY:SAVE] Game result saved", cashEntry);
-    // 🔌 API: History is saved server-side via POST /api/game/cashout above
 
     scheduleTimer(() => {
       const rev = revealUnselectedEggs();
       pixiGame.refreshGrid(s.diff, "ended", s.curRow, rev);
     }, 500);
-    pixiGame.showResultOverlay("win", mult, win);
+    if (!gs().autoRunning) pixiGame.showResultOverlay("win", mult, win);
     engageLockRef.current(2000);
   }, [pixiGame, revealUnselectedEggs, scheduleTimer]);
 
@@ -581,7 +578,6 @@ const DragonTower: React.FC = () => {
 
   const engageLock = useCallback(
     (ms = 1000) => {
-      // Clear any previous lock timeout so it doesn't unlock prematurely
       if (lockTimeoutRef.current) clearTimeout(lockTimeoutRef.current);
       gs().setPlayLock(true);
       pixiGame.panelCooldownRef.current = true;
@@ -589,7 +585,6 @@ const DragonTower: React.FC = () => {
         lockTimeoutRef.current = null;
         gs().setPlayLock(false);
         pixiGame.panelCooldownRef.current = false;
-        // Force panel redraw so button visually re-enables
         const s = gs();
         pixiGame.updateMobilePanel?.({
           balance: s.balance,
@@ -614,7 +609,6 @@ const DragonTower: React.FC = () => {
       engageLock(1000);
       cashOut();
     } else if (s.gstate !== "playing") {
-      // Clear any leftover animations/timers from previous game before starting
       clearPendingTimers();
       if (s.gstate === "ended") {
         pixiGame.hideResultOverlay();
@@ -632,10 +626,8 @@ const DragonTower: React.FC = () => {
   const handleDiffChange = useCallback(
     (v: Difficulty) => {
       const s = gs();
-      // Block during active play, but allow during ended (win/lose) or idle
       if (s.gstate === "playing") return;
 
-      // Reset to idle if in ended state
       if (s.gstate === "ended") {
         clearPendingTimers();
         clearSession();
@@ -655,18 +647,16 @@ const DragonTower: React.FC = () => {
         to: v,
         newConfig: DIFF[v],
         balance: s.balance,
-        // 🔌 API: POST /api/user/settings (optional — only if persisting preferences)
-        // Payload: { difficulty: v }
       });
 
       gs().setDiff(v);
+      gs().clearAutoPattern();
       pixiGame.buildGrid(v);
       pixiGame.refreshGrid(v, "idle", 0, {});
     },
     [pixiGame, clearPendingTimers],
   );
 
-  // Wire up panel callback refs
   useEffect(() => {
     diffChangeCbRef.current = handleDiffChange;
   }, [handleDiffChange]);
@@ -688,8 +678,6 @@ const DragonTower: React.FC = () => {
       roundsCompleted: s.auto.autoCount,
       balance: s.balance,
       reason: "manual stop",
-      // 🔌 API: POST /api/autobet/stop
-      // Payload: { totalProfit, roundsCompleted, balance, reason: "manual" }
     });
 
     gs().setAutoRunning(false);
@@ -697,10 +685,8 @@ const DragonTower: React.FC = () => {
     autoTimeoutRef.current = null;
 
     if (s.gstate === "playing" && s.curRow > 0) {
-      // Has progress — cash out safely
       cashOut();
     } else if (s.gstate === "playing" && s.curRow === 0) {
-      // No progress yet — refund bet and reset cleanly
       const refunded = s.balance + s.bet;
       gs().setBalance(refunded);
       clearPendingTimers();
@@ -717,6 +703,197 @@ const DragonTower: React.FC = () => {
       showToast("Autobet stopped — bet refunded.");
     }
   }, [cashOut, pixiGame, clearPendingTimers, showToast]);
+
+  // ─────────────────────────────────────────────────────────
+  // AUTO PLAY WITH PATTERN (instant all-at-once)
+  // ─────────────────────────────────────────────────────────
+  const autoPlayWithPattern = useCallback(() => {
+    const s = gs();
+    if (!s.autoRunning || s.gstate !== "playing") return;
+
+    const pattern = s.autoPattern;
+    const tower = s.tower;
+    const diffCfg = DIFF[s.diff];
+
+    let maxPatternRow = -1;
+    for (let r = 0; r < pattern.length; r++) {
+      if (pattern[r] !== null) maxPatternRow = r;
+      else break;
+    }
+    if (maxPatternRow < 0) return;
+
+    let lastSafeRow = -1;
+    let dragonRow = -1;
+    let dragonCol = -1;
+    const revealed: Record<number, Record<number, TileContent>> = {};
+
+    for (let r = 0; r <= maxPatternRow; r++) {
+      const col = pattern[r]!;
+      const tileContent = tower[r]?.[col];
+
+      if (tileContent === "dragon") {
+        dragonRow = r;
+        dragonCol = col;
+        revealed[r] = { [col]: "dragon" };
+        break;
+      } else {
+        revealed[r] = { [col]: "egg" };
+        lastSafeRow = r;
+      }
+    }
+
+    gs().setRevealed(revealed);
+
+    if (dragonRow >= 0) {
+      gs().setCurRow(dragonRow);
+      if (dragonRow > 0) {
+        const prevMult = MULTS[s.diff][dragonRow - 1] ?? 1;
+        gs().setCurMult(prevMult);
+        gs().setCurWin(parseFloat((s.bet * prevMult).toFixed(2)));
+      }
+
+      engageLockRef.current(1500);
+      gs().setGstate("ended");
+      clearSession();
+      gs().setAutoLastRoundWon(false);
+      gs().setRgstate("endgame");
+      gs().setPlayLock(true);
+      pixiGame.panelCooldownRef.current = true;
+
+      const roundProfit = parseFloat((-s.bet).toFixed(2));
+      const newTotalProfit = parseFloat(
+        (gs().autoTotalProfit + roundProfit).toFixed(2),
+      );
+      gs().setAutoTotalProfit(newTotalProfit);
+
+      pixiGame.stopNormalBgSound();
+      pixiGame.playLoseSound();
+      pixiGame.spawnLoseExplosion(dragonRow, dragonCol, s.diff);
+      pixiGame.screenShake();
+      pixiGame.refreshGrid(s.diff, "ended", dragonRow, revealed);
+      pixiGame.swapDragonSprite(false);
+
+      const loseEntry: HistoryEntry = {
+        id: s.gameId,
+        timestamp: Date.now(),
+        difficulty: s.diff,
+        bet: s.bet,
+        result: "lose",
+        multiplier: 0,
+        payout: 0,
+        profit: -s.bet,
+        rowsCleared: dragonRow,
+      };
+      gs().addHistoryEntry(loseEntry);
+
+      scheduleTimer(() => {
+        const rev = revealUnselectedEggs();
+        pixiGame.refreshGrid(s.diff, "ended", dragonRow, rev);
+      }, 500);
+      scheduleTimer(() => {
+        pixiGame.showResultOverlay("lose", 0, s.bet);
+        engageLockRef.current(2000);
+      }, 900);
+
+      autoTimeoutRef.current = setTimeout(() => {
+        runNextAutoRoundRef.current();
+      }, 2000);
+    } else {
+      const cashoutRow = lastSafeRow;
+      const mult = MULTS[s.diff][cashoutRow] ?? 1;
+      const win = parseFloat((s.bet * mult).toFixed(2));
+
+      gs().setCurRow(cashoutRow + 1);
+      gs().setCurMult(mult);
+      gs().setCurWin(win);
+
+      if (cashoutRow + 1 >= diffCfg.rows) {
+        const newBal = s.balance + win;
+        gs().setBalance(newBal);
+        gs().setGstate("ended");
+        gs().setRgstate("endgame");
+        gs().setAutoLastRoundWon(true);
+        gs().setPlayLock(true);
+        pixiGame.panelCooldownRef.current = true;
+
+        const roundProfit = parseFloat((win - s.bet).toFixed(2));
+        const newTotalProfit = parseFloat(
+          (gs().autoTotalProfit + roundProfit).toFixed(2),
+        );
+        gs().setAutoTotalProfit(newTotalProfit);
+
+        pixiGame.stopNormalBgSound();
+        pixiGame.swapDragonSprite(true);
+        pixiGame.showFlameEffects(true, true);
+        pixiGame.refreshGrid(s.diff, "ended", cashoutRow + 1, revealed);
+
+        const winEntry: HistoryEntry = {
+          id: s.gameId,
+          timestamp: Date.now(),
+          difficulty: s.diff,
+          bet: s.bet,
+          result: "win",
+          multiplier: mult,
+          payout: win,
+          profit: parseFloat((win - s.bet).toFixed(2)),
+          rowsCleared: cashoutRow + 1,
+        };
+        gs().addHistoryEntry(winEntry);
+
+        scheduleTimer(() => {
+          const rev = revealUnselectedEggs();
+          pixiGame.refreshGrid(s.diff, "ended", cashoutRow + 1, rev);
+        }, 500);
+        scheduleTimer(() => {
+          pixiGame.showResultOverlay("win", mult, win);
+          engageLockRef.current(2000);
+        }, 500);
+      } else {
+        const newBal = s.balance + win;
+        gs().setBalance(newBal);
+        gs().setGstate("ended");
+        gs().setRgstate("endgame");
+        gs().setAutoLastRoundWon(true);
+        gs().setPlayLock(true);
+        pixiGame.panelCooldownRef.current = true;
+
+        const roundProfit = parseFloat((win - s.bet).toFixed(2));
+        const newTotalProfit = parseFloat(
+          (gs().autoTotalProfit + roundProfit).toFixed(2),
+        );
+        gs().setAutoTotalProfit(newTotalProfit);
+
+        pixiGame.stopNormalBgSound();
+        pixiGame.swapDragonSprite(true);
+        pixiGame.showFlameEffects(true, true);
+        pixiGame.refreshGrid(s.diff, "ended", cashoutRow + 1, revealed);
+
+        const cashEntry: HistoryEntry = {
+          id: s.gameId,
+          timestamp: Date.now(),
+          difficulty: s.diff,
+          bet: s.bet,
+          result: "win",
+          multiplier: mult,
+          payout: win,
+          profit: parseFloat((win - s.bet).toFixed(2)),
+          rowsCleared: cashoutRow + 1,
+        };
+        gs().addHistoryEntry(cashEntry);
+
+        scheduleTimer(() => {
+          const rev = revealUnselectedEggs();
+          pixiGame.refreshGrid(s.diff, "ended", cashoutRow + 1, rev);
+        }, 500);
+        pixiGame.showResultOverlay("win", mult, win);
+        engageLockRef.current(2000);
+      }
+
+      autoTimeoutRef.current = setTimeout(() => {
+        runNextAutoRoundRef.current();
+      }, 2000);
+    }
+  }, [pixiGame, revealUnselectedEggs, scheduleTimer]);
 
   const autoPlayRows = useCallback(() => {
     const s = gs();
@@ -737,25 +914,35 @@ const DragonTower: React.FC = () => {
         difficulty: settings.autoDiff,
       });
 
-      let newBet = settings.autoBet;
-      if (settings.autoAdvanced) {
-        if (roundWon)
-          newBet =
-            settings.onWinMode === "increase" && settings.winInc > 0
-              ? parseFloat(
-                  (settings.autoBet * (1 + settings.winInc / 100)).toFixed(2),
-                )
-              : settings.autoBet;
-        else
-          newBet =
-            settings.onLossMode === "increase" && settings.lossInc > 0
-              ? parseFloat(
-                  (settings.autoBet * (1 + settings.lossInc / 100)).toFixed(2),
-                )
-              : settings.autoBet;
-      }
+      // ── FIXED: Use autoInitialBetRef for resets, compound on current bet for increases ──
+      const currentBet = settings.autoBet;
+      const initialBet = autoInitialBetRef.current;
+      let newBet = currentBet;
 
-      gs().setAuto({ autoBet: newBet });
+      if (settings.autoAdvanced) {
+        if (roundWon) {
+          if (settings.onWinMode === "increase" && settings.winInc > 0) {
+            newBet = parseFloat(
+              (currentBet * (1 + settings.winInc / 100)).toFixed(2),
+            );
+            newBet = Math.min(newBet, gs().balance);
+            if (newBet < MIN_BET) newBet = MIN_BET;
+          } else if (settings.onWinMode === "reset") {
+            newBet = initialBet;
+          }
+        } else {
+          if (settings.onLossMode === "increase" && settings.lossInc > 0) {
+            newBet = parseFloat(
+              (currentBet * (1 + settings.lossInc / 100)).toFixed(2),
+            );
+            newBet = Math.min(newBet, gs().balance);
+            if (newBet < MIN_BET) newBet = MIN_BET;
+          } else if (settings.onLossMode === "reset") {
+            newBet = initialBet;
+          }
+        }
+        gs().setAuto({ autoBet: newBet });
+      }
 
       autoTimeoutRef.current = setTimeout(() => {
         runNextAutoRoundRef.current();
@@ -779,7 +966,6 @@ const DragonTower: React.FC = () => {
         return;
       }
 
-      // Auto-cashout row check
       const cashoutRow = cur.auto.autoCashoutRow ?? 0;
       if (cashoutRow > 0 && cur.curRow >= cashoutRow && cur.curMult > 1) {
         console.log(
@@ -789,7 +975,7 @@ const DragonTower: React.FC = () => {
         cashOut();
         autoTimeoutRef.current = setTimeout(() => {
           runNextAutoRoundRef.current();
-        }, 3000);
+        }, 2000);
         return;
       }
 
@@ -801,11 +987,61 @@ const DragonTower: React.FC = () => {
     }, delay);
   }, [handleTileClick, cashOut]);
 
+  // ─────────────────────────────────────────────────────────
+  // RUN NEXT AUTO ROUND — FIXED BET ADJUSTMENT LOGIC
+  // ─────────────────────────────────────────────────────────
   const runNextAutoRound = useCallback(() => {
     const s = gs();
     if (!s.autoRunning) return;
 
     const settings = s.auto;
+    const roundWon = s.autoLastRoundWon;
+
+    // ── Adjust bet based on win/loss ──────────────────────────
+    // Key rules:
+    //   - "increase" compounds on the CURRENT bet each round it applies
+    //   - "reset" always returns to autoInitialBetRef.current (the bet set when autobet started)
+    //   - These two modes are independent per win/loss, so:
+    //     onWin=increase + onLoss=reset → win: compound up, lose: snap back to start
+    //     onWin=reset + onLoss=increase → win: snap back to start, lose: compound up
+    let newBet = settings.autoBet;
+
+    if (settings.autoAdvanced) {
+      const currentBet = settings.autoBet;
+      const initialBet = autoInitialBetRef.current;
+      newBet = currentBet;
+
+      if (roundWon) {
+        if (settings.onWinMode === "increase" && settings.winInc > 0) {
+          // Compound the increase on top of whatever the bet currently is
+          newBet = parseFloat(
+            (currentBet * (1 + settings.winInc / 100)).toFixed(2),
+          );
+          newBet = Math.min(newBet, gs().balance);
+          if (newBet < MIN_BET) newBet = MIN_BET;
+        } else if (settings.onWinMode === "reset") {
+          // Always reset to the original starting bet
+          newBet = initialBet;
+        }
+      } else {
+        // Lost
+        if (settings.onLossMode === "increase" && settings.lossInc > 0) {
+          // Compound the increase on top of whatever the bet currently is
+          newBet = parseFloat(
+            (currentBet * (1 + settings.lossInc / 100)).toFixed(2),
+          );
+          newBet = Math.min(newBet, gs().balance);
+          if (newBet < MIN_BET) newBet = MIN_BET;
+        } else if (settings.onLossMode === "reset") {
+          // Always reset to the original starting bet
+          newBet = initialBet;
+        }
+      }
+
+      if (newBet !== currentBet) {
+        gs().setAuto({ autoBet: newBet });
+      }
+    }
 
     if (!s.autoIsInfinite && s.autoCount <= 0) {
       console.log("🏁 [AUTO:COMPLETE] All rounds done", {
@@ -857,10 +1093,20 @@ const DragonTower: React.FC = () => {
       gs().setAuto({ autoCount: s.auto.autoCount - 1 });
     }
 
-    gs().setBet(settings.autoBet);
-    startGame(settings.autoBet, settings.autoDiff);
-    autoPlayRows();
-  }, [stopAutobet, showToast, startGame, autoPlayRows]);
+    const betToUse = settings.autoAdvanced ? newBet : settings.autoBet;
+    gs().setBet(betToUse);
+    startGame(betToUse, settings.autoDiff);
+
+    const pattern = gs().autoPattern;
+    const hasPattern = pattern.some((col) => col !== null);
+    if (hasPattern) {
+      autoTimeoutRef.current = setTimeout(() => {
+        autoPlayWithPattern();
+      }, 100);
+    } else {
+      autoPlayRows();
+    }
+  }, [stopAutobet, showToast, startGame, autoPlayRows, autoPlayWithPattern]);
 
   useEffect(() => {
     runNextAutoRoundRef.current = runNextAutoRound;
@@ -882,14 +1128,14 @@ const DragonTower: React.FC = () => {
       stopProfit: settings.stopProfit || "none",
       stopLoss: settings.stopLoss || "none",
       balanceAtStart: gs().balance,
-      // 🔌 API: POST /api/autobet/start
-      // Payload: { bet, difficulty, rounds, advanced, onWinMode, winInc, onLossMode, lossInc, stopProfit, stopLoss }
     });
 
     gs().setAutoRunning(true);
     gs().setAutoTotalProfit(0);
     gs().setAutoCount(settings.autoCount);
     gs().setAutoIsInfinite(settings.autoCount === 0);
+    // Snapshot the starting bet — this is the value "reset" always returns to
+    autoInitialBetRef.current = settings.autoBet;
     runNextAutoRound();
   }, [runNextAutoRound]);
 
@@ -906,9 +1152,6 @@ const DragonTower: React.FC = () => {
       initialBet: gs().bet,
       defaultDifficulty: "Medium",
       testMode: gs().testMode,
-      // 🔌 API: GET /api/user/profile
-      // Response: { userId, balance, preferences: { difficulty, bet }, activeGame? }
-      // Use this to hydrate the store on mount instead of localStorage
     });
 
     const tid = setTimeout(async () => {
@@ -923,7 +1166,6 @@ const DragonTower: React.FC = () => {
       const applyBalance = () => {
         if (gs().testMode) {
           console.log("🧪 TEST_MODE on — resetting balance to default");
-          // balance already initialized in store
         } else {
           const savedBalance = loadBalance();
           if (savedBalance !== null) {
@@ -941,10 +1183,6 @@ const DragonTower: React.FC = () => {
           sessionBet: session.bet,
           sessionMult: session.curMult,
           sessionWin: session.curWin,
-          // 🔌 API: GET /api/game/restore
-          // Payload: (none — server knows active game from auth token)
-          // Response: { gameId, tower (server-side), curRow, revealed, bet, curMult, curWin, balance }
-          // NOTE: In production, restore game state from SERVER, not localStorage
         });
 
         gs().setTower(session.tower);
@@ -1002,18 +1240,87 @@ const DragonTower: React.FC = () => {
 
       const s = gs();
       if (s.playLock) return;
+      if (!s.hotkeysEnabled) return;
+
+      // ── "R" only: works in auto tab when autobet is running ── disabled for now since it was causing confusion and isn't a critical feature
+      // if (
+      //   e.code === "KeyR" &&
+      //   s.gstate === "playing" &&
+      //   s.autoRunning &&
+      //   s.curRow > 0
+      // ) {
+      //   e.preventDefault();
+      //   const prevRow = s.curRow - 1;
+      //   const newRevealed = { ...s.revealed };
+      //   delete newRevealed[prevRow];
+      //   gs().setRevealed(newRevealed);
+      //   gs().setCurRow(prevRow);
+      //   const mults = MULTS[s.diff];
+      //   gs().setCurMult(prevRow === 0 ? 1 : mults[prevRow - 1]);
+      //   gs().setCurWin(
+      //     prevRow === 0 ? 0 : s.bet * (prevRow === 0 ? 1 : mults[prevRow - 1]),
+      //   );
+      //   pixiGame.refreshGrid(s.diff, s.gstate, prevRow, newRevealed);
+      //   return;
+      // }
+
+      // ── All other hotkeys: manual tab only, never during autobet ──
+      if (pixiGame.autoTabActiveRef.current) return;
+      if (s.autoRunning) return;
+
       if (e.code === "Space") {
         e.preventDefault();
         if (s.gstate === "playing" && s.curMult > 1) cashOut();
         else if (s.gstate !== "playing") startGame();
-      } else if (e.code === "KeyR" && s.gstate === "playing") {
+        return;
+      }
+
+      const cols = DIFF[s.diff].cols;
+
+      if (e.code >= "Digit1" && e.code <= "Digit4") {
+        e.preventDefault();
+        const col = parseInt(e.code.charAt(5)) - 1;
+        if (s.gstate === "playing" && col < cols) {
+          handleTileClick(s.curRow, col);
+        }
+        return;
+      }
+
+      if (e.code === "KeyQ" && s.gstate === "playing") {
         e.preventDefault();
         doRandom();
+        return;
+      }
+
+      if (e.code === "KeyW" && s.gstate === "playing" && s.curMult > 1) {
+        e.preventDefault();
+        cashOut();
+        return;
+      }
+
+      if (e.code === "KeyS" && s.gstate !== "playing") {
+        e.preventDefault();
+        const doubled = Math.min(s.bet * 2, s.balance);
+        gs().setBet(parseFloat(doubled.toFixed(2)));
+        return;
+      }
+
+      if (e.code === "KeyA" && s.gstate !== "playing") {
+        e.preventDefault();
+        const halved = Math.max(s.bet / 2, MIN_BET);
+        gs().setBet(parseFloat(halved.toFixed(2)));
+        return;
+      }
+
+      if (e.code === "KeyD" && s.gstate !== "playing") {
+        e.preventDefault();
+        gs().setBet(0);
+        return;
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [cashOut, startGame, doRandom]);
+  }, [cashOut, startGame, doRandom, handleTileClick]);
 
   // ── Render ────────────────────────────────────────────
   return (
@@ -1024,6 +1331,15 @@ const DragonTower: React.FC = () => {
         onCashOut={cashOut}
         onRandom={doRandom}
         onAutoToggle={toggleAutobet}
+        onTabChange={(tab) => {
+          pixiGame.autoTabActiveRef.current = tab === "auto";
+          const s = gs();
+          pixiGame.refreshGrid(s.diff, s.gstate, s.curRow, s.revealed);
+        }}
+        onPatternClear={() => {
+          const s = gs();
+          pixiGame.refreshGrid(s.diff, s.gstate, s.curRow, s.revealed);
+        }}
       />
 
       <div id="game-panel-outer">
