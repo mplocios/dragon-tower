@@ -90,7 +90,8 @@ export const Dragon = (): JSX.Element => {
   const [showMaxBetConfirm, setShowMaxBetConfirm] = useState(false);
   const volume = useGameStore((s) => s.volume);
   const setVolume = useGameStore((s) => s.setVolume);
-  const [animations, setAnimations] = useState(true);
+  const animations = useGameStore((s) => s.animations);
+  const setAnimations = useGameStore((s) => s.setAnimations);
   const maxBet = useGameStore((s) => s.maxBet);
   const setMaxBet = useGameStore((s) => s.setMaxBet);
   const hotkeysEnabled = useGameStore((s) => s.hotkeysEnabled);

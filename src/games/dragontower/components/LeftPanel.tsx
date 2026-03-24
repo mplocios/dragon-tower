@@ -77,7 +77,7 @@ const S = {
     background: C.bg,
     flexDirection: "column" as const,
     borderRadius: "18px 0 0 18px",
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "'Poppins', sans-serif",
     color: C.textPrimary,
     padding: "14px 14px 20px",
     gap: 11,
@@ -100,7 +100,7 @@ const S = {
     padding: "8px 0",
     border: "none",
     borderRadius: 99,
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "'Poppins', sans-serif",
     fontSize: 14,
     fontWeight: 700,
     cursor: disabled ? "not-allowed" : "pointer",
@@ -150,7 +150,7 @@ const S = {
     border: "none",
     outline: "none",
     color: C.textPrimary,
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "'Poppins', sans-serif",
     fontSize: 15,
     fontWeight: 700,
     minWidth: 0,
@@ -179,7 +179,7 @@ const S = {
     borderLeft: `1px solid ${C.border}`,
     borderRadius: 0,
     color: C.valueColor,
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "'Poppins', sans-serif",
     fontSize: 13,
     fontWeight: 700,
     padding: "0 10px",
@@ -210,7 +210,7 @@ const S = {
     border: `1.5px solid ${C.border}`,
     borderRadius: 9,
     color: C.textPrimary,
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "'Poppins', sans-serif",
     fontSize: 14,
     fontWeight: 600,
     padding: "11px 34px 11px 13px",
@@ -233,7 +233,7 @@ const S = {
     width: "100%",
     border: "none",
     borderRadius: 11,
-    fontFamily: "'Cinzel', serif",
+    fontFamily: "'Poppins', sans-serif",
     fontSize: 15,
     fontWeight: 900,
     padding: 14,
@@ -248,7 +248,7 @@ const S = {
     width: "100%",
     border: "none",
     borderRadius: 11,
-    fontFamily: "'Cinzel', serif",
+    fontFamily: "'Poppins', sans-serif",
     fontSize: 13,
     fontWeight: 900,
     padding: 14,
@@ -262,7 +262,7 @@ const S = {
     width: "100%",
     border: "none",
     borderRadius: 11,
-    fontFamily: "'Cinzel', serif",
+    fontFamily: "'Poppins', sans-serif",
     fontSize: 15,
     fontWeight: 900,
     padding: 14,
@@ -315,7 +315,7 @@ const S = {
     color: C.textPrimary,
     padding: "5px 7px",
     fontSize: 13,
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "'Poppins', sans-serif",
     outline: "none",
   },
   modeBtn: (active: boolean): React.CSSProperties => ({
@@ -327,7 +327,7 @@ const S = {
     fontSize: 12,
     cursor: "pointer",
     transition: ".18s",
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "'Poppins', sans-serif",
     fontWeight: 700,
   }),
 };
@@ -734,7 +734,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   style={{
                     color: "#e84040",
                     fontSize: 12,
-                    fontFamily: "'Rajdhani', sans-serif",
+                    fontFamily: "'Poppins', sans-serif",
                     fontWeight: 600,
                   }}
                 >
@@ -756,7 +756,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   style={{
                     color: "#e84040",
                     fontSize: 12,
-                    fontFamily: "'Rajdhani', sans-serif",
+                    fontFamily: "'Poppins', sans-serif",
                     fontWeight: 600,
                   }}
                 >
@@ -778,7 +778,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   style={{
                     color: "#e84040",
                     fontSize: 12,
-                    fontFamily: "'Rajdhani', sans-serif",
+                    fontFamily: "'Poppins', sans-serif",
                     fontWeight: 600,
                   }}
                 >
@@ -1017,7 +1017,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   style={{
                     color: "#e84040",
                     fontSize: 12,
-                    fontFamily: "'Rajdhani', sans-serif",
+                    fontFamily: "'Poppins', sans-serif",
                     fontWeight: 600,
                   }}
                 >
@@ -1039,7 +1039,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   style={{
                     color: "#e84040",
                     fontSize: 12,
-                    fontFamily: "'Rajdhani', sans-serif",
+                    fontFamily: "'Poppins', sans-serif",
                     fontWeight: 600,
                   }}
                 >
@@ -1061,7 +1061,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   style={{
                     color: "#e84040",
                     fontSize: 12,
-                    fontFamily: "'Rajdhani', sans-serif",
+                    fontFamily: "'Poppins', sans-serif",
                     fontWeight: 600,
                   }}
                 >
@@ -1095,32 +1095,39 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             </div>
           </div>
 
-          {/* Auto Cashout Row — hidden for now */}
+          {/* Auto Cashout Row */}
           {true &&
             (() => {
               const maxRow = DIFF[auto.autoDiff]?.rows ?? 9;
+              const hasPattern = autoPattern.some((c) => c !== null);
               return (
-                <div style={S.fieldWrap}>
+                <div style={{ ...S.fieldWrap, opacity: hasPattern ? 0.4 : 1 }}>
                   <div style={S.rowBetween}>
                     <span style={S.lbl}>Auto Cashout At Row</span>
                     <span
                       style={{
                         ...S.lblRight,
-                        color: auto.autoCashoutRow === 0 ? C.textDim : C.gold,
+                        color: hasPattern
+                          ? C.textDim
+                          : auto.autoCashoutRow === 0
+                            ? C.textDim
+                            : C.gold,
                       }}
                     >
-                      {auto.autoCashoutRow === 0
-                        ? "Disabled"
-                        : `Row ${auto.autoCashoutRow} / ${maxRow}`}
+                      {hasPattern
+                        ? "Pattern active"
+                        : auto.autoCashoutRow === 0
+                          ? "Disabled"
+                          : `Row ${auto.autoCashoutRow} / ${maxRow}`}
                     </span>
                   </div>
                   <div style={S.inputBox()}>
                     <NumberInput
-                      value={autoCashoutInput}
+                      value={hasPattern ? "" : autoCashoutInput}
                       step={1}
                       min={0}
-                      disabled={autoRunning}
-                      placeholder={`0`}
+                      disabled={autoRunning || hasPattern}
+                      placeholder={hasPattern ? "0" : `0`}
                       inputStyle={{ fontSize: 15 }}
                       onChange={(raw) => {
                         if (raw === "" || raw === "0") {
@@ -1492,7 +1499,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 style={{
                   color: "#c8a44a",
                   fontSize: 11,
-                  fontFamily: "'Rajdhani', sans-serif",
+                  fontFamily: "'Poppins', sans-serif",
                   fontWeight: 600,
                 }}
               >
@@ -1512,7 +1519,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   background: "rgba(124,58,237,0.12)", borderRadius: 8, padding: "8px 12px",
                   marginBottom: 8, border: "1px solid rgba(124,58,237,0.3)",
                 }}>
-                  <span style={{ color: "#b366ff", fontSize: 12, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
+                  <span style={{ color: "#b366ff", fontSize: 12, fontFamily: "'Poppins', sans-serif", fontWeight: 700 }}>
                     Pattern: {selectedRows} row{selectedRows > 1 ? "s" : ""} selected
                   </span>
                   <button
@@ -1520,7 +1527,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                     disabled={autoRunning}
                     style={{
                       background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.4)",
-                      borderRadius: 6, color: "#b366ff", fontSize: 11, fontFamily: "'Rajdhani', sans-serif",
+                      borderRadius: 6, color: "#b366ff", fontSize: 11, fontFamily: "'Poppins', sans-serif",
                       fontWeight: 700, padding: "3px 10px", cursor: autoRunning ? "not-allowed" : "pointer",
                       opacity: autoRunning ? 0.5 : 1,
                     }}
@@ -1532,7 +1539,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             }
             return (
               <div style={{
-                color: "#4a5568", fontSize: 11, fontFamily: "'Rajdhani', sans-serif", fontWeight: 600,
+                color: "#4a5568", fontSize: 11, fontFamily: "'Poppins', sans-serif", fontWeight: 600,
                 textAlign: "center", marginBottom: 8, padding: "4px 0",
               }}>
                 Click tiles on the grid to set a pattern (bottom to top)
@@ -1547,7 +1554,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               width: "100%",
               border: "none",
               borderRadius: 11,
-              fontFamily: "'Cinzel', serif",
+              fontFamily: "'Poppins', sans-serif",
               fontSize: 14,
               fontWeight: 900,
               padding: 13,

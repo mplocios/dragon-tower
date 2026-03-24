@@ -8,7 +8,7 @@ import {
   AutoSettings,
 } from "../types";
 import { INITIAL_BET } from "../constants";
-import { loadHistory, saveHistoryEntry } from "../utils/session";
+import { loadHistory, saveHistoryEntry, loadSettings, saveSettings } from "../utils/session";
 import { usePlayerStore } from "../../../store/usePlayerStore";
 
 // ── Session game-ID counter ──────────────────────────────────
@@ -45,6 +45,8 @@ export interface GameStore {
   setInstantBet: (v: boolean) => void;
   hotkeysEnabled: boolean;
   setHotkeysEnabled: (v: boolean) => void;
+  animations: boolean;
+  setAnimations: (v: boolean) => void;
 
   // auto-bet state
   auto: AutoSettings;
@@ -86,6 +88,8 @@ export interface GameStore {
 }
 
 // ── Store creation ───────────────────────────────────────────
+const _savedSettings = loadSettings();
+
 export const useGameStore = create<GameStore>()((set) => ({
   // ── initial state ──────────────────────────────────────────
   testMode: usePlayerStore.getState().mode === 'demo',
@@ -105,10 +109,11 @@ export const useGameStore = create<GameStore>()((set) => ({
   gameStartTime: 0,
   history: loadHistory(),
   playLock: false,
-  volume: 80,
-  maxBet: false,
-  instantBet: false,
-  hotkeysEnabled: false,
+  volume: _savedSettings.volume,
+  maxBet: _savedSettings.maxBet,
+  instantBet: _savedSettings.instantBet,
+  hotkeysEnabled: _savedSettings.hotkeysEnabled,
+  animations: _savedSettings.animations,
 
   auto: {
     autoBet: 5,
@@ -128,7 +133,7 @@ export const useGameStore = create<GameStore>()((set) => ({
   autoTotalProfit: 0,
   autoCount: 10,
   autoIsInfinite: false,
-  autoPattern: Array(9).fill(null),
+  autoPattern: _savedSettings.autoPattern,
 
   // ── actions ────────────────────────────────────────────────
   setTestMode: (v) => set({ testMode: v }),
@@ -164,10 +169,11 @@ export const useGameStore = create<GameStore>()((set) => ({
     }),
 
   setPlayLock: (v) => set({ playLock: v }),
-  setVolume: (v) => set({ volume: v }),
-  setMaxBet: (v) => set({ maxBet: v }),
-  setInstantBet: (v) => set({ instantBet: v }),
-  setHotkeysEnabled: (v) => set({ hotkeysEnabled: v }),
+  setVolume: (v) => { set({ volume: v }); saveSettings({ volume: v }); },
+  setMaxBet: (v) => { set({ maxBet: v }); saveSettings({ maxBet: v }); },
+  setInstantBet: (v) => { set({ instantBet: v }); saveSettings({ instantBet: v }); },
+  setHotkeysEnabled: (v) => { set({ hotkeysEnabled: v }); saveSettings({ hotkeysEnabled: v }); },
+  setAnimations: (v) => { set({ animations: v }); saveSettings({ animations: v }); },
 
   setHistory: (entries) => set({ history: entries }),
 
@@ -193,17 +199,20 @@ export const useGameStore = create<GameStore>()((set) => ({
     set((state) => {
       const newPattern = [...state.autoPattern];
       if (col === null) {
-        // Deselect this row and all rows above it
         for (let r = row; r < newPattern.length; r++) {
           newPattern[r] = null;
         }
       } else {
         newPattern[row] = col;
       }
+      saveSettings({ autoPattern: newPattern });
       return { autoPattern: newPattern };
     }),
 
-  clearAutoPattern: () => set({ autoPattern: Array(9).fill(null) }),
+  clearAutoPattern: () => {
+    set({ autoPattern: Array(9).fill(null) });
+    saveSettings({ autoPattern: Array(9).fill(null) });
+  },
 
   resetRound: () =>
     set({

@@ -10,7 +10,7 @@ export const PAD_MOBILE = 22;
 export const DESKTOP_SCALE = 0.97;
 export const INITIAL_BALANCE = 0.20;
 export const INITIAL_BET = 5;
-export const MIN_BET = 0.10;
+export const MIN_BET = 0.00000001;
 export const MAX_BET = 1000;
 
 // ─── Difficulty & Multipliers ───────────────────────────────────────
@@ -76,6 +76,10 @@ export const WALL_OFFSET_X = 20;
 export const WALL_OFFSET_Y = 10;
 /** Wall bottom sprite height */
 export const WALL_BOTTOM_H = 76;
+/** Wall bottom sprite width overshoot (total extra width beyond grid) */
+export const WALL_BOTTOM_OVERSHOOT_W = 39;
+/** Wall bottom sprite y-offset from grid bottom */
+export const WALL_BOTTOM_OFFSET_Y = 15;
 /** Top flame bg width extension beyond frame width */
 export const TOP_FLAME_W_EXT = 80;
 /** Top flame bg height */

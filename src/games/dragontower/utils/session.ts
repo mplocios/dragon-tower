@@ -44,3 +44,36 @@ export const loadHistory = (): any[] => {
 };
 
 export const clearHistory = () => localStorage.removeItem(HISTORY_KEY);
+
+// ── Settings persistence ──────────────────────────────────
+const SETTINGS_KEY = 'dragon_settings';
+
+export interface GameSettings {
+  volume: number;
+  maxBet: boolean;
+  instantBet: boolean;
+  hotkeysEnabled: boolean;
+  animations: boolean;
+  autoPattern: (number | null)[];
+}
+
+const DEFAULT_SETTINGS: GameSettings = {
+  volume: 80,
+  maxBet: false,
+  instantBet: false,
+  hotkeysEnabled: false,
+  animations: true,
+  autoPattern: Array(9).fill(null),
+};
+
+export const saveSettings = (settings: Partial<GameSettings>) => {
+  const current = loadSettings();
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...current, ...settings }));
+};
+
+export const loadSettings = (): GameSettings => {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : DEFAULT_SETTINGS;
+  } catch { return DEFAULT_SETTINGS; }
+};

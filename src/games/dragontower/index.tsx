@@ -43,6 +43,7 @@ const DragonTower: React.FC = () => {
   const curWin = useGameStore((s) => s.curWin);
   const toast = useGameStore((s) => s.toast);
   const rgstate = useGameStore((s) => s.rgstate);
+  const animationsEnabled = useGameStore((s) => s.animations);
 
   // ── Remaining refs (non-state, timers, callbacks) ─────────
   const mountedRef = useRef(false);
@@ -187,7 +188,7 @@ const DragonTower: React.FC = () => {
           pixiGame.refreshGrid(s.diff, "ended", s.curRow, revealed);
           const rev = revealUnselectedEggs();
           pixiGame.refreshGrid(s.diff, "ended", s.curRow, rev);
-          pixiGame.showResultOverlay("lose", 0, s.bet);
+          if (!gs().autoRunning) pixiGame.showResultOverlay("lose", 0, s.bet);
           engageLockRef.current(500);
         } else {
           pixiGame.stopNormalBgSound();
@@ -791,7 +792,6 @@ const DragonTower: React.FC = () => {
         pixiGame.refreshGrid(s.diff, "ended", dragonRow, rev);
       }, 500);
       scheduleTimer(() => {
-        pixiGame.showResultOverlay("lose", 0, s.bet);
         engageLockRef.current(2000);
       }, 900);
 
@@ -1054,7 +1054,7 @@ const DragonTower: React.FC = () => {
       stopAutobet();
       return;
     }
-    if (settings.stopProfit > 0 && s.autoTotalProfit >= settings.stopProfit) {
+    if (settings.autoAdvanced && settings.stopProfit > 0 && s.autoTotalProfit >= settings.stopProfit) {
       console.log("🎯 [AUTO:STOP_PROFIT] Stop profit target hit", {
         timestamp: new Date().toISOString(),
         totalProfit: s.autoTotalProfit,
@@ -1065,7 +1065,7 @@ const DragonTower: React.FC = () => {
       stopAutobet();
       return;
     }
-    if (settings.stopLoss > 0 && s.autoTotalProfit <= -settings.stopLoss) {
+    if (settings.autoAdvanced && settings.stopLoss > 0 && s.autoTotalProfit <= -settings.stopLoss) {
       console.log("🛑 [AUTO:STOP_LOSS] Stop loss limit hit", {
         timestamp: new Date().toISOString(),
         totalProfit: s.autoTotalProfit,
@@ -1213,6 +1213,12 @@ const DragonTower: React.FC = () => {
     }, 100);
     return () => clearTimeout(tid);
   }, []); // eslint-disable-line
+
+  // ── Refresh grid when animations toggle (swap dragon sprites) ──
+  useEffect(() => {
+    const s = gs();
+    pixiGame.refreshGrid(s.diff, s.gstate, s.curRow, s.revealed);
+  }, [animationsEnabled, pixiGame]);
 
   // ── Sync volume changes to active sounds ──────────────
   const storeVolume = useGameStore((s) => s.volume);

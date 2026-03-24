@@ -5,7 +5,7 @@ import { useGameStore } from '../store/useGameStore';
 import { CW, CH, CH_MOBILE, PANEL_H, PAD, PAD_MOBILE, TGAP, RGAP, WALL_H, DIFF, MULTS, REF_COLS, DESKTOP_SCALE,
   GRID_TOP_RESERVE, TILE_ASPECT_RATIO, TILE_ASPECT_RATIO_MOBILE, GRID_BOTTOM_MARGIN, GRID_LAYER_Y,
   DRAGON_NORMAL_MAX_W, DRAGON_NORMAL_MAX_H, DRAGON_FIRE_MAX_W, DRAGON_FIRE_MAX_H,
-  WALL_OVERSHOOT_W, WALL_OVERSHOOT_H, WALL_OFFSET_X, WALL_OFFSET_Y,
+  WALL_OVERSHOOT_W, WALL_OVERSHOOT_H, WALL_OFFSET_X, WALL_OFFSET_Y, WALL_BOTTOM_OVERSHOOT_W, WALL_BOTTOM_OFFSET_Y, WALL_BOTTOM_H,
   DRAGON_BREATH_AMPLITUDE, DRAGON_BREATH_FREQ, DRAGON_Y_OFFSET,
   DRAGON_GLOW_RADII, DRAGON_GLOW_X_OFFSET, DRAGON_GLOW_Y_OFFSET, DRAGON_GLOW_COLORS, DRAGON_GLOW_ALPHAS,
   DRAGON_GLOW_STEPS, DRAGON_GLOW_GRADIENT_COLOR, DRAGON_GLOW_ALPHA_MIN, DRAGON_GLOW_ALPHA_MAX,
@@ -186,10 +186,8 @@ export function usePixiGame(
         g.roundRect(0, 0, w, h, R).stroke({ width: 2, color: 0x222222, alpha: 0.9 });
       }
     } else if (state === 'pattern') {
-      g.roundRect(-2, -2, w + 4, h + 4, R + 2).fill({ color: 0x9933ff, alpha: 0.15 });
-      setTileSprite(ts, null, w, h);
-      g.roundRect(0, 0, w, h, R).fill({ color: 0x7c3aed, alpha: 0.85 });
-      g.roundRect(0, 0, w, h, R).stroke({ width: 2, color: 0xb366ff, alpha: 0.6 });
+      g.roundRect(-2, -2, w + 4, h + 4, R + 2).fill({ color: 0x8833cc, alpha: 0.12 });
+      setTileSprite(ts, TEX.tile_purple ?? null, w, h);
       if (ttex) ttex.alpha = 0;
     } else if (state === 'dragon') {
       setTileSprite(ts, null, w, h);
@@ -243,8 +241,10 @@ export function usePixiGame(
       tile.root.alpha = 0.5;
       tile.root.zIndex = 5;
     } else if (type === 'dragon') {
+      const animEnabled = useGameStore.getState().animations;
       const frames = dragonFramesRef.current;
-      if (frames.length > 0) {
+      const TEX = texRef.current;
+      if (animEnabled && frames.length > 0) {
         // Shadow ellipse (behind the icon)
         const shadow = new PIXI.Graphics();
         const shadowW = w * DRAGON_SHADOW_W;
@@ -271,6 +271,17 @@ export function usePixiGame(
         sp.label = 'dragonIcon';
         (sp as any)._baseY = sp.y;
         (sp as any)._floatOffset = Math.random() * Math.PI * 2;
+        tile.icons.addChild(sp);
+      } else if (!animEnabled && TEX.dragon_static) {
+        // Static dragon icon — no shadow, no float
+        const sp = new PIXI.Sprite(TEX.dragon_static);
+        const targetW = w * DRAGON_ICON_SCALE_W;
+        const targetH = h * DRAGON_ICON_SCALE_H;
+        const sc = Math.min(targetW / sp.texture.width, targetH / sp.texture.height);
+        sp.scale.set(sc); sp.anchor.set(0.5); sp.x = w / 2; sp.y = h / 2 + DRAGON_ICON_Y_OFFSET;
+        sp.alpha = DRAGON_ICON_ALPHA;
+        sp.tint = DRAGON_ICON_TINT;
+        sp.label = 'dragonIcon';
         tile.icons.addChild(sp);
       }
       tile.root.zIndex = 10;
@@ -372,16 +383,18 @@ export function usePixiGame(
     }
 
     // ── Fire glow overlays on left & right borders ──────────────
-    const glowG = new PIXI.Graphics();
-    // Left glow strip
-    glowG.rect(fx - 6, fy, 12, fh).fill({ color: 0xff4400, alpha: 0.06 });
-    glowG.rect(fx - 3, fy, 6, fh).fill({ color: 0xff6600, alpha: 0.08 });
-    // Right glow strip
-    glowG.rect(fx + fw - 6, fy, 12, fh).fill({ color: 0xff4400, alpha: 0.06 });
-    glowG.rect(fx + fw - 3, fy, 6, fh).fill({ color: 0xff6600, alpha: 0.08 });
-    // Bottom glow
-    glowG.rect(fx, fy + fh - 4, fw, 8).fill({ color: 0xff5500, alpha: 0.05 });
-    gridLayer.addChild(glowG);
+    if (useGameStore.getState().animations) {
+      const glowG = new PIXI.Graphics();
+      // Left glow strip
+      glowG.rect(fx - 6, fy, 12, fh).fill({ color: 0xff4400, alpha: 0.06 });
+      glowG.rect(fx - 3, fy, 6, fh).fill({ color: 0xff6600, alpha: 0.08 });
+      // Right glow strip
+      glowG.rect(fx + fw - 6, fy, 12, fh).fill({ color: 0xff4400, alpha: 0.06 });
+      glowG.rect(fx + fw - 3, fy, 6, fh).fill({ color: 0xff6600, alpha: 0.08 });
+      // Bottom glow
+      glowG.rect(fx, fy + fh - 4, fw, 8).fill({ color: 0xff5500, alpha: 0.05 });
+      gridLayer.addChild(glowG);
+    }
 
     if (TEX.wall) {
       const wt = new PIXI.Sprite(TEX.wall);
@@ -418,13 +431,15 @@ export function usePixiGame(
 
     // Dragon glow — smooth radial gradient, IN FRONT of dragon
     const dragonGlow = new PIXI.Graphics();
-    const glowX = CW / 2 + DRAGON_GLOW_X_OFFSET, glowY = wcy + DRAGON_GLOW_Y_OFFSET;
-    const maxR = DRAGON_GLOW_RADII[0];
-    for (let i = 0; i < DRAGON_GLOW_STEPS; i++) {
-      const t = i / (DRAGON_GLOW_STEPS - 1); // 0 = outer, 1 = inner
-      const r = maxR * (1 - t);
-      const a = DRAGON_GLOW_ALPHA_MIN + t * DRAGON_GLOW_ALPHA_MAX;
-      dragonGlow.circle(glowX, glowY, r).fill({ color: DRAGON_GLOW_GRADIENT_COLOR, alpha: a });
+    if (useGameStore.getState().animations) {
+      const glowX = CW / 2 + DRAGON_GLOW_X_OFFSET, glowY = wcy + DRAGON_GLOW_Y_OFFSET;
+      const maxR = DRAGON_GLOW_RADII[0];
+      for (let i = 0; i < DRAGON_GLOW_STEPS; i++) {
+        const t = i / (DRAGON_GLOW_STEPS - 1); // 0 = outer, 1 = inner
+        const r = maxR * (1 - t);
+        const a = DRAGON_GLOW_ALPHA_MIN + t * DRAGON_GLOW_ALPHA_MAX;
+        dragonGlow.circle(glowX, glowY, r).fill({ color: DRAGON_GLOW_GRADIENT_COLOR, alpha: a });
+      }
     }
     dragonGlow.label = 'dragonGlow';
     dragonGlow.zIndex = 21;
@@ -447,9 +462,8 @@ export function usePixiGame(
 
     if (TEX.wall_bottom) {
       const wb = new PIXI.Sprite(TEX.wall_bottom);
-      const wbH = 76;
-      wb.width = fw + 36; wb.height = wbH;
-      wb.x = fx - 18; wb.y = fy + fh - wbH / 2 + 15;
+      wb.width = fw + WALL_BOTTOM_OVERSHOOT_W; wb.height = WALL_BOTTOM_H;
+      wb.x = fx - WALL_BOTTOM_OVERSHOOT_W / 2; wb.y = fy + fh - WALL_BOTTOM_H / 2 + WALL_BOTTOM_OFFSET_Y;
       wb.alpha = 1;
       gridLayer.addChild(wb);
     }
@@ -905,6 +919,7 @@ export function usePixiGame(
     type: 'fire' | 'sparkle',
     diff: Difficulty
   ) => {
+    if (!useGameStore.getState().animations) return;
     const fxLayer = fxLayerRef.current;
     if (!fxLayer) return;
     const L = calcLayout(diff);
@@ -933,6 +948,7 @@ export function usePixiGame(
 
   // ─── Win Celebration ────────────────────────────────────────
   const spawnWinCelebration = useCallback((diff: Difficulty) => {
+    if (!useGameStore.getState().animations) return;
     const fxLayer = fxLayerRef.current;
     if (!fxLayer) return;
     const L = calcLayout(diff);
@@ -1027,6 +1043,7 @@ export function usePixiGame(
 
   // ─── Lose Fire Explosion ────────────────────────────────────
   const spawnLoseExplosion = useCallback((r: number, c: number, diff: Difficulty) => {
+    if (!useGameStore.getState().animations) return;
     const fxLayer = fxLayerRef.current;
     if (!fxLayer) return;
     const L = calcLayout(diff);
@@ -1108,6 +1125,7 @@ export function usePixiGame(
 
   // ─── Screen Shake ───────────────────────────────────────────
   const screenShake = useCallback(() => {
+    if (!useGameStore.getState().animations) return;
     const app = appRef.current;
     if (!app) return;
     const stage = app.stage;
@@ -1209,17 +1227,19 @@ export function usePixiGame(
   }, []);
 
   const showFlameEffects = useCallback((show: boolean, winOnly?: boolean) => {
+    const animEnabled = useGameStore.getState().animations;
     const left = flameBorderLeftRef.current;
     const right = flameBorderRightRef.current;
     const topFlame = topFlameBgRef.current;
     const gTop = glowTopRef.current;
     const gBottom = glowBottomRef.current;
-    // Flame borders only visible on win/cashout
-    if (left) { left.visible = show; left.alpha = show ? 0.8 : 0; }
-    if (right) { right.visible = show; right.alpha = show ? 0.8 : 0; }
-    if (topFlame) { topFlame.visible = show && !!winOnly; topFlame.alpha = (show && !!winOnly) ? 0.7 : 0; }
-    if (gTop) { gTop.visible = show; gTop.alpha = show ? 0.8 : 0; }
-    if (gBottom) { gBottom.visible = show; gBottom.alpha = show ? 0.8 : 0; }
+    // Hide all visual flame/glow effects when animations disabled
+    const showVisual = show && animEnabled;
+    if (left) { left.visible = showVisual; left.alpha = showVisual ? 0.8 : 0; }
+    if (right) { right.visible = showVisual; right.alpha = showVisual ? 0.8 : 0; }
+    if (topFlame) { topFlame.visible = showVisual && !!winOnly; topFlame.alpha = (showVisual && !!winOnly) ? 0.7 : 0; }
+    if (gTop) { gTop.visible = showVisual; gTop.alpha = showVisual ? 0.8 : 0; }
+    if (gBottom) { gBottom.visible = showVisual; gBottom.alpha = showVisual ? 0.8 : 0; }
     // Dragon glow: hide on win (flame effects take over), show on normal/lose
     const dGlow = dragonGlowRef.current;
     if (dGlow) { dGlow.visible = !show; }
@@ -1360,6 +1380,8 @@ export function usePixiGame(
       wall:          BASE+'/wall.png',
       egg:           BASE+'/dragon-egg-3.png',
       dragon_sprite: BASE+'/dragon-icon-2-sprite.png',
+      dragon_static: BASE+'/dragon-icon-no-anim.png',
+      tile_purple:   BASE+'/purple-tile.png',
       tile_dark:     BASE+'/black-tile-2.png',
       tile_green:    BASE+'/green-tile.png',
       result_bg:     BASE+'/result_background.png',
@@ -1455,11 +1477,15 @@ export function usePixiGame(
 
       app.ticker.add(() => {
         frameRef.current++;
+        const animEnabled = useGameStore.getState().animations;
 
         // ── Particle system ──────────────────────────────────────
         const particles = particlesRef.current;
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i] as any;
+          if (!animEnabled) {
+            fxLayer.removeChild(p); p.destroy(); particles.splice(i, 1); continue;
+          }
           p._life -= p._decay;
           if (p._life <= 0) {
             fxLayer.removeChild(p); p.destroy(); particles.splice(i, 1); continue;
@@ -1470,63 +1496,72 @@ export function usePixiGame(
 
         // ── Tile entrance animations ──────────────────────────────
         const anims = tileAnimsRef.current;
-        for (let i = anims.length - 1; i >= 0; i--) {
-          const a = anims[i];
-          a.progress += 0.07;
-          if (a.progress >= 1) {
-            a.root.scale.set(1);
-            a.root.alpha = 1;
-            anims.splice(i, 1);
-          } else {
-            const t = a.progress;
-            const overshoot = 1.12;
-            const ease = t < 0.55
-              ? (t / 0.55) * overshoot
-              : overshoot - (overshoot - 1) * ((t - 0.55) / 0.45);
-            const startScale = 0.4;
-            const s = startScale + (1 - startScale) * Math.min(ease, 1.08);
-            a.root.scale.set(s);
-            a.root.alpha = Math.min(1, t * 2.5);
+        if (animEnabled) {
+          for (let i = anims.length - 1; i >= 0; i--) {
+            const a = anims[i];
+            a.progress += 0.07;
+            if (a.progress >= 1) {
+              a.root.scale.set(1);
+              a.root.alpha = 1;
+              anims.splice(i, 1);
+            } else {
+              const t = a.progress;
+              const overshoot = 1.12;
+              const ease = t < 0.55
+                ? (t / 0.55) * overshoot
+                : overshoot - (overshoot - 1) * ((t - 0.55) / 0.45);
+              const startScale = 0.4;
+              const s = startScale + (1 - startScale) * Math.min(ease, 1.08);
+              a.root.scale.set(s);
+              a.root.alpha = Math.min(1, t * 2.5);
+            }
           }
+        } else {
+          // Skip entrance animations — snap to final state
+          for (let i = anims.length - 1; i >= 0; i--) {
+            anims[i].root.scale.set(1);
+            anims[i].root.alpha = 1;
+          }
+          anims.length = 0;
         }
 
         // ── Dragon icon floating animation + shadow ──────────────
-        const tiles = tileObjsRef.current;
-        for (let ri = 0; ri < tiles.length; ri++) {
-          const row = tiles[ri];
-          for (let ci = 0; ci < row.length; ci++) {
-            const tile = row[ci];
-            if (!tile) continue;
-            // First pass: find icon and compute float value
-            let floatVal = 0;
-            let hasIcon = false;
-            for (let k = 0; k < tile.icons.children.length; k++) {
-              const ch = tile.icons.children[k];
-              if (ch.label === 'dragonIcon') {
-                const baseY = (ch as any)._baseY ?? 0;
-                const offset = (ch as any)._floatOffset ?? 0;
-                floatVal = Math.sin(frameRef.current * DRAGON_ICON_FLOAT_SPEED + offset);
-                ch.y = baseY + floatVal * DRAGON_ICON_FLOAT_AMP;
-                hasIcon = true;
-                break;
-              }
-            }
-            // Second pass: apply float to shadow
-            if (hasIcon) {
+        if (animEnabled) {
+          const tiles = tileObjsRef.current;
+          for (let ri = 0; ri < tiles.length; ri++) {
+            const row = tiles[ri];
+            for (let ci = 0; ci < row.length; ci++) {
+              const tile = row[ci];
+              if (!tile) continue;
+              let floatVal = 0;
+              let hasIcon = false;
               for (let k = 0; k < tile.icons.children.length; k++) {
                 const ch = tile.icons.children[k];
-                if (ch.label === 'dragonShadow') {
-                  const t = (floatVal + 1) / 2; // 0 = up, 1 = down
-                  const shadowScale = 0.7 + 0.3 * t;
-                  const baseScX = (ch as any)._baseScaleX ?? 1;
-                  const baseScY = (ch as any)._baseScaleY ?? 1;
-                  ch.scale.set(baseScX * shadowScale, baseScY * shadowScale);
-                  ch.alpha = 0.15 + 0.2 * t;
-                  const r = Math.round(0x66 + (0xff - 0x66) * t);
-                  const gg = Math.round(0x08 + (0x88 - 0x08) * t);
-                  const b = Math.round(0x08 + (0x22 - 0x08) * t);
-                  (ch as PIXI.Graphics).tint = (r << 16) | (gg << 8) | b;
+                if (ch.label === 'dragonIcon') {
+                  const baseY = (ch as any)._baseY ?? 0;
+                  const offset = (ch as any)._floatOffset ?? 0;
+                  floatVal = Math.sin(frameRef.current * DRAGON_ICON_FLOAT_SPEED + offset);
+                  ch.y = baseY + floatVal * DRAGON_ICON_FLOAT_AMP;
+                  hasIcon = true;
                   break;
+                }
+              }
+              if (hasIcon) {
+                for (let k = 0; k < tile.icons.children.length; k++) {
+                  const ch = tile.icons.children[k];
+                  if (ch.label === 'dragonShadow') {
+                    const t = (floatVal + 1) / 2;
+                    const shadowScale = 0.7 + 0.3 * t;
+                    const baseScX = (ch as any)._baseScaleX ?? 1;
+                    const baseScY = (ch as any)._baseScaleY ?? 1;
+                    ch.scale.set(baseScX * shadowScale, baseScY * shadowScale);
+                    ch.alpha = 0.15 + 0.2 * t;
+                    const r = Math.round(0x66 + (0xff - 0x66) * t);
+                    const gg = Math.round(0x08 + (0x88 - 0x08) * t);
+                    const b = Math.round(0x08 + (0x22 - 0x08) * t);
+                    (ch as PIXI.Graphics).tint = (r << 16) | (gg << 8) | b;
+                    break;
+                  }
                 }
               }
             }
@@ -1535,9 +1570,9 @@ export function usePixiGame(
 
         // ── FIRE BORDER ANIMATION — always visible during play ─────
         const st = getStateRef.current();
- 
+
         // ── Ambient embers — only on win/cashout ──
-        if (st.gstate === 'ended' && frameRef.current % 8 === 0) {
+        if (animEnabled && st.gstate === 'ended' && frameRef.current % 8 === 0) {
           const idleColors = [0xff5500, 0xff7700, 0xff9900];
           for (let i = 0; i < 2; i++) {
             const pg = new PIXI.Graphics() as any;
@@ -1554,8 +1589,8 @@ export function usePixiGame(
           }
         }
 
-// ── Active row pulse (manual only) ───────────────────────
-        if (st.gstate === 'playing' && !useGameStore.getState().autoRunning) {
+        // ── Active row pulse (manual only) ───────────────────────
+        if (animEnabled && st.gstate === 'playing' && !useGameStore.getState().autoRunning) {
           const pulseAlpha = 0.86 + 0.14 * Math.sin(frameRef.current * 0.06);
           const row = tileObjsRef.current[st.curRow];
           if (row) {
@@ -1564,52 +1599,68 @@ export function usePixiGame(
                 row[c].root.alpha = pulseAlpha;
               }
             }
-          } 
+          }
         }
 
         // ── Dragon breathing animation + glow sync ────────────────
-        const breathVal = Math.sin(frameRef.current * DRAGON_BREATH_FREQ);
-        for (let i = 0; i < gridLayer.children.length; i++) {
-          const ch = gridLayer.children[i];
-          if (ch.label === 'wallDragon') {
-            const base = dragonBaseScaleRef.current;
-            ch.scale.set(base * (1 + DRAGON_BREATH_AMPLITUDE * breathVal));
-            break;
+        if (animEnabled) {
+          const breathVal = Math.sin(frameRef.current * DRAGON_BREATH_FREQ);
+          for (let i = 0; i < gridLayer.children.length; i++) {
+            const ch = gridLayer.children[i];
+            if (ch.label === 'wallDragon') {
+              const base = dragonBaseScaleRef.current;
+              ch.scale.set(base * (1 + DRAGON_BREATH_AMPLITUDE * breathVal));
+              break;
+            }
           }
-        }
-        // Glow brightens when dragon inhales (scale up), dims on exhale
-        const dGlow = dragonGlowRef.current;
-        if (dGlow && dGlow.visible) {
-          const t = (breathVal + 1) / 2; // 0 = exhale, 1 = inhale
-          // Smooth easing: cubic ease-in-out for seamless pulse
-          const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-          dGlow.alpha = 0.7 + 0.3 * eased;
+          const dGlow = dragonGlowRef.current;
+          if (dGlow && dGlow.visible) {
+            const t = (breathVal + 1) / 2;
+            const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+            dGlow.alpha = 0.7 + 0.3 * eased;
+          }
+        } else {
+          // Hide glow when animations disabled
+          const dGlow = dragonGlowRef.current;
+          if (dGlow) dGlow.visible = false;
         }
 
         // ── Flame & glow pulse (slow) ─────────────────────────────
-        const pulse = Math.sin(frameRef.current * 0.02);
-        const flameL = flameBorderLeftRef.current;
-        const flameR = flameBorderRightRef.current;
-        const gTop = glowTopRef.current;
-        const gBot = glowBottomRef.current;
-        if (flameL && flameL.visible) {
-          flameL.alpha = 0.75 + 0.08 * pulse;
-        }
-        if (flameR && flameR.visible) {
-          flameR.alpha = 0.75 + 0.08 * Math.sin(frameRef.current * 0.02 + 0.5);
-        }
-        if (gTop && gTop.visible) {
-          gTop.alpha = 0.7 + 0.1 * pulse;
-        }
-        if (gBot && gBot.visible) {
-          gBot.alpha = 0.7 + 0.1 * Math.sin(frameRef.current * 0.02 + 1);
+        if (animEnabled) {
+          const pulse = Math.sin(frameRef.current * 0.02);
+          const flameL = flameBorderLeftRef.current;
+          const flameR = flameBorderRightRef.current;
+          const gTop = glowTopRef.current;
+          const gBot = glowBottomRef.current;
+          if (flameL && flameL.visible) {
+            flameL.alpha = 0.75 + 0.08 * pulse;
+          }
+          if (flameR && flameR.visible) {
+            flameR.alpha = 0.75 + 0.08 * Math.sin(frameRef.current * 0.02 + 0.5);
+          }
+          if (gTop && gTop.visible) {
+            gTop.alpha = 0.7 + 0.1 * pulse;
+          }
+          if (gBot && gBot.visible) {
+            gBot.alpha = 0.7 + 0.1 * Math.sin(frameRef.current * 0.02 + 1);
+          }
+        } else {
+          // Hide flame borders and glow overlays when animations disabled
+          if (flameBorderLeftRef.current) flameBorderLeftRef.current.visible = false;
+          if (flameBorderRightRef.current) flameBorderRightRef.current.visible = false;
+          if (glowTopRef.current) glowTopRef.current.visible = false;
+          if (glowBottomRef.current) glowBottomRef.current.visible = false;
         }
 
         // ── Multiplier display smooth scale ───────────────────────
         if (multDisplayRef.current && multDisplayRef.current.visible) {
-          const s = multDisplayRef.current.scale.x;
-          if (Math.abs(s - 1) > 0.01) {
-            multDisplayRef.current.scale.set(s + (1 - s) * 0.12);
+          if (animEnabled) {
+            const s = multDisplayRef.current.scale.x;
+            if (Math.abs(s - 1) > 0.01) {
+              multDisplayRef.current.scale.set(s + (1 - s) * 0.12);
+            } else {
+              multDisplayRef.current.scale.set(1);
+            }
           } else {
             multDisplayRef.current.scale.set(1);
           }
