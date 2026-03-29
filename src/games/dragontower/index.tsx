@@ -317,8 +317,7 @@ const DragonTower: React.FC = () => {
                 pixiGame.refreshGrid(s.diff, "ended", nextRow, dimRev);
               }, 500);
               scheduleTimer(() => {
-                if (!gs().autoRunning)
-                  pixiGame.showResultOverlay("win", newMult, newWin);
+                pixiGame.showResultOverlay("win", newMult, newWin);
                 engageLockRef.current(2000);
               }, 500);
             }
@@ -516,7 +515,7 @@ const DragonTower: React.FC = () => {
       const rev = revealUnselectedEggs();
       pixiGame.refreshGrid(s.diff, "ended", s.curRow, rev);
     }, 500);
-    if (!gs().autoRunning) pixiGame.showResultOverlay("win", mult, win);
+    pixiGame.showResultOverlay("win", mult, win);
     engageLockRef.current(2000);
   }, [pixiGame, revealUnselectedEggs, scheduleTimer]);
 
@@ -702,6 +701,24 @@ const DragonTower: React.FC = () => {
       pixiGame.buildGrid(s.diff);
       pixiGame.refreshGrid(s.diff, "idle", 0, {});
       showToast("Autobet stopped — bet refunded.");
+    } else if (s.gstate === "ended") {
+      // Stopped during win/lose animation — wait then reset to idle
+      setTimeout(() => {
+        clearPendingTimers();
+        clearSession();
+        pixiGame.hideResultOverlay();
+        gs().resetRound();
+        gs().setGstate("idle");
+        gs().setRgstate("newgame");
+        pixiGame.resetAnimationState();
+        pixiGame.swapDragonSprite(false);
+        pixiGame.showFlameEffects(false);
+        pixiGame.stopLoseSound();
+        pixiGame.stopNormalBgSound();
+        const diff = gs().diff;
+        pixiGame.buildGrid(diff);
+        pixiGame.refreshGrid(diff, "idle", 0, {});
+      }, 3000);
     }
   }, [cashOut, pixiGame, clearPendingTimers, showToast]);
 
@@ -890,8 +907,9 @@ const DragonTower: React.FC = () => {
       }
 
       autoTimeoutRef.current = setTimeout(() => {
+        pixiGame.hideResultOverlay();
         runNextAutoRoundRef.current();
-      }, 2000);
+      }, 3500);
     }
   }, [pixiGame, revealUnselectedEggs, scheduleTimer]);
 
@@ -945,8 +963,9 @@ const DragonTower: React.FC = () => {
       }
 
       autoTimeoutRef.current = setTimeout(() => {
+        pixiGame.hideResultOverlay();
         runNextAutoRoundRef.current();
-      }, 3000);
+      }, 3500);
       return;
     }
 
@@ -974,8 +993,9 @@ const DragonTower: React.FC = () => {
         );
         cashOut();
         autoTimeoutRef.current = setTimeout(() => {
+          pixiGame.hideResultOverlay();
           runNextAutoRoundRef.current();
-        }, 2000);
+        }, 3500);
         return;
       }
 
@@ -1210,6 +1230,17 @@ const DragonTower: React.FC = () => {
         pixiGame.refreshGrid(s.diff, s.gstate, s.curRow, s.revealed);
       }
       mountedRef.current = true;
+
+      // Initial mobile panel sync (coin positions depend on rendered text width)
+      const initState = gs();
+      pixiGame.updateMobilePanel?.({
+        balance: initState.balance,
+        bet: initState.bet,
+        diff: initState.diff,
+        gstate: initState.gstate,
+        curMult: initState.curMult,
+        curWin: initState.curWin,
+      });
     }, 100);
     return () => clearTimeout(tid);
   }, []); // eslint-disable-line
@@ -1248,27 +1279,22 @@ const DragonTower: React.FC = () => {
       if (s.playLock) return;
       if (!s.hotkeysEnabled) return;
 
-      // ── "R" only: works in auto tab when autobet is running ── disabled for now since it was causing confusion and isn't a critical feature
-      // if (
-      //   e.code === "KeyR" &&
-      //   s.gstate === "playing" &&
-      //   s.autoRunning &&
-      //   s.curRow > 0
-      // ) {
-      //   e.preventDefault();
-      //   const prevRow = s.curRow - 1;
-      //   const newRevealed = { ...s.revealed };
-      //   delete newRevealed[prevRow];
-      //   gs().setRevealed(newRevealed);
-      //   gs().setCurRow(prevRow);
-      //   const mults = MULTS[s.diff];
-      //   gs().setCurMult(prevRow === 0 ? 1 : mults[prevRow - 1]);
-      //   gs().setCurWin(
-      //     prevRow === 0 ? 0 : s.bet * (prevRow === 0 ? 1 : mults[prevRow - 1]),
-      //   );
-      //   pixiGame.refreshGrid(s.diff, s.gstate, prevRow, newRevealed);
-      //   return;
-      // }
+      // ── "R": undo pattern selection (top to bottom) — works in auto tab ──
+      if (e.code === "KeyR" && pixiGame.autoTabActiveRef.current && !s.autoRunning) {
+        e.preventDefault();
+        const pattern = s.autoPattern;
+        // find the highest row that has a selection
+        let topRow = -1;
+        for (let r = pattern.length - 1; r >= 0; r--) {
+          if (pattern[r] !== null) { topRow = r; break; }
+        }
+        if (topRow >= 0) {
+          gs().setAutoPattern(topRow, null);
+          const updated = gs();
+          pixiGame.refreshGrid(updated.diff, updated.gstate, updated.curRow, updated.revealed);
+        }
+        return;
+      }
 
       // ── All other hotkeys: manual tab only, never during autobet ──
       if (pixiGame.autoTabActiveRef.current) return;

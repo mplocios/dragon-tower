@@ -10,7 +10,7 @@ export const PAD_MOBILE = 22;
 export const DESKTOP_SCALE = 0.97;
 export const INITIAL_BALANCE = 0.20;
 export const INITIAL_BET = 5;
-export const MIN_BET = 0.00000001;
+export const MIN_BET = 0.10;
 export const MAX_BET = 1000;
 
 // ─── Difficulty & Multipliers ───────────────────────────────────────
@@ -204,7 +204,7 @@ export const PANEL_BOT_H = 80;
 /** Gap between middle row cards (balance & random pick) */
 export const PANEL_MID_GAP = 15;
 /** Gap between bottom row cards (bet & profit) */
-export const PANEL_BOT_GAP = 85;
+export const PANEL_BOT_GAP = 95;
 /** Panel card corner radius */
 export const PANEL_CARD_RADIUS = 8;
 /** Panel fallback card bg color */
@@ -233,6 +233,12 @@ export const PANEL_BAL_AMT_X = 105;
 export const PANEL_COIN_SIZE = 16;
 /** Coin gap after amount text */
 export const PANEL_COIN_GAP = 12;
+/** Balance coin x-axis offset adjustment */
+export const PANEL_BAL_COIN_X_OFFSET = 23;
+/** Balance amount text right margin from card edge (before coin) */
+export const PANEL_BAL_AMT_RIGHT = 100;
+/** Total Profit coin x-axis offset adjustment */
+export const PANEL_PROFIT_COIN_X_OFFSET = 0;
 
 // ─── Mobile Panel — Random Pick Card ────────────────────────────────
 /** Random Pick card text x offset */
@@ -294,17 +300,25 @@ export const PLAY_COIN_SIZE = 22;
 
 // ─── Result Overlay ─────────────────────────────────────────────────
 /** Result card width */
-export const RESULT_CARD_W = 170;
+export const RESULT_CARD_W = 210;
 /** Result card height */
-export const RESULT_CARD_H = 150;
+export const RESULT_CARD_H = 190;
 /** Result card corner radius */
 export const RESULT_CARD_RADIUS = 14;
 /** Multiplier text font size on result card */
-export const RESULT_MULT_FONT_SIZE = 52;
+export const RESULT_MULT_FONT_SIZE = 36;
 /** Amount text font size on result card */
-export const RESULT_AMT_FONT_SIZE = 13;
+export const RESULT_AMT_FONT_SIZE = 12;
 /** Coin icon size on result card */
-export const RESULT_COIN_SIZE = 20;
+export const RESULT_COIN_SIZE = 16;
+/** Divider line horizontal inset from card edge (each side) */  // hr length  - lower = longer
+export const RESULT_DIVIDER_INSET = 80;
+/** Divider line Y position as fraction of card height (0–1) */
+export const RESULT_DIVIDER_Y = 0.53;
+/** Multiplier text Y position as fraction of card height (0–1) */
+export const RESULT_MULT_Y = 0.38;
+/** Amount text gap below divider (px) */
+export const RESULT_AMT_GAP = 10;
 /** Pop-out animation speed */
 export const RESULT_POP_SPEED = 0.045;
 /** Auto-dismiss delay (ms) */

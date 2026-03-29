@@ -72,15 +72,15 @@ const S = {
   panel: {
     // width: 300,
     minWidth: 341,
-    maxWidth: 341,
+    maxWidth: "22.3%",
     flexShrink: 0,
     background: C.bg,
     flexDirection: "column" as const,
     borderRadius: "18px 0 0 18px",
     fontFamily: "'Poppins', sans-serif",
     color: C.textPrimary,
-    padding: "14px 14px 20px",
-    gap: 11,
+    padding: "10px 12px 12px",
+    gap: 7,
     boxSizing: "border-box" as const,
     overflowX: "hidden" as const,
     overflowY: "auto" as const,
@@ -118,7 +118,7 @@ const S = {
     flexDirection: "column" as const,
     gap: 5,
     opacity: disabled ? 0.35 : 1,
-    pointerEvents: disabled ? "none" as const : "auto" as const,
+    pointerEvents: disabled ? ("none" as const) : ("auto" as const),
     transition: "opacity .15s",
   }),
   rowBetween: {
@@ -306,7 +306,7 @@ const S = {
   sectionBox: {
     background: C.surface,
     borderRadius: 9,
-    padding: "10px 11px",
+    padding: "7px 10px",
     border: `1.5px solid ${C.border}`,
     display: "flex",
     flexDirection: "column" as const,
@@ -378,6 +378,7 @@ const NumberInput: React.FC<{
         position: "relative",
         display: "flex",
         alignItems: "stretch",
+        alignSelf: "stretch",
         ...style,
       }}
     >
@@ -398,7 +399,7 @@ const NumberInput: React.FC<{
           fontFamily: "'Poppins', sans-serif",
           fontSize: 15,
           fontWeight: 700,
-          paddingRight: 24,
+          paddingRight: 30,
           ...inputStyle,
         }}
       />
@@ -411,6 +412,7 @@ const NumberInput: React.FC<{
           bottom: 0,
           display: "flex",
           flexDirection: "column",
+          padding: "4px 0",
         }}
       >
         <button
@@ -422,7 +424,7 @@ const NumberInput: React.FC<{
           disabled={disabled}
           style={{
             flex: 1,
-            width: 20,
+            width: 26,
             background: "rgba(255,255,255,0.06)",
             border: "none",
             borderLeft: "1px solid rgba(255,255,255,0.08)",
@@ -432,9 +434,9 @@ const NumberInput: React.FC<{
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 0,
+            padding: "0 4px",
             color: "#9ca3af",
-            fontSize: 8,
+            fontSize: 11,
             lineHeight: 1,
           }}
         >
@@ -449,7 +451,7 @@ const NumberInput: React.FC<{
           disabled={disabled}
           style={{
             flex: 1,
-            width: 20,
+            width: 26,
             background: "rgba(255,255,255,0.06)",
             border: "none",
             borderLeft: "1px solid rgba(255,255,255,0.08)",
@@ -458,9 +460,9 @@ const NumberInput: React.FC<{
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 0,
+            padding: "0 4px",
             color: "#9ca3af",
-            fontSize: 8,
+            fontSize: 11,
             lineHeight: 1,
           }}
         >
@@ -1109,7 +1111,9 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               const maxRow = DIFF[auto.autoDiff]?.rows ?? 9;
               const hasPattern = autoPattern.some((c) => c !== null);
               return (
-                <div style={{ ...S.fieldWrapDisabled(autoRunning || hasPattern) }}>
+                <div
+                  style={{ ...S.fieldWrapDisabled(autoRunning || hasPattern) }}
+                >
                   <div style={S.rowBetween}>
                     <span style={S.lbl}>Auto Cashout At Row</span>
                     <span
@@ -1423,10 +1427,18 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               </div>
 
               {/* Stop conditions */}
-              <div style={{ display: "flex", gap: 7 }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 7,
+                  width: "100%",
+                  boxSizing: "border-box",
+                }}
+              >
                 <div
                   style={{
                     flex: 1,
+                    minWidth: 0,
                     display: "flex",
                     flexDirection: "column",
                     gap: 4,
@@ -1464,6 +1476,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                 <div
                   style={{
                     flex: 1,
+                    minWidth: 0,
                     display: "flex",
                     flexDirection: "column",
                     gap: 4,

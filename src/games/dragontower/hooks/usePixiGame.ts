@@ -20,13 +20,16 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, PAD_MOBILE, TGAP, RGAP, WALL_H, DIFF, 
   PANEL_ROW_GAP, PANEL_MID_GAP, PANEL_BOT_GAP, PANEL_Y_OFFSET,
   PANEL_LBL_COLOR, PANEL_GOLD_COLOR, PLAY_R, PLAY_BTN_Y_OFFSET, PLAY_LABEL_FONT, PLAY_AMT_FONT, PLAY_COIN_SIZE,
   PANEL_LBL_FONT, PANEL_AMT_FONT, PANEL_INNER_PX, PANEL_CARD_RADIUS, PANEL_CARD_BG,
-  PANEL_DIFF_RIGHT, PANEL_BAL_AMT_X, PANEL_COIN_SIZE, PANEL_COIN_GAP,
+  PANEL_DIFF_RIGHT, PANEL_BAL_AMT_X, PANEL_COIN_SIZE, PANEL_COIN_GAP, PANEL_BAL_COIN_X_OFFSET, PANEL_PROFIT_COIN_X_OFFSET, PANEL_BAL_AMT_RIGHT,
   PANEL_BET_COIN_SIZE, PANEL_BET_COIN_X, PANEL_BET_AMT_X, PANEL_BET_AMT_FONT,
   PANEL_BET_LBL_Y, PANEL_BET_BOT_OFFSET,
   PANEL_ARROW_UP_W, PANEL_ARROW_UP_H, PANEL_ARROW_DOWN_W, PANEL_ARROW_DOWN_H, PANEL_ARROW_RIGHT, PANEL_ARROW_UP_Y, PANEL_ARROW_DOWN_Y,
   PANEL_PROFIT_LBL_Y, PANEL_PROFIT_MULT_GAP, PANEL_PROFIT_AMT_FONT, PANEL_PROFIT_BOT_OFFSET, PANEL_PROFIT_COIN_GAP,
 PANEL_RANDOM_INNER_PX, PANEL_PROFIT_INNER_PX,
   MIN_BET, MAX_BET,
+  RESULT_CARD_W, RESULT_CARD_H, RESULT_CARD_RADIUS, RESULT_MULT_FONT_SIZE, RESULT_AMT_FONT_SIZE,
+  RESULT_COIN_SIZE, RESULT_DIVIDER_INSET, RESULT_DIVIDER_Y, RESULT_MULT_Y, RESULT_AMT_GAP,
+  RESULT_POP_SPEED, RESULT_AUTO_DISMISS_MS,
 } from '../constants';
 
 interface TileObj {
@@ -114,6 +117,7 @@ export function usePixiGame(
   const onPlayActionRef = useRef(options.onPlayAction);
   const onRandomRef = useRef(options.onRandom);
   const autoTabActiveRef = useRef(false);
+  const poppinsLoadedRef = useRef(false);
   useEffect(() => { onTileClickRef.current = options.onTileClick; }, [options.onTileClick]);
   useEffect(() => { onPlayAgainRef.current = options.onPlayAgain; }, [options.onPlayAgain]);
   useEffect(() => { getStateRef.current = options.getState; }, [options.getState]);
@@ -619,7 +623,7 @@ export function usePixiGame(
         row[c] = tile;
         gridLayer.addChild(tile.root);
       }
-      const ml = new PIXI.Text({ text: '', style: { fontFamily: 'Rajdhani', fontSize: 10, fill: 0x1a3050, fontWeight: '700' } });
+      const ml = new PIXI.Text({ text: '', style: { fontFamily: 'Poppins', fontSize: 10, fill: 0x1a3050, fontWeight: '700' } });
       ml.anchor.set(0, 0.5); ml.x = CW - L.hPad + 5; ml.y = rowY + L.tileH / 2;
       gridLayer.addChild(ml);
       row._ml = ml;
@@ -717,7 +721,7 @@ export function usePixiGame(
           container.addChild(bg);
           const text = new PIXI.Text({
             text: `${mult.toFixed(2)}x`,
-            style: { fontFamily: 'Rajdhani', fontSize: 40, fontWeight: '900', fill: 0xe89010 },
+            style: { fontFamily: 'Poppins', fontSize: 40, fontWeight: '900', fill: 0xe89010 },
           });
           text.anchor.set(0.5);
           container.addChild(text);
@@ -763,7 +767,7 @@ export function usePixiGame(
 
   // ─── Result Overlay ──────────────────────────────────────────
   const showResultOverlay = useCallback((type: 'win' | 'lose', mult: number, amount: number) => {
-    if (useGameStore.getState().autoRunning) return;
+    if (useGameStore.getState().autoRunning && type === 'lose') return;
     const uiLayer = uiLayerRef.current;
     if (!uiLayer) return;
 
@@ -778,50 +782,52 @@ export function usePixiGame(
     const TEX = texRef.current;
     const container = new PIXI.Container();
 
-    const cardW = 170;
-    const cardH = 150;
+    const cardW = RESULT_CARD_W;
+    const cardH = RESULT_CARD_H;
     const cardX = (CW - cardW) / 2;
     const cardY = (CH - cardH) / 2;
 
-    if (TEX.result_bg) {
-      const bg = new PIXI.Sprite(TEX.result_bg);
+    const bgTex = type === 'win' ? TEX.result_bg_win : TEX.result_bg_lose;
+    if (bgTex) {
+      const bg = new PIXI.Sprite(bgTex);
       bg.width = cardW; bg.height = cardH;
       bg.x = cardX; bg.y = cardY;
       container.addChild(bg);
     } else {
       const card = new PIXI.Graphics();
-      card.roundRect(cardX, cardY, cardW, cardH, 14).fill({ color: 0x0d1828 });
+      card.roundRect(cardX, cardY, cardW, cardH, RESULT_CARD_RADIUS).fill({ color: 0x0d1828 });
       container.addChild(card);
     }
 
     const multText = new PIXI.Text({
       text: `${mult.toFixed(2)}x`,
-      style: { fontFamily: 'Rajdhani', fontSize: 52, fontWeight: '900', fill: type === 'win' ? 0xe89010 : 0xcc3333 },
+      style: { fontFamily: 'Poppins', fontSize: RESULT_MULT_FONT_SIZE, fontWeight: '900', fill: type === 'win' ? 0xe89010 : 0xcc3333 },
     });
-    multText.anchor.set(0.5, 0);
-    multText.x = CW / 2; multText.y = cardY + 16;
+    multText.anchor.set(0.5, 0.5);
+    multText.x = CW / 2; multText.y = cardY + cardH * RESULT_MULT_Y;
     container.addChild(multText);
 
+    const divY = cardY + cardH * RESULT_DIVIDER_Y;
     const div = new PIXI.Graphics();
-    div.moveTo(cardX + 30, cardY + 82).lineTo(cardX + cardW - 30, cardY + 82).stroke({ width: 1, color: 0xb47810, alpha: 0.35 });
+    div.moveTo(cardX + RESULT_DIVIDER_INSET, divY).lineTo(cardX + cardW - RESULT_DIVIDER_INSET, divY).stroke({ width: 1, color: 0xb47810, alpha: 0.35 });
     container.addChild(div);
 
     const amtText = new PIXI.Text({
-      text: `$${type === 'lose' ? '0.00' : amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      style: { fontFamily: 'Rajdhani', fontSize: 13, fontWeight: '600', fill: 0xb0b8c4 },
+      text: `${type === 'lose' ? '0.00000000' : amount.toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })}`,
+      style: { fontFamily: 'Poppins', fontSize: RESULT_AMT_FONT_SIZE, fontWeight: '600', fill: 0xb0b8c4 },
     });
     amtText.anchor.set(0.5, 0);
-    amtText.x = CW / 2 - 12; amtText.y = cardY + 92;
+    amtText.x = CW / 2 - 10; amtText.y = divY + RESULT_AMT_GAP;
     container.addChild(amtText);
 
     if (TEX.gcoin) {
-  const coin = new PIXI.Sprite(TEX.gcoin);
-  coin.width = 20; coin.height = 20;
-  coin.anchor.set(0.5);
-  coin.x = amtText.x + amtText.width / 2 + 14;
-  coin.y = amtText.y + amtText.height / 2;
-  container.addChild(coin);
-}
+      const coin = new PIXI.Sprite(TEX.gcoin);
+      coin.width = RESULT_COIN_SIZE; coin.height = RESULT_COIN_SIZE;
+      coin.anchor.set(0.5);
+      coin.x = amtText.x + amtText.width / 2 + 12;
+      coin.y = amtText.y + amtText.height / 2;
+      container.addChild(coin);
+    }
 
     // Set pivot to center so scale animation pops from middle
     container.pivot.set(CW / 2, CH / 2);
@@ -836,7 +842,7 @@ export function usePixiGame(
     // Pop-out animation from center
     let t = 0;
     const popTicker = () => {
-      t += 0.045;
+      t += RESULT_POP_SPEED;
       if (t >= 1) {
         container.scale.set(1);
         container.alpha = 1;
@@ -856,11 +862,12 @@ export function usePixiGame(
     activeTickersRef.current.add(popTicker);
 
     if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
+    const isAuto = useGameStore.getState().autoRunning;
     const tid = setTimeout(() => {
       resultTimerRef.current = null;
       activeTimeoutsRef.current.delete(tid);
-      onPlayAgainRef.current();
-    }, 7000);
+      if (!isAuto) onPlayAgainRef.current();
+    }, isAuto ? 3000 : RESULT_AUTO_DISMISS_MS);
     resultTimerRef.current = tid;
     activeTimeoutsRef.current.add(tid);
   }, []);
@@ -1387,7 +1394,8 @@ export function usePixiGame(
       tile_purple:   BASE+'/purple-tile.png',
       tile_dark:     BASE+'/black-tile-2.png',
       tile_green:    BASE+'/green-tile.png',
-      result_bg:     BASE+'/result_background.png',
+      result_bg_win:  BASE+'/result_background_2.png',
+      result_bg_lose: BASE+'/result_background_1.png',
       flame_border:  BASE+'/flame-border.png',
       top_flame_bg:  BASE+'/top-flame-bg.png',
       dif_bg:        BASE+'/dif-bg.png',
@@ -1883,14 +1891,21 @@ export function usePixiGame(
     balCard.addChild(balLbl);
 
     const initBal = useGameStore.getState().balance;
-    const fmtBal = initBal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const balText = new PIXI.Text({ text: fmtBal, style: amtStyle });
-    balText.x = PANEL_BAL_AMT_X; balText.y = PANEL_MID_H / 2; balText.anchor.set(0, 0.5);
+    const fmtBal = initBal.toFixed(2);
+    const maxBalW = midW - PANEL_BAL_AMT_RIGHT - PANEL_COIN_SIZE - 8;
+    const balText = new PIXI.Text({ text: fmtBal, style: { ...amtStyle, maxWidth: maxBalW } });
+    (balText as any)._baseFont = PANEL_AMT_FONT;
+    balText.x = PANEL_BAL_AMT_RIGHT; balText.y = PANEL_MID_H / 2; balText.anchor.set(0, 0.5);
     balCard.addChild(balText);
 
     const balCoin = makeCoin(PANEL_COIN_SIZE);
-    balCoin.x = balText.x + balText.width + PANEL_COIN_GAP; balCoin.y = PANEL_MID_H / 2;
+    balCoin.x = PANEL_BAL_AMT_RIGHT + balText.width + PANEL_COIN_SIZE / 2 + 4; balCoin.y = PANEL_MID_H / 2;
     balCard.addChild(balCoin);
+    const balMask = new PIXI.Graphics();
+    balMask.rect(0, 0, midW, PANEL_MID_H).fill({ color: 0xffffff });
+    balCard.addChild(balMask);
+    balCard.mask = balMask;
+ 
     panelLayer.addChild(balCard);
 
     // Random Pick card — centered text
@@ -1963,7 +1978,7 @@ export function usePixiGame(
         const bg = new PIXI.Graphics();
         bg.roundRect(0, 0, aw, ah, 4).fill({ color: 0x1a2a3a });
         btn.addChild(bg);
-        const txt = new PIXI.Text({ text: label, style: { fontFamily: 'Rajdhani', fontSize: PANEL_AMT_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' } });
+        const txt = new PIXI.Text({ text: label, style: { fontFamily: 'Poppins', fontSize: PANEL_AMT_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' } });
         txt.anchor.set(0.5); txt.x = aw / 2; txt.y = ah / 2;
         btn.addChild(txt);
       }
@@ -1976,7 +1991,7 @@ export function usePixiGame(
     };
 
     // Insufficient funds warning text (hidden by default)
-    const insuffText = new PIXI.Text({ text: 'Insufficient funds', style: { fontFamily: 'Rajdhani', fontSize: 11, fill: 0xff4444, fontWeight: '700' } });
+    const insuffText = new PIXI.Text({ text: 'Insufficient funds', style: { fontFamily: 'Poppins', fontSize: 11, fill: 0xff4444, fontWeight: '700' } });
     insuffText.anchor.set(0.5, 0); insuffText.x = botSideW / 2; insuffText.y = PANEL_BOT_H + 2;
     insuffText.visible = false;
     betCard.addChild(insuffText);
@@ -2056,10 +2071,31 @@ export function usePixiGame(
 
     const profitCoin = makeCoin(PANEL_COIN_SIZE);
     const maxCoinX = botSideW - PANEL_COIN_SIZE / 2 - 6;
-    profitCoin.x = Math.min(profitText.x + profitText.width / 2 + PANEL_PROFIT_COIN_GAP, maxCoinX);
+    profitCoin.x = Math.min(profitText.x + profitText.width / 2 + PANEL_PROFIT_COIN_GAP + PANEL_PROFIT_COIN_X_OFFSET, maxCoinX);
     profitCoin.y = PANEL_BOT_H - PANEL_PROFIT_BOT_OFFSET;
     profitCard.addChild(profitCoin);
     panelLayer.addChild(profitCard);
+    document.fonts.ready.then(() => {
+      // Mark text dirty so Pixi re-renders with loaded fonts
+      balText.text = balText.text;
+      profitText.text = profitText.text;
+      profitLbl.text = profitLbl.text;
+      // Frame 1: Pixi renders text with correct font
+      // Frame 2: widths are now accurate — reposition
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        // Re-measure balance text with correct font and reposition coin
+        balText.text = balText.text;
+        const maxBalW = midW - PANEL_BAL_AMT_RIGHT - PANEL_COIN_SIZE - 8;
+        if (balText.width > maxBalW) {
+          balText.scale.x = maxBalW / balText.width;
+        } else {
+          balText.scale.x = 1;
+        }
+        balCoin.x = PANEL_BAL_AMT_RIGHT + balText.width + PANEL_COIN_SIZE / 2 + 4;
+        profitCoin.x = Math.min(profitText.x + profitText.width / 2 + PANEL_PROFIT_COIN_GAP + PANEL_PROFIT_COIN_X_OFFSET, maxCoinX);
+        multText.x = profitLbl.x + profitLbl.width + PANEL_PROFIT_MULT_GAP;
+      }));
+    });
 
     // ── Play Button (centered in gap between rows 2 & 3) ──────
     const playX = CW / 2;
@@ -2112,7 +2148,7 @@ export function usePixiGame(
     panelLayer.addChild(playCoin);
 
     // Cash-out amount text (hidden by default)
-    const playAmtText = new PIXI.Text({ text: '', style: { fontFamily: 'Rajdhani', fontSize: PLAY_AMT_FONT, fill: 0x1c2e00, fontWeight: '800' } });
+    const playAmtText = new PIXI.Text({ text: '', style: { fontFamily: 'Poppins', fontSize: PLAY_AMT_FONT, fill: 0x1c2e00, fontWeight: '800' } });
     playAmtText.anchor.set(0.5); playAmtText.x = playX; playAmtText.y = playY + 14;
     playAmtText.visible = false;
     panelLayer.addChild(playAmtText);
@@ -2207,6 +2243,7 @@ export function usePixiGame(
       betText: betText,
       diffText: diffText,
       multText: multText,
+      profitLbl: profitLbl,
       profitText: profitText,
       profitCoin: profitCoin,
       playCircle: playCircle,
@@ -2217,6 +2254,7 @@ export function usePixiGame(
       diffHit: diffHit,
       diffCard: diffCard,
       profitCardW: botSideW,
+      balanceCardW: midW,
     };
   }, []);
 
@@ -2233,10 +2271,40 @@ export function usePixiGame(
     const t = panelTextsRef.current;
     const fmt = (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    if (t.balanceText) {
-      t.balanceText.text = fmt(state.balance);
-      // Reposition coin after amount text
-      if (t.balanceCoin) t.balanceCoin.x = t.balanceText.x + t.balanceText.width + PANEL_COIN_GAP;
+     if (t.balanceText) {
+      const maxBalW = (t.balanceCardW || 244) - PANEL_BAL_AMT_RIGHT - PANEL_COIN_SIZE - PANEL_COIN_GAP - 8;
+      t.balanceText.style = new PIXI.TextStyle({
+        fontFamily: 'Poppins',
+        fontSize: PANEL_AMT_FONT,
+        fill: PANEL_GOLD_COLOR,
+        fontWeight: '700',
+      });
+      t.balanceText.text = state.balance.toFixed(2);
+      t.balanceText.scale.x = 1;
+      const applyBalScale = () => {
+        if (!t.balanceText) return;
+        t.balanceText.text = t.balanceText.text;
+        const actualWidth = t.balanceText.width;
+        if (actualWidth > maxBalW) {
+          t.balanceText.scale.x = maxBalW / actualWidth;
+        } else {
+          t.balanceText.scale.x = 1;
+        }
+        if (t.balanceCoin) {
+          t.balanceCoin.x =
+            t.balanceText.x +
+            t.balanceText.width * t.balanceText.scale.x +
+            PANEL_COIN_SIZE / 2 + 4;
+        }
+      };
+      if (poppinsLoadedRef.current) {
+        applyBalScale();
+      } else {
+        document.fonts.load(`700 ${PANEL_AMT_FONT}px Poppins`).then(() => {
+          poppinsLoadedRef.current = true;
+          requestAnimationFrame(applyBalScale);
+        });
+      }
     }
 
     // Keep hidden input in sync
@@ -2265,12 +2333,44 @@ export function usePixiGame(
       t.betText.text = formatted;
     }
     if (t.diffText) t.diffText.text = state.diff;
-    if (t.multText) t.multText.text = `(${state.curMult.toFixed(2)}×)`;
+    if (t.multText) {
+      t.multText.text = `(${state.curMult.toFixed(2)}×)`;
+      if (t.profitLbl) t.multText.x = t.profitLbl.x + t.profitLbl.width + PANEL_PROFIT_MULT_GAP;
+    }
     if (t.profitText) {
+      const maxProfitW = (t.profitCardW || 192) - PANEL_PROFIT_INNER_PX * 2;
+      t.profitText.style = new PIXI.TextStyle({
+        fontFamily: 'Poppins',
+        fontSize: PANEL_PROFIT_AMT_FONT,
+        fill: PANEL_GOLD_COLOR,
+        fontWeight: '700',
+      });
       t.profitText.text = state.curWin.toFixed(2);
-      if (t.profitCoin) {
-        const maxX = (t.profitCardW || 192) - PANEL_COIN_SIZE / 2 - 6;
-        t.profitCoin.x = Math.min(t.profitText.x + t.profitText.width / 2 + PANEL_PROFIT_COIN_GAP, maxX);
+      t.profitText.scale.x = 1;
+      const applyProfitScale = () => {
+        if (!t.profitText) return;
+        t.profitText.text = t.profitText.text;
+        const actualWidth = t.profitText.width;
+        if (actualWidth > maxProfitW) {
+          t.profitText.scale.x = maxProfitW / actualWidth;
+        } else {
+          t.profitText.scale.x = 1;
+        }
+        if (t.profitCoin) {
+          const maxX = (t.profitCardW || 192) - PANEL_COIN_SIZE / 2 - 6;
+          t.profitCoin.x = Math.min(
+            t.profitText.x + t.profitText.width * t.profitText.scale.x / 2 + PANEL_PROFIT_COIN_GAP + PANEL_PROFIT_COIN_X_OFFSET,
+            maxX
+          );
+        }
+      };
+      if (poppinsLoadedRef.current) {
+        applyProfitScale();
+      } else {
+        document.fonts.load(`700 ${PANEL_PROFIT_AMT_FONT}px Poppins`).then(() => {
+          poppinsLoadedRef.current = true;
+          requestAnimationFrame(applyProfitScale);
+        });
       }
     }
 
