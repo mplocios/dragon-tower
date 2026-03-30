@@ -22,14 +22,14 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, PAD_MOBILE, TGAP, RGAP, WALL_H, DIFF, 
   PANEL_LBL_FONT, PANEL_AMT_FONT, PANEL_INNER_PX, PANEL_CARD_RADIUS, PANEL_CARD_BG,
   PANEL_DIFF_RIGHT, PANEL_BAL_AMT_X, PANEL_COIN_SIZE, PANEL_COIN_GAP, PANEL_BAL_COIN_X_OFFSET, PANEL_PROFIT_COIN_X_OFFSET, PANEL_BAL_AMT_RIGHT,
   PANEL_BET_COIN_SIZE, PANEL_BET_COIN_X, PANEL_BET_AMT_X, PANEL_BET_AMT_FONT,
-  PANEL_BET_LBL_Y, PANEL_BET_BOT_OFFSET,
+  PANEL_BET_LBL_Y, PANEL_BET_BOT_OFFSET, PANEL_BET_WARN_FONT, PANEL_BET_WARN_X, PANEL_BET_WARN_Y,
   PANEL_ARROW_UP_W, PANEL_ARROW_UP_H, PANEL_ARROW_DOWN_W, PANEL_ARROW_DOWN_H, PANEL_ARROW_RIGHT, PANEL_ARROW_UP_Y, PANEL_ARROW_DOWN_Y,
-  PANEL_PROFIT_LBL_Y, PANEL_PROFIT_MULT_GAP, PANEL_PROFIT_AMT_FONT, PANEL_PROFIT_BOT_OFFSET, PANEL_PROFIT_COIN_GAP,
+  PANEL_PROFIT_LBL_Y, PANEL_PROFIT_LBL_SPACING, PANEL_PROFIT_MULT_RIGHT, PANEL_PROFIT_MULT_GAP, PANEL_PROFIT_AMT_FONT, PANEL_PROFIT_BOT_OFFSET, PANEL_PROFIT_COIN_GAP,
 PANEL_RANDOM_INNER_PX, PANEL_PROFIT_INNER_PX,
   MIN_BET, MAX_BET,
   RESULT_CARD_W, RESULT_CARD_H, RESULT_CARD_RADIUS, RESULT_MULT_FONT_SIZE, RESULT_AMT_FONT_SIZE,
   RESULT_COIN_SIZE, RESULT_DIVIDER_INSET, RESULT_DIVIDER_Y, RESULT_MULT_Y, RESULT_AMT_GAP,
-  RESULT_POP_SPEED, RESULT_AUTO_DISMISS_MS,
+  RESULT_Y_OFFSET, RESULT_POP_SPEED, RESULT_AUTO_DISMISS_MS,
 } from '../constants';
 
 interface TileObj {
@@ -191,7 +191,9 @@ export function usePixiGame(
         g.roundRect(0, 0, w, h, R).stroke({ width: 2, color: 0x222222, alpha: 0.9 });
       }
     } else if (state === 'pattern') {
-      g.roundRect(-2, -2, w + 4, h + 4, R + 2).fill({ color: 0x8833cc, alpha: 0.12 });
+      g.roundRect(-4, -4, w + 8, h + 8, R + 4).fill({ color: 0xaa44ff, alpha: 0.10 });
+      g.roundRect(-2, -2, w + 4, h + 4, R + 2).fill({ color: 0x8833cc, alpha: 0.18 });
+      g.roundRect(0, 0, w, h, R).stroke({ width: 1.5, color: 0xaa55ff, alpha: 0.35 });
       setTileSprite(ts, TEX.tile_purple ?? null, w, h);
       if (ttex) ttex.alpha = 0;
     } else if (state === 'dragon') {
@@ -785,7 +787,7 @@ export function usePixiGame(
     const cardW = RESULT_CARD_W;
     const cardH = RESULT_CARD_H;
     const cardX = (CW - cardW) / 2;
-    const cardY = (CH - cardH) / 2;
+    const cardY = (CH - cardH) / 2 + RESULT_Y_OFFSET;
 
     const bgTex = type === 'win' ? TEX.result_bg_win : TEX.result_bg_lose;
     if (bgTex) {
@@ -813,7 +815,7 @@ export function usePixiGame(
     container.addChild(div);
 
     const amtText = new PIXI.Text({
-      text: `${type === 'lose' ? '0.00000000' : amount.toLocaleString('en-US', { minimumFractionDigits: 8, maximumFractionDigits: 8 })}`,
+      text: `${type === 'lose' ? '0.00' : amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       style: { fontFamily: 'Poppins', fontSize: RESULT_AMT_FONT_SIZE, fontWeight: '600', fill: 0xb0b8c4 },
     });
     amtText.anchor.set(0.5, 0);
@@ -1615,6 +1617,24 @@ export function usePixiGame(
           }
         }
 
+        // ── Purple pattern tile subtle glow ─────────────────────
+        if (animEnabled && autoTabActiveRef.current) {
+          const pattern = useGameStore.getState().autoPattern;
+          const tileObjs = tileObjsRef.current;
+          const purplePulse = 0.92 + 0.08 * Math.sin(frameRef.current * 0.03);
+          for (let r = 0; r < tileObjs.length; r++) {
+            const row = tileObjs[r];
+            if (!row) continue;
+            const patCol = pattern[r];
+            if (patCol == null) continue;
+            const tile = row[patCol];
+            if (!tile) continue;
+            const rv = (st.revealed[r] ?? {} as Record<number, string>)[patCol];
+            if (rv) continue;
+            tile.root.alpha = purplePulse;
+          }
+        }
+
         // ── Dragon breathing animation + glow sync ────────────────
         if (animEnabled) {
           const breathVal = Math.sin(frameRef.current * DRAGON_BREATH_FREQ);
@@ -1769,109 +1789,12 @@ export function usePixiGame(
     const px = PANEL_PX;
     const contentW = pw - px * 2;
     const DIFF_OPTS: Difficulty[] = ['Easy', 'Medium', 'Hard', 'Expert', 'Master'];
-    const lblStyle = { fontFamily: 'Poppins', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' as const };
-    const amtStyle = { fontFamily: 'Poppins', fontSize: PANEL_AMT_FONT, fill: PANEL_GOLD_COLOR, fontWeight: '700' as const };
+    const lblStyle = { fontFamily: 'Inter', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' as const };
+    const amtStyle = { fontFamily: 'Inter', fontSize: PANEL_AMT_FONT, fill: PANEL_GOLD_COLOR, fontWeight: '700' as const };
 
     let yy = PANEL_PY + PANEL_TAB_Y_OFFSET;
 
-    // ── Row 0: Manual / Auto tabs ──────────────────────────────
-    const tabCard = new PIXI.Container();
-    const tabW = PANEL_TAB_W > 0 ? PANEL_TAB_W : contentW;
-    const tabX = PANEL_TAB_W > 0 ? (CW - PANEL_TAB_W) / 2 : px;
-    tabCard.x = tabX; tabCard.y = yy;
-    if (TEX.dif_bg) {
-      const bg = new PIXI.Sprite(TEX.dif_bg);
-      bg.width = tabW; bg.height = PANEL_TAB_H;
-      tabCard.addChild(bg);
-    } else {
-      const bg = new PIXI.Graphics();
-      bg.roundRect(0, 0, tabW, PANEL_TAB_H, PANEL_CARD_RADIUS).fill({ color: PANEL_CARD_BG, alpha: 0.9 });
-      tabCard.addChild(bg);
-    }
-
-    // Active tab highlight (left half = Manual)
-    const tabHighlight = new PIXI.Graphics();
-    tabHighlight.roundRect(4, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
-    tabCard.addChild(tabHighlight);
-
-    const manualLbl = new PIXI.Text({ text: 'Manual', style: { fontFamily: 'Poppins', fontSize: 15, fill: 0xffffff, fontWeight: '700' } });
-    manualLbl.anchor.set(0.5); manualLbl.x = tabW / 4; manualLbl.y = PANEL_TAB_H / 2;
-    tabCard.addChild(manualLbl);
-
-    const autoLbl = new PIXI.Text({ text: 'Auto', style: { fontFamily: 'Poppins', fontSize: 15, fill: 0x8899aa, fontWeight: '700' } });
-    autoLbl.anchor.set(0.5); autoLbl.x = tabW * 3 / 4; autoLbl.y = PANEL_TAB_H / 2;
-    tabCard.addChild(autoLbl);
-
-    // Tab hit areas
-    const manualHit = new PIXI.Graphics();
-    manualHit.rect(0, 0, tabW / 2, PANEL_TAB_H).fill({ color: 0x000000, alpha: 0.001 });
-    manualHit.eventMode = 'static'; manualHit.cursor = 'pointer';
-    manualHit.on('pointerdown', () => {
-      tabHighlight.clear();
-      tabHighlight.roundRect(4, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
-      manualLbl.style.fill = 0xffffff;
-      autoLbl.style.fill = 0x8899aa;
-    });
-    tabCard.addChild(manualHit);
-
-    const autoHit = new PIXI.Graphics();
-    autoHit.rect(tabW / 2, 0, tabW / 2, PANEL_TAB_H).fill({ color: 0x000000, alpha: 0.001 });
-    autoHit.eventMode = 'static'; autoHit.cursor = 'pointer';
-    autoHit.on('pointerdown', () => {
-      tabHighlight.clear();
-      tabHighlight.roundRect(tabW / 2, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
-      manualLbl.style.fill = 0x8899aa;
-      autoLbl.style.fill = 0xffffff;
-    });
-    tabCard.addChild(autoHit);
-
-    panelLayer.addChild(tabCard);
-    yy += PANEL_TAB_H + PANEL_ROW_GAP;
-
-    // ── Row 1: Difficulty ──────────────────────────────────────
-    const diffCard = new PIXI.Container();
-    diffCard.x = px; diffCard.y = yy;
-    if (TEX.dif_bg) {
-      const bg = new PIXI.Sprite(TEX.dif_bg);
-      bg.width = contentW; bg.height = PANEL_DIFF_H;
-      diffCard.addChild(bg);
-    } else {
-      const bg = new PIXI.Graphics();
-      bg.roundRect(0, 0, contentW, PANEL_DIFF_H, PANEL_CARD_RADIUS).fill({ color: PANEL_CARD_BG, alpha: 0.9 });
-      diffCard.addChild(bg);
-    }
-    const diffLbl = new PIXI.Text({ text: 'DIFFICULTY', style: { ...lblStyle, letterSpacing: 2 } });
-    diffLbl.x = PANEL_INNER_PX; diffLbl.y = PANEL_DIFF_H / 2; diffLbl.anchor.set(0, 0.5);
-    diffCard.addChild(diffLbl);
-
-    // Diff value + dropdown arrow "Medium ▼"
-    const diffText = new PIXI.Text({ text: 'Medium', style: { fontFamily: 'Poppins', fontSize: PANEL_AMT_FONT, fill: 0xffffff, fontWeight: '700' } });
-    const diffArrow = new PIXI.Text({ text: ' ▼', style: { fontFamily: 'Poppins', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' } });
-    diffText.anchor.set(1, 0.5); diffText.x = contentW - PANEL_DIFF_RIGHT; diffText.y = PANEL_DIFF_H / 2;
-    diffArrow.anchor.set(0, 0.5); diffArrow.x = contentW - PANEL_DIFF_RIGHT + 2; diffArrow.y = PANEL_DIFF_H / 2;
-    diffCard.addChild(diffText); diffCard.addChild(diffArrow);
-
-    // Tap to cycle difficulty
-    const diffHit = new PIXI.Container();
-    const diffHitBg = new PIXI.Graphics();
-    diffHitBg.rect(0, 0, contentW, PANEL_DIFF_H).fill({ color: 0x000000, alpha: 0.001 });
-    diffHit.addChild(diffHitBg);
-    diffHit.eventMode = 'static'; diffHit.cursor = 'pointer';
-    let diffCooldown = false;
-    diffHit.on('pointerdown', () => {
-      if (diffCooldown || panelCooldownRef.current) return;
-      diffCooldown = true;
-      const cur = diffText.text as Difficulty;
-      const idx = DIFF_OPTS.indexOf(cur);
-      const next = DIFF_OPTS[(idx + 1) % DIFF_OPTS.length];
-      onDiffChangeRef.current?.(next);
-      setTimeout(() => { diffCooldown = false; }, 300);
-    });
-    diffCard.addChild(diffHit);
-    panelLayer.addChild(diffCard);
-    yy += PANEL_DIFF_H + PANEL_ROW_GAP;
-
-    // ── Row 2: Balance | [gap for play btn] | Random Pick ─────
+    // ── Row 0: Balance | Random Pick ───────────────────────────
     const midW = (contentW - PANEL_MID_GAP) / 2;
 
     // Balance card — "BALANCE  0.00  (coin)" all on one row
@@ -1920,20 +1843,28 @@ export function usePixiGame(
       bg.roundRect(0, 0, midW, PANEL_MID_H, PANEL_CARD_RADIUS).fill({ color: PANEL_CARD_BG, alpha: 0.9 });
       rndCard.addChild(bg);
     }
-    const rndLbl = new PIXI.Text({ text: 'RANDOM PICK', style: { ...lblStyle, letterSpacing: 1.5 } });
-    rndLbl.x = PANEL_RANDOM_INNER_PX; rndLbl.y = PANEL_MID_H / 2; rndLbl.anchor.set(0, 0.5);
+    const rndLbl = new PIXI.Text({ text: 'CASHOUT', style: { ...lblStyle, letterSpacing: 1.5 } });
+    rndLbl.anchor.set(0.5, 0.5);
+    rndLbl.x = midW / 2; rndLbl.y = PANEL_MID_H / 2;
+    rndLbl.visible = false; // hidden before play, shows "CASHOUT" during play
     rndCard.addChild(rndLbl);
     const randomBtn = new PIXI.Container();
     const rndHitBg = new PIXI.Graphics();
     rndHitBg.rect(0, 0, midW, PANEL_MID_H).fill({ color: 0x000000, alpha: 0.001 });
     randomBtn.addChild(rndHitBg);
     randomBtn.eventMode = 'static'; randomBtn.cursor = 'pointer';
-    randomBtn.on('pointerdown', () => { onRandomRef.current?.(); });
+    randomBtn.on('pointerdown', () => {
+      const gs = useGameStore.getState();
+      if (gs.gstate === 'playing') {
+        // During play, this card is the cashout button
+        onPlayActionRef.current?.();
+      }
+    });
     rndCard.addChild(randomBtn);
     panelLayer.addChild(rndCard);
     yy += PANEL_MID_H + PANEL_ROW_GAP;
 
-    // ── Row 3: Bet | Play Button | Total Profit ───────────────
+    // ── Row 1: Bet | Total Profit ──────────────────────────────
     // Bottom row card width based on PANEL_BOT_GAP
     const botSideW = (contentW - PANEL_BOT_GAP) / 2;
 
@@ -1991,8 +1922,8 @@ export function usePixiGame(
     };
 
     // Insufficient funds warning text (hidden by default)
-    const insuffText = new PIXI.Text({ text: 'Insufficient funds', style: { fontFamily: 'Poppins', fontSize: 11, fill: 0xff4444, fontWeight: '700' } });
-    insuffText.anchor.set(0.5, 0); insuffText.x = botSideW / 2; insuffText.y = PANEL_BOT_H + 2;
+    const insuffText = new PIXI.Text({ text: 'Insufficient funds', style: { fontFamily: 'Poppins', fontSize: PANEL_BET_WARN_FONT, fill: 0xff4444, fontWeight: '700' } });
+    insuffText.anchor.set(0, 1); insuffText.x = PANEL_BET_WARN_X; insuffText.y = PANEL_BOT_H - PANEL_BET_WARN_Y;
     insuffText.visible = false;
     betCard.addChild(insuffText);
 
@@ -2007,7 +1938,7 @@ export function usePixiGame(
       if (newBet > MAX_BET) {
         const clamped = Math.min(MAX_BET, bal);
         if (cur >= clamped) {
-          insuffText.text = 'Already at max bet!';
+          insuffText.text = 'Max bet is ' + MAX_BET.toFixed(2) + '!';
           insuffText.visible = true;
           setTimeout(() => { insuffText.visible = false; }, 2000);
           return;
@@ -2030,13 +1961,14 @@ export function usePixiGame(
 
     const downArrow = makeArrowBtn(PANEL_ARROW_DOWN_Y, '▼', PANEL_ARROW_DOWN_W, PANEL_ARROW_DOWN_H, () => {
       const cur = parseFmt(betText.text);
-      const newBet = parseFloat((cur * 0.5).toFixed(2));
-      if (newBet < MIN_BET) {
+      if (cur <= MIN_BET) {
         insuffText.text = 'Min bet is ' + MIN_BET.toFixed(2) + '!';
         insuffText.visible = true;
         setTimeout(() => { insuffText.visible = false; }, 2000);
         return;
       }
+      const halved = parseFloat((cur * 0.5).toFixed(2));
+      const newBet = Math.max(halved, MIN_BET);
       onBetChangeRef.current?.(newBet);
     });
     betCard.addChild(downArrow);
@@ -2055,13 +1987,13 @@ export function usePixiGame(
       bg.roundRect(0, 0, botSideW, PANEL_BOT_H, PANEL_CARD_RADIUS).fill({ color: PANEL_CARD_BG, alpha: 0.9 });
       profitCard.addChild(bg);
     }
-    // "TOTAL PROFIT (1.00×)" left-aligned on one line
-    const profitLbl = new PIXI.Text({ text: 'TOTAL PROFIT', style: { ...lblStyle, letterSpacing: 1.5 } });
+    // "Total Profit (1.00×)" left-aligned on one line
+    const profitLbl = new PIXI.Text({ text: 'Total Profit', style: { ...lblStyle, letterSpacing: PANEL_PROFIT_LBL_SPACING } });
     profitLbl.x = PANEL_PROFIT_INNER_PX; profitLbl.y = PANEL_PROFIT_LBL_Y;
     profitCard.addChild(profitLbl);
 
     const multText = new PIXI.Text({ text: '(1.00×)', style: { fontFamily: 'Poppins', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' } });
-    multText.x = profitLbl.x + profitLbl.width + PANEL_PROFIT_MULT_GAP; multText.y = PANEL_PROFIT_LBL_Y;
+    multText.anchor.set(1, 0); multText.x = botSideW - PANEL_PROFIT_MULT_RIGHT; multText.y = PANEL_PROFIT_LBL_Y;
     profitCard.addChild(multText);
 
     // Amount + coin left-aligned on bottom row
@@ -2075,15 +2007,107 @@ export function usePixiGame(
     profitCoin.y = PANEL_BOT_H - PANEL_PROFIT_BOT_OFFSET;
     profitCard.addChild(profitCoin);
     panelLayer.addChild(profitCard);
+    // Save yy for play button positioning (between Balance/Random & Bet/Profit)
+    const playBtnYY = yy;
+    yy += PANEL_BOT_H + PANEL_ROW_GAP;
+
+    // ── Row 2: Difficulty ──────────────────────────────────────
+    const diffCard = new PIXI.Container();
+    diffCard.x = px; diffCard.y = yy;
+    if (TEX.dif_bg) {
+      const bg = new PIXI.Sprite(TEX.dif_bg);
+      bg.width = contentW; bg.height = PANEL_DIFF_H;
+      diffCard.addChild(bg);
+    } else {
+      const bg = new PIXI.Graphics();
+      bg.roundRect(0, 0, contentW, PANEL_DIFF_H, PANEL_CARD_RADIUS).fill({ color: PANEL_CARD_BG, alpha: 0.9 });
+      diffCard.addChild(bg);
+    }
+    const diffLbl = new PIXI.Text({ text: 'DIFFICULTY', style: { ...lblStyle, letterSpacing: 2 } });
+    diffLbl.x = PANEL_INNER_PX; diffLbl.y = PANEL_DIFF_H / 2; diffLbl.anchor.set(0, 0.5);
+    diffCard.addChild(diffLbl);
+
+    const diffText = new PIXI.Text({ text: 'Medium', style: { fontFamily: 'Poppins', fontSize: PANEL_AMT_FONT, fill: 0xffffff, fontWeight: '700' } });
+    const diffArrow = new PIXI.Text({ text: ' ▼', style: { fontFamily: 'Poppins', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' } });
+    diffText.anchor.set(1, 0.5); diffText.x = contentW - PANEL_DIFF_RIGHT; diffText.y = PANEL_DIFF_H / 2;
+    diffArrow.anchor.set(0, 0.5); diffArrow.x = contentW - PANEL_DIFF_RIGHT + 2; diffArrow.y = PANEL_DIFF_H / 2;
+    diffCard.addChild(diffText); diffCard.addChild(diffArrow);
+
+    const diffHit = new PIXI.Container();
+    const diffHitBg = new PIXI.Graphics();
+    diffHitBg.rect(0, 0, contentW, PANEL_DIFF_H).fill({ color: 0x000000, alpha: 0.001 });
+    diffHit.addChild(diffHitBg);
+    diffHit.eventMode = 'static'; diffHit.cursor = 'pointer';
+    let diffCooldown = false;
+    diffHit.on('pointerdown', () => {
+      if (diffCooldown || panelCooldownRef.current) return;
+      diffCooldown = true;
+      const cur = diffText.text as Difficulty;
+      const idx = DIFF_OPTS.indexOf(cur);
+      const next = DIFF_OPTS[(idx + 1) % DIFF_OPTS.length];
+      onDiffChangeRef.current?.(next);
+      setTimeout(() => { diffCooldown = false; }, 300);
+    });
+    diffCard.addChild(diffHit);
+    panelLayer.addChild(diffCard);
+    yy += PANEL_DIFF_H + PANEL_ROW_GAP;
+
+    // ── Row 3: Manual / Auto tabs ──────────────────────────────
+    const tabCard = new PIXI.Container();
+    const tabW = PANEL_TAB_W > 0 ? PANEL_TAB_W : contentW;
+    const tabX = PANEL_TAB_W > 0 ? (CW - PANEL_TAB_W) / 2 : px;
+    tabCard.x = tabX; tabCard.y = yy;
+    if (TEX.dif_bg) {
+      const bg = new PIXI.Sprite(TEX.dif_bg);
+      bg.width = tabW; bg.height = PANEL_TAB_H;
+      tabCard.addChild(bg);
+    } else {
+      const bg = new PIXI.Graphics();
+      bg.roundRect(0, 0, tabW, PANEL_TAB_H, PANEL_CARD_RADIUS).fill({ color: PANEL_CARD_BG, alpha: 0.9 });
+      tabCard.addChild(bg);
+    }
+
+    const tabHighlight = new PIXI.Graphics();
+    tabHighlight.roundRect(4, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+    tabCard.addChild(tabHighlight);
+
+    const manualLbl = new PIXI.Text({ text: 'Manual', style: { fontFamily: 'Poppins', fontSize: 15, fill: 0xffffff, fontWeight: '700' } });
+    manualLbl.anchor.set(0.5); manualLbl.x = tabW / 4; manualLbl.y = PANEL_TAB_H / 2;
+    tabCard.addChild(manualLbl);
+
+    const autoLbl = new PIXI.Text({ text: 'Auto', style: { fontFamily: 'Poppins', fontSize: 15, fill: 0x8899aa, fontWeight: '700' } });
+    autoLbl.anchor.set(0.5); autoLbl.x = tabW * 3 / 4; autoLbl.y = PANEL_TAB_H / 2;
+    tabCard.addChild(autoLbl);
+
+    const manualHit = new PIXI.Graphics();
+    manualHit.rect(0, 0, tabW / 2, PANEL_TAB_H).fill({ color: 0x000000, alpha: 0.001 });
+    manualHit.eventMode = 'static'; manualHit.cursor = 'pointer';
+    manualHit.on('pointerdown', () => {
+      tabHighlight.clear();
+      tabHighlight.roundRect(4, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+      manualLbl.style.fill = 0xffffff;
+      autoLbl.style.fill = 0x8899aa;
+    });
+    tabCard.addChild(manualHit);
+
+    const autoHit = new PIXI.Graphics();
+    autoHit.rect(tabW / 2, 0, tabW / 2, PANEL_TAB_H).fill({ color: 0x000000, alpha: 0.001 });
+    autoHit.eventMode = 'static'; autoHit.cursor = 'pointer';
+    autoHit.on('pointerdown', () => {
+      tabHighlight.clear();
+      tabHighlight.roundRect(tabW / 2, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+      manualLbl.style.fill = 0x8899aa;
+      autoLbl.style.fill = 0xffffff;
+    });
+    tabCard.addChild(autoHit);
+
+    panelLayer.addChild(tabCard);
+
     document.fonts.ready.then(() => {
-      // Mark text dirty so Pixi re-renders with loaded fonts
       balText.text = balText.text;
       profitText.text = profitText.text;
       profitLbl.text = profitLbl.text;
-      // Frame 1: Pixi renders text with correct font
-      // Frame 2: widths are now accurate — reposition
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        // Re-measure balance text with correct font and reposition coin
         balText.text = balText.text;
         const maxBalW = midW - PANEL_BAL_AMT_RIGHT - PANEL_COIN_SIZE - 8;
         if (balText.width > maxBalW) {
@@ -2093,13 +2117,13 @@ export function usePixiGame(
         }
         balCoin.x = PANEL_BAL_AMT_RIGHT + balText.width + PANEL_COIN_SIZE / 2 + 4;
         profitCoin.x = Math.min(profitText.x + profitText.width / 2 + PANEL_PROFIT_COIN_GAP + PANEL_PROFIT_COIN_X_OFFSET, maxCoinX);
-        multText.x = profitLbl.x + profitLbl.width + PANEL_PROFIT_MULT_GAP;
+        multText.x = botSideW - PANEL_PROFIT_MULT_RIGHT;
       }));
     });
 
-    // ── Play Button (centered in gap between rows 2 & 3) ──────
+    // ── Play Button (centered in gap between Balance/Random & Bet/Profit rows) ──────
     const playX = CW / 2;
-    const playY = yy - PANEL_ROW_GAP / 2 + PLAY_BTN_Y_OFFSET;
+    const playY = playBtnYY - PANEL_ROW_GAP / 2 + PLAY_BTN_Y_OFFSET;
     let playCircle: PIXI.Sprite | PIXI.Graphics;
     if (TEX.play_btn) {
       playCircle = new PIXI.Sprite(TEX.play_btn);
@@ -2117,7 +2141,13 @@ export function usePixiGame(
     playCircle.eventMode = 'static'; playCircle.cursor = 'pointer';
     playCircle.on('pointerdown', () => {
       if (panelCooldownRef.current) return;
-      onPlayActionRef.current?.();
+      const gs = useGameStore.getState();
+      if (gs.gstate === 'playing') {
+        // During play, play button triggers random pick
+        onRandomRef.current?.();
+      } else {
+        onPlayActionRef.current?.();
+      }
     });
     panelLayer.addChild(playCircle);
 
@@ -2161,11 +2191,17 @@ export function usePixiGame(
 
       mobileBetInput.addEventListener('input', () => {
         const raw = mobileBetInput.value;
-        const parsed = parseFloat(raw);
+        // Block more than 2 decimal places
+        const dotIdx = raw.indexOf('.');
+        if (dotIdx !== -1 && raw.length - dotIdx - 1 > 2) {
+          mobileBetInput.value = raw.slice(0, dotIdx + 3);
+        }
+        const parsed = parseFloat(mobileBetInput.value);
         if (!isNaN(parsed) && parsed >= MIN_BET && parsed <= MAX_BET) {
+          const rounded = parseFloat(parsed.toFixed(2));
           const bal = useGameStore.getState().balance;
-          if (parsed <= bal) {
-            onBetChangeRef.current?.(parsed);
+          if (rounded <= bal) {
+            onBetChangeRef.current?.(rounded);
           }
         }
       });
@@ -2251,6 +2287,7 @@ export function usePixiGame(
       playCoin: playCoin,
       playAmtText: playAmtText,
       randomBtn: randomBtn,
+      rndLbl: rndLbl,
       diffHit: diffHit,
       diffCard: diffCard,
       profitCardW: botSideW,
@@ -2269,7 +2306,6 @@ export function usePixiGame(
 
   const updateMobilePanel = useCallback((state: PanelState) => {
     const t = panelTextsRef.current;
-    const fmt = (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
      if (t.balanceText) {
       const maxBalW = (t.balanceCardW || 244) - PANEL_BAL_AMT_RIGHT - PANEL_COIN_SIZE - PANEL_COIN_GAP - 8;
@@ -2335,7 +2371,7 @@ export function usePixiGame(
     if (t.diffText) t.diffText.text = state.diff;
     if (t.multText) {
       t.multText.text = `(${state.curMult.toFixed(2)}×)`;
-      if (t.profitLbl) t.multText.x = t.profitLbl.x + t.profitLbl.width + PANEL_PROFIT_MULT_GAP;
+      if (t.profitCardW) t.multText.x = t.profitCardW - PANEL_PROFIT_MULT_RIGHT;
     }
     if (t.profitText) {
       const maxProfitW = (t.profitCardW || 192) - PANEL_PROFIT_INNER_PX * 2;
@@ -2378,26 +2414,45 @@ export function usePixiGame(
     const canCash = playing && state.curMult > 1;
     const disabled = (playing && !canCash) || panelCooldownRef.current;
 
-    // Play button state
+    // Random Pick card: empty before play, "CASHOUT" during play
+    if (t.rndLbl) {
+      t.rndLbl.visible = playing;
+    }
+    if (t.randomBtn) {
+      t.randomBtn.alpha = playing ? 1 : 0.4;
+      t.randomBtn.eventMode = playing ? 'static' : 'none';
+    }
+
+    // Play button: play icon before play, "RANDOM PICK" during play
     const TEX = texRef.current;
     if (t.playCircle) {
-      t.playCircle.alpha = disabled ? 0.45 : 1;
-      // Swap play button texture for cashout state
-      if (t.playCircle instanceof PIXI.Sprite) {
-        if (canCash && TEX.play_btn_empty) {
+      if (playing) {
+        // During play: swap to empty button texture, full opacity
+        t.playCircle.alpha = 1;
+        if (t.playCircle instanceof PIXI.Sprite && TEX.play_btn_empty) {
           t.playCircle.texture = TEX.play_btn_empty;
-        } else if (TEX.play_btn) {
+        }
+      } else {
+        t.playCircle.alpha = disabled ? 0.45 : 1;
+        if (t.playCircle instanceof PIXI.Sprite && TEX.play_btn) {
           t.playCircle.texture = TEX.play_btn;
         }
       }
     }
     if (t.playTriangle && t.playCoin && t.playAmtText) {
-      if (canCash) {
+      if (playing) {
+        // During play: show "RANDOM PICK" on play button
         t.playTriangle.visible = false;
-        t.playCoin.visible = true;
+        t.playCoin.visible = false;
         t.playAmtText.visible = true;
-        t.playAmtText.text = fmt(state.curWin);
+        t.playAmtText.text = 'RANDOM\nPICK';
+        t.playAmtText.style.fill = 0xffffff;
+        t.playAmtText.style.fontSize = 15;
+        t.playAmtText.style.fontWeight = '800';
+        t.playAmtText.style.align = 'center';
+        t.playAmtText.y = (t.playCircle?.y ?? 0);
       } else {
+        // Idle: show play triangle
         t.playTriangle.visible = true;
         t.playCoin.visible = false;
         t.playAmtText.visible = false;
@@ -2408,7 +2463,6 @@ export function usePixiGame(
     if (t.downArrow) { t.downArrow.alpha = playing ? 0.35 : 1; t.downArrow.eventMode = playing ? 'none' : 'static'; }
     if (t.diffHit) { t.diffHit.eventMode = playing ? 'none' : 'static'; }
     if (t.diffCard) { t.diffCard.alpha = playing ? 0.45 : 1; }
-    if (t.randomBtn) t.randomBtn.alpha = playing ? 1 : 0.4;
   }, []);
 
   return {

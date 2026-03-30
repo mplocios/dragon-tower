@@ -348,6 +348,7 @@ const NumberInput: React.FC<{
   placeholder?: string;
   step?: number;
   min?: number;
+  max?: number;
   style?: React.CSSProperties;
   inputStyle?: React.CSSProperties;
 }> = ({
@@ -358,12 +359,15 @@ const NumberInput: React.FC<{
   placeholder,
   step = 1,
   min = 0,
+  max,
   style,
   inputStyle,
 }) => {
   const handleUp = () => {
     const parsed = parseFloat(value) || 0;
-    onChange((parsed + step).toFixed(2));
+    const next = parseFloat((parsed + step).toFixed(2));
+    if (max !== undefined && next > max) return;
+    onChange(next.toFixed(2));
   };
   const handleDown = () => {
     const parsed = parseFloat(value) || 0;
@@ -623,9 +627,13 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   value={betInputVal}
                   step={0.01}
                   min={MIN_BET}
+                  max={Math.min(MAX_BET, balance)}
                   disabled={playing || autoRunning}
                   inputStyle={{ fontSize: 15 }}
                   onChange={(raw) => {
+                    // Block more than 2 decimal places
+                    const dotIdx = raw.indexOf('.');
+                    if (dotIdx !== -1 && raw.length - dotIdx - 1 > 2) return;
                     setBetInputVal(raw);
                     const parsed = parseFloat(raw);
                     if (!isNaN(parsed) && parsed >= MIN_BET) {
@@ -829,9 +837,9 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             </button>
           ) : (
             <button
-              style={cooldown ? S.disabledBtn : S.betBtn}
+              style={cooldown || betExceedsBalance || betExceedsMax || betInvalid || bet < MIN_BET || bet > MAX_BET ? S.disabledBtn : S.betBtn}
               onClick={onStartGame}
-              disabled={cooldown}
+              disabled={cooldown || betExceedsBalance || betExceedsMax || betInvalid || bet < MIN_BET || bet > MAX_BET}
             >
               Bet
             </button>
@@ -904,9 +912,13 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   value={autoBetInputVal}
                   step={0.01}
                   min={MIN_BET}
+                  max={Math.min(MAX_BET, balance)}
                   disabled={autoRunning}
                   inputStyle={{ fontSize: 15 }}
                   onChange={(raw) => {
+                    // Block more than 2 decimal places
+                    const dotIdx = raw.indexOf('.');
+                    if (dotIdx !== -1 && raw.length - dotIdx - 1 > 2) return;
                     setAutoBetInputVal(raw);
                     const parsed = parseFloat(raw);
                     if (!isNaN(parsed) && parsed >= MIN_BET) {
@@ -1147,9 +1159,8 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                           onAutoSettingsChange({ autoCashoutRow: 0 });
                           return;
                         }
-                        if (!/^\d+$/.test(raw)) return;
-                        const parsed = parseInt(raw, 10);
-                        if (isNaN(parsed)) return;
+                        const parsed = parseInt(parseFloat(raw).toString(), 10);
+                        if (isNaN(parsed) || parsed < 0) return;
                         const clamped = Math.min(parsed, maxRow);
                         setAutoCashoutInput(String(clamped));
                         onAutoSettingsChange({ autoCashoutRow: clamped });
@@ -1216,9 +1227,9 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                     onAutoSettingsChange({ autoCount: 0 });
                     return;
                   }
-                  if (!/^\d+$/.test(raw)) return;
-                  const parsed = parseInt(raw, 10);
-                  if (isNaN(parsed)) return;
+                  // Accept integers or decimal strings from arrows (e.g. "1.00")
+                  const parsed = parseInt(parseFloat(raw).toString(), 10);
+                  if (isNaN(parsed) || parsed < 0) return;
                   setAutoCountInput(String(parsed));
                   onAutoSettingsChange({ autoCount: parsed });
                 }}

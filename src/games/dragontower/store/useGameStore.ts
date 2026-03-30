@@ -139,7 +139,7 @@ export const useGameStore = create<GameStore>()((set) => ({
   setTestMode: (v) => set({ testMode: v }),
   setMode: (v) => set({ mode: v }),
   setBalance: (v) => set({ balance: v }),
-  setBet: (v) => set({ bet: v }),
+  setBet: (v) => set({ bet: parseFloat(v.toFixed(2)) }),
   setDiff: (v) => set({ diff: v }),
   setGstate: (v) => set({ gstate: v }),
   setRgstate: (v) => set({ rgstate: v }),

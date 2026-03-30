@@ -216,7 +216,7 @@ export const PANEL_LBL_COLOR = 0x91a9b6;
 /** Amount text color */
 export const PANEL_GOLD_COLOR = 0xffffff;
 /** Label font size */
-export const PANEL_LBL_FONT = 13;
+export const PANEL_LBL_FONT = 12;
 /** Amount font size */
 export const PANEL_AMT_FONT = 16;
 
@@ -257,6 +257,12 @@ export const PANEL_BET_AMT_FONT = 18;
 export const PANEL_BET_LBL_Y = 12;
 /** Bet bottom row y offset from card bottom */
 export const PANEL_BET_BOT_OFFSET = 30;
+/** Bet warning text font size */
+export const PANEL_BET_WARN_FONT = 11;
+/** Bet warning text x position */
+export const PANEL_BET_WARN_X = 20;
+/** Bet warning text y offset from card bottom */
+export const PANEL_BET_WARN_Y = 4;
 /** Arrow up button width */
 export const PANEL_ARROW_UP_W = 40;
 /** Arrow up button height */
@@ -274,9 +280,13 @@ export const PANEL_ARROW_DOWN_Y = 36;
 
 // ─── Mobile Panel — Total Profit Card ───────────────────────────────
 /** Total Profit card text x offset */
-export const PANEL_PROFIT_INNER_PX = 38;
+export const PANEL_PROFIT_INNER_PX = 48;
 /** Profit label y position */
 export const PANEL_PROFIT_LBL_Y = 14;
+/** Profit label letter spacing */
+export const PANEL_PROFIT_LBL_SPACING = 0.5;
+/** Profit multiplier (1.00×) right margin from card edge */
+export const PANEL_PROFIT_MULT_RIGHT = 42;
 /** Profit multiplier gap after label */
 export const PANEL_PROFIT_MULT_GAP = 5;
 /** Profit amount font size */
@@ -290,7 +300,7 @@ export const PANEL_PROFIT_COIN_GAP = 10;
 /** Play button circle radius */
 export const PLAY_R = 57;
 /** Play button y-offset adjustment */
-export const PLAY_BTN_Y_OFFSET = 25;
+export const PLAY_BTN_Y_OFFSET = 28;
 /** Play button label font size */
 export const PLAY_LABEL_FONT = 14;
 /** Play button amount font size */
@@ -300,25 +310,28 @@ export const PLAY_COIN_SIZE = 22;
 
 // ─── Result Overlay ─────────────────────────────────────────────────
 /** Result card width */
-export const RESULT_CARD_W = 210;
+export const RESULT_CARD_W = 271;
 /** Result card height */
-export const RESULT_CARD_H = 190;
+export const RESULT_CARD_H = 249;
 /** Result card corner radius */
 export const RESULT_CARD_RADIUS = 14;
 /** Multiplier text font size on result card */
-export const RESULT_MULT_FONT_SIZE = 36;
+export const RESULT_MULT_FONT_SIZE = 42;
 /** Amount text font size on result card */
-export const RESULT_AMT_FONT_SIZE = 12;
+export const RESULT_AMT_FONT_SIZE = 17;
 /** Coin icon size on result card */
-export const RESULT_COIN_SIZE = 16;
+export const RESULT_COIN_SIZE = 22;
 /** Divider line horizontal inset from card edge (each side) */  // hr length  - lower = longer
-export const RESULT_DIVIDER_INSET = 80;
+export const RESULT_DIVIDER_INSET = 110;
 /** Divider line Y position as fraction of card height (0–1) */
 export const RESULT_DIVIDER_Y = 0.53;
 /** Multiplier text Y position as fraction of card height (0–1) */
 export const RESULT_MULT_Y = 0.38;
 /** Amount text gap below divider (px) */
-export const RESULT_AMT_GAP = 10;
+export const RESULT_AMT_GAP = 15;
+/** Pop-out animation speed */
+/** Result popup vertical offset (positive = down, negative = up) */
+export const RESULT_Y_OFFSET = 35;
 /** Pop-out animation speed */
 export const RESULT_POP_SPEED = 0.045;
 /** Auto-dismiss delay (ms) */
