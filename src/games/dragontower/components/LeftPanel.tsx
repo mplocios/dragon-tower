@@ -885,8 +885,8 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
           {/* Bet */}
           <div style={S.fieldWrapDisabled(autoRunning)}>
             <div style={S.rowBetween}>
-              <span style={S.lbl}>Bet Amount</span>
-              <span style={S.lblRight}>{fmt(auto.autoBet)}</span>
+              <span style={S.lbl}>Bet</span>
+              <span style={S.lblRight}>Balance: {fmt(balance)}</span>
             </div>
             <div style={S.betRow}>
               <div
@@ -1623,14 +1623,16 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
               (!autoRunning &&
                 (auto.autoBet < MIN_BET ||
                   autoBetExceedsBalance ||
-                  autoBetInvalid))
+                  autoBetInvalid ||
+                  !autoPattern.some((c) => c !== null)))
             }
             onClick={() => {
               if (
                 !autoRunning &&
                 (auto.autoBet < MIN_BET ||
                   autoBetExceedsBalance ||
-                  autoBetInvalid)
+                  autoBetInvalid ||
+                  !autoPattern.some((c) => c !== null))
               )
                 return;
               onAutoToggle();
@@ -1638,11 +1640,13 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             title={
               playing && !autoRunning
                 ? "Finish the current manual round first"
-                : !autoRunning && auto.autoBet < MIN_BET
-                  ? "Enter a valid bet amount to start autoplay"
-                  : autoRunning
-                    ? "Stops after current round resolves"
-                    : undefined
+                : !autoRunning && !autoPattern.some((c) => c !== null)
+                  ? "Select a pattern on the grid to start autoplay"
+                  : !autoRunning && auto.autoBet < MIN_BET
+                    ? "Enter a valid bet amount to start autoplay"
+                    : autoRunning
+                      ? "Stops after current round resolves"
+                      : undefined
             }
           >
             {autoRunning ? "⏹ Stop Autobet" : "▶ Start Autobet"}

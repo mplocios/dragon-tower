@@ -279,6 +279,13 @@ const DragonTower: React.FC = () => {
             gs().setGstate("ended");
             gs().setRgstate("endgame");
             gs().setAutoLastRoundWon(true);
+            if (gs().autoRunning) {
+              const roundProfit = parseFloat((newWin - s.bet).toFixed(2));
+              const newTotalProfit = parseFloat(
+                (gs().autoTotalProfit + roundProfit).toFixed(2),
+              );
+              gs().setAutoTotalProfit(newTotalProfit);
+            }
 
             const elapsed = Date.now() - s.gameStartTime;
             console.log("🏆 [GAME:WIN] All rows cleared", {
@@ -913,100 +920,6 @@ const DragonTower: React.FC = () => {
     }
   }, [pixiGame, revealUnselectedEggs, scheduleTimer]);
 
-  const autoPlayRows = useCallback(() => {
-    const s = gs();
-
-    if (!s.autoRunning || s.gstate !== "playing") {
-      if (!s.autoRunning) return;
-
-      const settings = s.auto;
-      const roundWon = s.autoLastRoundWon;
-
-      console.log(`${roundWon ? "✅" : "❌"} [AUTO:ROUND_END] Round finished`, {
-        gameId: s.gameId,
-        timestamp: new Date().toISOString(),
-        result: roundWon ? "win" : "lose",
-        totalProfit: gs().autoTotalProfit,
-        roundsLeft: gs().autoCount,
-        balance: gs().balance,
-        difficulty: settings.autoDiff,
-      });
-
-      // ── FIXED: Use autoInitialBetRef for resets, compound on current bet for increases ──
-      const currentBet = settings.autoBet;
-      const initialBet = autoInitialBetRef.current;
-      let newBet = currentBet;
-
-      if (settings.autoAdvanced) {
-        if (roundWon) {
-          if (settings.onWinMode === "increase" && settings.winInc > 0) {
-            newBet = parseFloat(
-              (currentBet * (1 + settings.winInc / 100)).toFixed(2),
-            );
-            newBet = Math.min(newBet, gs().balance);
-            if (newBet < MIN_BET) newBet = MIN_BET;
-          } else if (settings.onWinMode === "reset") {
-            newBet = initialBet;
-          }
-        } else {
-          if (settings.onLossMode === "increase" && settings.lossInc > 0) {
-            newBet = parseFloat(
-              (currentBet * (1 + settings.lossInc / 100)).toFixed(2),
-            );
-            newBet = Math.min(newBet, gs().balance);
-            if (newBet < MIN_BET) newBet = MIN_BET;
-          } else if (settings.onLossMode === "reset") {
-            newBet = initialBet;
-          }
-        }
-        gs().setAuto({ autoBet: newBet });
-      }
-
-      autoTimeoutRef.current = setTimeout(() => {
-        pixiGame.hideResultOverlay();
-        runNextAutoRoundRef.current();
-      }, 3500);
-      return;
-    }
-
-    const delay = 600 + Math.random() * 500;
-    autoTimeoutRef.current = setTimeout(() => {
-      const cur = gs();
-      if (!cur.autoRunning || cur.gstate !== "playing") {
-        autoPlayRows();
-        return;
-      }
-      const avail: number[] = [];
-      for (let c = 0; c < DIFF[cur.diff].cols; c++) {
-        if (!(cur.revealed[cur.curRow] ?? {})[c]) avail.push(c);
-      }
-      if (!avail.length) {
-        autoPlayRows();
-        return;
-      }
-
-      const cashoutRow = cur.auto.autoCashoutRow ?? 0;
-      if (cashoutRow > 0 && cur.curRow >= cashoutRow && cur.curMult > 1) {
-        console.log(
-          "💰 [AUTO:CASHOUT] Auto-cashout triggered at row",
-          cur.curRow,
-        );
-        cashOut();
-        autoTimeoutRef.current = setTimeout(() => {
-          pixiGame.hideResultOverlay();
-          runNextAutoRoundRef.current();
-        }, 3500);
-        return;
-      }
-
-      const col = avail[Math.floor(Math.random() * avail.length)];
-      handleTileClick(cur.curRow, col);
-      autoTimeoutRef.current = setTimeout(() => {
-        autoPlayRows();
-      }, 150);
-    }, delay);
-  }, [handleTileClick, cashOut]);
-
   // ─────────────────────────────────────────────────────────
   // RUN NEXT AUTO ROUND — FIXED BET ADJUSTMENT LOGIC
   // ─────────────────────────────────────────────────────────
@@ -1124,15 +1037,24 @@ const DragonTower: React.FC = () => {
         autoPlayWithPattern();
       }, 100);
     } else {
-      autoPlayRows();
+      showToast("Auto: Select a pattern to start autobet!");
+      stopAutobet();
+      return;
     }
-  }, [stopAutobet, showToast, startGame, autoPlayRows, autoPlayWithPattern]);
+  }, [stopAutobet, showToast, startGame, autoPlayWithPattern]);
 
   useEffect(() => {
     runNextAutoRoundRef.current = runNextAutoRound;
   }, [runNextAutoRound]);
 
   const startAutobet = useCallback(() => {
+    const pattern = gs().autoPattern;
+    const hasPattern = pattern.some((col) => col !== null);
+    if (!hasPattern) {
+      showToast("Select a pattern on the grid to start autobet!");
+      return;
+    }
+
     const settings = gs().auto;
 
     console.log("▶ [AUTO:START] Autobet started", {
