@@ -44,6 +44,7 @@ const DragonTower: React.FC = () => {
   const toast = useGameStore((s) => s.toast);
   const rgstate = useGameStore((s) => s.rgstate);
   const animationsEnabled = useGameStore((s) => s.animations);
+  const autoRunning = useGameStore((s) => s.autoRunning);
 
   // ── Remaining refs (non-state, timers, callbacks) ─────────
   const mountedRef = useRef(false);
@@ -58,6 +59,7 @@ const DragonTower: React.FC = () => {
   const diffChangeCbRef = useRef<(v: Difficulty) => void>(() => {});
   const playActionCbRef = useRef<() => void>(() => {});
   const randomCbRef = useRef<() => void>(() => {});
+  const autoToggleCbRef = useRef<() => void>(() => {});
   const canvasWrapRef = useRef<HTMLDivElement>(null);
 
   // ── Persist balance to localStorage on change ─────────────
@@ -376,6 +378,7 @@ const DragonTower: React.FC = () => {
     onDiffChange: (v) => diffChangeCbRef.current(v),
     onPlayAction: () => playActionCbRef.current(),
     onRandom: () => randomCbRef.current(),
+    onAutoToggle: () => autoToggleCbRef.current(),
   });
 
   // ─────────────────────────────────────────────────────────
@@ -1086,6 +1089,8 @@ const DragonTower: React.FC = () => {
     else startAutobet();
   }, [startAutobet, stopAutobet]);
 
+  autoToggleCbRef.current = toggleAutobet;
+
   // ── Init grid on mount ─────────────────────────────────
   useEffect(() => {
     console.log("🚀 [GAME:INIT] DragonTower mounted", {
@@ -1163,6 +1168,7 @@ const DragonTower: React.FC = () => {
         curMult: initState.curMult,
         curWin: initState.curWin,
       });
+
     }, 100);
     return () => clearTimeout(tid);
   }, []); // eslint-disable-line
@@ -1189,7 +1195,7 @@ const DragonTower: React.FC = () => {
       curMult,
       curWin,
     });
-  }, [balance, bet, diff, gstate, curMult, curWin, pixiGame]);
+  }, [balance, bet, diff, gstate, curMult, curWin, autoRunning, pixiGame]);
 
   // ── Keyboard shortcuts ─────────────────────────────────
   useEffect(() => {

@@ -1117,7 +1117,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
             </div>
           </div>
 
-          {/* Auto Cashout Row */}
+          {/* Auto Cashout Row — commented out for later use
           {true &&
             (() => {
               const maxRow = DIFF[auto.autoDiff]?.rows ?? 9;
@@ -1196,7 +1196,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   </div>
                 </div>
               );
-            })()}
+            })()} */}
 
           {/* Number of bets */}
           <div style={S.fieldWrapDisabled(autoRunning)}>

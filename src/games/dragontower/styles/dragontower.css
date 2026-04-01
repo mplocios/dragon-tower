@@ -453,7 +453,6 @@ input[type="number"] {
     align-items: center;
     justify-content: center;
     margin: 0 auto;
-    /* margin-right: 0 !important; */
   }
 
   #canvas-wrap canvas {

@@ -60,6 +60,7 @@ interface UsePixiGameOptions {
   onDiffChange?: (v: Difficulty) => void;
   onPlayAction?: () => void;
   onRandom?: () => void;
+  onAutoToggle?: () => void;
 }
 
 export function usePixiGame(
@@ -116,6 +117,7 @@ export function usePixiGame(
   const onDiffChangeRef = useRef(options.onDiffChange);
   const onPlayActionRef = useRef(options.onPlayAction);
   const onRandomRef = useRef(options.onRandom);
+  const onAutoToggleRef = useRef(options.onAutoToggle);
   const autoTabActiveRef = useRef(false);
   const poppinsLoadedRef = useRef(false);
   useEffect(() => { onTileClickRef.current = options.onTileClick; }, [options.onTileClick]);
@@ -125,6 +127,7 @@ export function usePixiGame(
   useEffect(() => { onDiffChangeRef.current = options.onDiffChange; }, [options.onDiffChange]);
   useEffect(() => { onPlayActionRef.current = options.onPlayAction; }, [options.onPlayAction]);
   useEffect(() => { onRandomRef.current = options.onRandom; }, [options.onRandom]);
+  useEffect(() => { onAutoToggleRef.current = options.onAutoToggle; }, [options.onAutoToggle]);
 
   // ─── Helpers ────────────────────────────────────────────────
   const calcLayout = useCallback((diff: Difficulty) => {
@@ -2087,6 +2090,10 @@ export function usePixiGame(
       tabHighlight.roundRect(4, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
       manualLbl.style.fill = 0xffffff;
       autoLbl.style.fill = 0x8899aa;
+      autoTabActiveRef.current = false;
+      useGameStore.getState().setMobileAutoTab(false);
+      const gs = useGameStore.getState();
+      refreshGrid(gs.diff, gs.gstate, gs.curRow, gs.revealed);
     });
     tabCard.addChild(manualHit);
 
@@ -2098,10 +2105,652 @@ export function usePixiGame(
       tabHighlight.roundRect(tabW / 2, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
       manualLbl.style.fill = 0x8899aa;
       autoLbl.style.fill = 0xffffff;
+      autoTabActiveRef.current = true;
+      useGameStore.getState().setMobileAutoTab(true);
+      const gs = useGameStore.getState();
+      refreshGrid(gs.diff, gs.gstate, gs.curRow, gs.revealed);
     });
     tabCard.addChild(autoHit);
 
     panelLayer.addChild(tabCard);
+
+    // ── Row 4: Auto Settings Panel (hidden by default) ─────────
+    const AP_GAP = 6;
+    const AP_CARD_H = 42;
+    const AP_BTN_H = 46;
+    const AP_ADV_ROW_H = 56;
+    const AP_STOP_H = 50;
+    const autoPanel = new PIXI.Container();
+    autoPanel.x = px;
+    autoPanel.y = yy + PANEL_TAB_H + PANEL_ROW_GAP;
+    autoPanel.visible = false;
+    panelLayer.addChild(autoPanel);
+
+    let apY = 0;
+
+    // Helper: draw a card bg
+    const apCardBg = (w: number, h: number) => {
+      const g = new PIXI.Graphics();
+      g.roundRect(0, 0, w, h, PANEL_CARD_RADIUS).fill({ color: PANEL_CARD_BG, alpha: 0.9 });
+      return g;
+    };
+    const apLblStyle = { fontFamily: 'Poppins', fontSize: 11, fill: 0x4a7aaa, fontWeight: '700' as const, letterSpacing: 1.5 };
+    const apValStyle = { fontFamily: 'Poppins', fontSize: 13, fill: 0xffffff, fontWeight: '700' as const };
+
+    // Helper: small arrow button for auto fields
+    const AP_ARR_W = 28; const AP_ARR_H = 18;
+    const makeApArrow = (label: string, onClick: () => void) => {
+      const c = new PIXI.Container();
+      const bg = new PIXI.Graphics();
+      bg.roundRect(0, 0, AP_ARR_W, AP_ARR_H, 4).fill({ color: 0x1a2a3a, alpha: 0.8 });
+      c.addChild(bg);
+      const txt = new PIXI.Text({ text: label, style: { fontFamily: 'Poppins', fontSize: 10, fill: 0x8899aa, fontWeight: '700' } });
+      txt.anchor.set(0.5); txt.x = AP_ARR_W / 2; txt.y = AP_ARR_H / 2;
+      c.addChild(txt);
+      c.eventMode = 'static'; c.cursor = 'pointer';
+      c.on('pointerdown', () => { if (!useGameStore.getState().autoRunning) onClick(); });
+      return c;
+    };
+
+    // ── Number of Bets card ──
+    const numBetsCard = new PIXI.Container(); numBetsCard.y = apY;
+    numBetsCard.addChild(apCardBg(contentW, AP_CARD_H));
+    const numBetsLbl = new PIXI.Text({ text: 'NUMBER OF BETS', style: apLblStyle });
+    numBetsLbl.x = 12; numBetsLbl.y = AP_CARD_H / 2; numBetsLbl.anchor.set(0, 0.5);
+    numBetsCard.addChild(numBetsLbl);
+    const numBetsVal = new PIXI.Text({ text: '∞ Infinite', style: { ...apValStyle, fill: 0xc8a44a } });
+    numBetsVal.anchor.set(1, 0.5); numBetsVal.x = contentW - 12 - AP_ARR_W - 4; numBetsVal.y = AP_CARD_H / 2;
+    numBetsCard.addChild(numBetsVal);
+    const nbUp = makeApArrow('▲', () => {
+      const a = useGameStore.getState().auto;
+      useGameStore.getState().setAuto({ autoCount: a.autoCount + 1 });
+      updateAutoPanel();
+    });
+    nbUp.x = contentW - AP_ARR_W - 6; nbUp.y = 3;
+    numBetsCard.addChild(nbUp);
+    const nbDown = makeApArrow('▼', () => {
+      const a = useGameStore.getState().auto;
+      useGameStore.getState().setAuto({ autoCount: Math.max(0, a.autoCount - 1) });
+      updateAutoPanel();
+    });
+    nbDown.x = contentW - AP_ARR_W - 6; nbDown.y = AP_CARD_H - AP_ARR_H - 3;
+    numBetsCard.addChild(nbDown);
+    // Tap value to edit
+    const numBetsHit = new PIXI.Graphics();
+    numBetsHit.rect(0, 0, contentW - AP_ARR_W - 10, AP_CARD_H).fill({ color: 0, alpha: 0.001 });
+    numBetsHit.eventMode = 'static'; numBetsHit.cursor = 'pointer';
+    numBetsHit.on('pointerdown', () => {
+      if (useGameStore.getState().autoRunning) return;
+      const input = document.getElementById('mobile-auto-input') as HTMLInputElement | null;
+      if (!input) return;
+      const gs = useGameStore.getState();
+      input.value = gs.auto.autoCount === 0 ? '' : String(gs.auto.autoCount);
+      input.placeholder = '0 = Infinite';
+      input.dataset.field = 'autoCount';
+      showMobileAutoInput(input, numBetsVal);
+    });
+    numBetsCard.addChild(numBetsHit);
+    autoPanel.addChild(numBetsCard);
+    apY += AP_CARD_H + AP_GAP;
+
+    // ── Auto Cashout At Row card — commented out for later use ──
+    // const cashoutCard = new PIXI.Container(); cashoutCard.y = apY;
+    // cashoutCard.addChild(apCardBg(contentW, AP_CARD_H));
+    // const cashoutLbl = new PIXI.Text({ text: 'CASHOUT AT ROW', style: apLblStyle });
+    // cashoutLbl.x = 12; cashoutLbl.y = AP_CARD_H / 2; cashoutLbl.anchor.set(0, 0.5);
+    // cashoutCard.addChild(cashoutLbl);
+    // const cashoutVal = new PIXI.Text({ text: 'Disabled', style: { ...apValStyle, fill: 0x4a7aaa } });
+    // cashoutVal.anchor.set(1, 0.5); cashoutVal.x = contentW - 12 - AP_ARR_W - 4; cashoutVal.y = AP_CARD_H / 2;
+    // cashoutCard.addChild(cashoutVal);
+    // const coUp = makeApArrow('▲', () => {
+    //   const a = useGameStore.getState().auto;
+    //   const maxRow = DIFF[a.autoDiff]?.rows ?? 9;
+    //   useGameStore.getState().setAuto({ autoCashoutRow: Math.min(a.autoCashoutRow + 1, maxRow) });
+    //   updateAutoPanel();
+    // });
+    // coUp.x = contentW - AP_ARR_W - 6; coUp.y = 3;
+    // cashoutCard.addChild(coUp);
+    // const coDown = makeApArrow('▼', () => {
+    //   const a = useGameStore.getState().auto;
+    //   useGameStore.getState().setAuto({ autoCashoutRow: Math.max(0, a.autoCashoutRow - 1) });
+    //   updateAutoPanel();
+    // });
+    // coDown.x = contentW - AP_ARR_W - 6; coDown.y = AP_CARD_H - AP_ARR_H - 3;
+    // cashoutCard.addChild(coDown);
+    // const cashoutHit = new PIXI.Graphics();
+    // cashoutHit.rect(0, 0, contentW - AP_ARR_W - 10, AP_CARD_H).fill({ color: 0, alpha: 0.001 });
+    // cashoutHit.eventMode = 'static'; cashoutHit.cursor = 'pointer';
+    // cashoutHit.on('pointerdown', () => {
+    //   if (useGameStore.getState().autoRunning) return;
+    //   const hasP = useGameStore.getState().autoPattern.some((c: number | null) => c !== null);
+    //   if (hasP) return;
+    //   const input = document.getElementById('mobile-auto-input') as HTMLInputElement | null;
+    //   if (!input) return;
+    //   const v = useGameStore.getState().auto.autoCashoutRow;
+    //   input.value = v === 0 ? '' : String(v);
+    //   input.placeholder = '0 = Disabled';
+    //   input.dataset.field = 'autoCashoutRow';
+    //   showMobileAutoInput(input, cashoutVal);
+    // });
+    // cashoutCard.addChild(cashoutHit);
+    // autoPanel.addChild(cashoutCard);
+    // apY += AP_CARD_H + AP_GAP;
+
+    // ── Advanced Settings toggle card ──
+    const advCard = new PIXI.Container(); advCard.y = apY;
+    advCard.addChild(apCardBg(contentW, AP_CARD_H));
+    const advLbl = new PIXI.Text({ text: 'ADVANCED SETTINGS', style: apLblStyle });
+    advLbl.x = 12; advLbl.y = AP_CARD_H / 2; advLbl.anchor.set(0, 0.5);
+    advCard.addChild(advLbl);
+    // Toggle button
+    const toggleW = 44; const toggleH = 24; const toggleR = 12;
+    const toggleBg = new PIXI.Graphics();
+    toggleBg.roundRect(0, 0, toggleW, toggleH, toggleR).fill({ color: 0x100f13 });
+    toggleBg.x = contentW - toggleW - 12; toggleBg.y = (AP_CARD_H - toggleH) / 2;
+    advCard.addChild(toggleBg);
+    const toggleKnob = new PIXI.Graphics();
+    toggleKnob.circle(0, 0, 9).fill({ color: 0xc8d8e8 });
+    toggleKnob.x = toggleBg.x + 12; toggleKnob.y = AP_CARD_H / 2;
+    advCard.addChild(toggleKnob);
+    const advHit = new PIXI.Graphics();
+    advHit.rect(0, 0, contentW, AP_CARD_H).fill({ color: 0, alpha: 0.001 });
+    advHit.eventMode = 'static'; advHit.cursor = 'pointer';
+    advHit.on('pointerdown', () => {
+      if (useGameStore.getState().autoRunning) return;
+      const gs = useGameStore.getState();
+      const newVal = !gs.auto.autoAdvanced;
+      gs.setAuto({ autoAdvanced: newVal });
+      updateAdvToggle(newVal);
+      layoutAdvanced(newVal);
+    });
+    advCard.addChild(advHit);
+    autoPanel.addChild(advCard);
+    apY += AP_CARD_H + AP_GAP;
+
+    const updateAdvToggle = (on: boolean) => {
+      toggleBg.clear();
+      toggleBg.roundRect(0, 0, toggleW, toggleH, toggleR).fill({ color: on ? 0x33333a : 0x100f13 });
+      toggleKnob.x = on ? toggleBg.x + toggleW - 12 : toggleBg.x + 12;
+    };
+
+    // ── Advanced content container ──
+    const advContent = new PIXI.Container(); advContent.y = apY; advContent.visible = false;
+    autoPanel.addChild(advContent);
+    let acY = 0;
+
+    // Helper: mode button
+    const makeModeBtn = (label: string, w: number, h: number) => {
+      const c = new PIXI.Container();
+      const bg = new PIXI.Graphics();
+      bg.roundRect(0, 0, w, h, 6).fill({ color: 0x0c1828, alpha: 0.5 });
+      c.addChild(bg);
+      const txt = new PIXI.Text({ text: label, style: { fontFamily: 'Poppins', fontSize: 11, fill: 0x4a7aaa, fontWeight: '600' } });
+      txt.anchor.set(0.5); txt.x = w / 2; txt.y = h / 2;
+      c.addChild(txt);
+      c.eventMode = 'static'; c.cursor = 'pointer';
+      return { container: c, bg, txt };
+    };
+    const setModeBtnActive = (btn: { bg: PIXI.Graphics, txt: PIXI.Text }, active: boolean, w: number, h: number) => {
+      btn.bg.clear();
+      if (active) {
+        btn.bg.roundRect(0, 0, w, h, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+        btn.bg.roundRect(0, 0, w, h, 6).stroke({ color: 0xc8a844, alpha: 0.4, width: 1 });
+      } else {
+        btn.bg.roundRect(0, 0, w, h, 6).fill({ color: 0x0c1828, alpha: 0.5 });
+      }
+      btn.txt.style.fill = active ? 0xc8d8e8 : 0x4a7aaa;
+    };
+
+    // ── On Win card ──
+    const onWinCard = new PIXI.Container(); onWinCard.y = acY;
+    onWinCard.addChild(apCardBg(contentW, AP_ADV_ROW_H));
+    const owLbl = new PIXI.Text({ text: 'ON WIN', style: apLblStyle });
+    owLbl.x = 12; owLbl.y = 12;
+    onWinCard.addChild(owLbl);
+    const mbW = 62; const mbH = 26;
+    const owReset = makeModeBtn('Reset', mbW, mbH);
+    owReset.container.x = 12; owReset.container.y = 28;
+    onWinCard.addChild(owReset.container);
+    const owIncrease = makeModeBtn('Increase', mbW + 10, mbH);
+    owIncrease.container.x = 12 + mbW + 5; owIncrease.container.y = 28;
+    onWinCard.addChild(owIncrease.container);
+    const owByLbl = new PIXI.Text({ text: 'by', style: { fontFamily: 'Poppins', fontSize: 11, fill: 0x4a7aaa, fontWeight: '600' } });
+    owByLbl.x = 12 + mbW + 5 + mbW + 10 + 8; owByLbl.y = 34;
+    onWinCard.addChild(owByLbl);
+    const owPctVal = new PIXI.Text({ text: '0', style: { fontFamily: 'Poppins', fontSize: 12, fill: 0xffffff, fontWeight: '700' } });
+    owPctVal.x = owByLbl.x + 22; owPctVal.y = 34;
+    onWinCard.addChild(owPctVal);
+    const owPctLbl = new PIXI.Text({ text: '%', style: { fontFamily: 'Poppins', fontSize: 11, fill: 0x4a7aaa, fontWeight: '600' } });
+    owPctLbl.x = owPctVal.x + 30; owPctLbl.y = 34;
+    onWinCard.addChild(owPctLbl);
+    // Arrows for win %
+    const owUp = makeApArrow('▲', () => {
+      const a = useGameStore.getState().auto;
+      if (a.onWinMode === 'reset') return;
+      useGameStore.getState().setAuto({ winInc: (a.winInc || 0) + 1 });
+      updateAutoPanel();
+    });
+    owUp.x = contentW - AP_ARR_W - 6; owUp.y = 3;
+    onWinCard.addChild(owUp);
+    const owDown = makeApArrow('▼', () => {
+      const a = useGameStore.getState().auto;
+      if (a.onWinMode === 'reset') return;
+      useGameStore.getState().setAuto({ winInc: Math.max(0, (a.winInc || 0) - 1) });
+      updateAutoPanel();
+    });
+    owDown.x = contentW - AP_ARR_W - 6; owDown.y = AP_ADV_ROW_H - AP_ARR_H - 3;
+    onWinCard.addChild(owDown);
+    // Pct hit area
+    const owPctHit = new PIXI.Graphics();
+    owPctHit.rect(owByLbl.x + 18, 24, 50, mbH).fill({ color: 0, alpha: 0.001 });
+    owPctHit.eventMode = 'static'; owPctHit.cursor = 'pointer';
+    owPctHit.on('pointerdown', () => {
+      if (useGameStore.getState().autoRunning || useGameStore.getState().auto.onWinMode === 'reset') return;
+      const input = document.getElementById('mobile-auto-input') as HTMLInputElement | null;
+      if (!input) return;
+      input.value = String(useGameStore.getState().auto.winInc || '');
+      input.placeholder = '0';
+      input.dataset.field = 'winInc';
+      showMobileAutoInput(input, owPctVal);
+    });
+    onWinCard.addChild(owPctHit);
+    owReset.container.on('pointerdown', () => {
+      if (useGameStore.getState().autoRunning) return;
+      useGameStore.getState().setAuto({ onWinMode: 'reset' });
+      setModeBtnActive(owReset, true, mbW, mbH);
+      setModeBtnActive(owIncrease, false, mbW + 10, mbH);
+    });
+    owIncrease.container.on('pointerdown', () => {
+      if (useGameStore.getState().autoRunning) return;
+      useGameStore.getState().setAuto({ onWinMode: 'increase' });
+      setModeBtnActive(owReset, false, mbW, mbH);
+      setModeBtnActive(owIncrease, true, mbW + 10, mbH);
+    });
+    advContent.addChild(onWinCard);
+    acY += AP_ADV_ROW_H + AP_GAP;
+
+    // ── On Loss card ──
+    const onLossCard = new PIXI.Container(); onLossCard.y = acY;
+    onLossCard.addChild(apCardBg(contentW, AP_ADV_ROW_H));
+    const olLbl = new PIXI.Text({ text: 'ON LOSS', style: apLblStyle });
+    olLbl.x = 12; olLbl.y = 12;
+    onLossCard.addChild(olLbl);
+    const olReset = makeModeBtn('Reset', mbW, mbH);
+    olReset.container.x = 12; olReset.container.y = 28;
+    onLossCard.addChild(olReset.container);
+    const olIncrease = makeModeBtn('Increase', mbW + 10, mbH);
+    olIncrease.container.x = 12 + mbW + 5; olIncrease.container.y = 28;
+    onLossCard.addChild(olIncrease.container);
+    const olByLbl = new PIXI.Text({ text: 'by', style: { fontFamily: 'Poppins', fontSize: 11, fill: 0x4a7aaa, fontWeight: '600' } });
+    olByLbl.x = owByLbl.x; olByLbl.y = 34;
+    onLossCard.addChild(olByLbl);
+    const olPctVal = new PIXI.Text({ text: '0', style: { fontFamily: 'Poppins', fontSize: 12, fill: 0xffffff, fontWeight: '700' } });
+    olPctVal.x = owPctVal.x; olPctVal.y = 34;
+    onLossCard.addChild(olPctVal);
+    const olPctLbl = new PIXI.Text({ text: '%', style: { fontFamily: 'Poppins', fontSize: 11, fill: 0x4a7aaa, fontWeight: '600' } });
+    olPctLbl.x = owPctLbl.x; olPctLbl.y = 34;
+    onLossCard.addChild(olPctLbl);
+    // Arrows for loss %
+    const olUp = makeApArrow('▲', () => {
+      const a = useGameStore.getState().auto;
+      if (a.onLossMode === 'reset') return;
+      useGameStore.getState().setAuto({ lossInc: (a.lossInc || 0) + 1 });
+      updateAutoPanel();
+    });
+    olUp.x = contentW - AP_ARR_W - 6; olUp.y = 3;
+    onLossCard.addChild(olUp);
+    const olDown = makeApArrow('▼', () => {
+      const a = useGameStore.getState().auto;
+      if (a.onLossMode === 'reset') return;
+      useGameStore.getState().setAuto({ lossInc: Math.max(0, (a.lossInc || 0) - 1) });
+      updateAutoPanel();
+    });
+    olDown.x = contentW - AP_ARR_W - 6; olDown.y = AP_ADV_ROW_H - AP_ARR_H - 3;
+    onLossCard.addChild(olDown);
+    const olPctHit = new PIXI.Graphics();
+    olPctHit.rect(olByLbl.x + 18, 24, 50, mbH).fill({ color: 0, alpha: 0.001 });
+    olPctHit.eventMode = 'static'; olPctHit.cursor = 'pointer';
+    olPctHit.on('pointerdown', () => {
+      if (useGameStore.getState().autoRunning || useGameStore.getState().auto.onLossMode === 'reset') return;
+      const input = document.getElementById('mobile-auto-input') as HTMLInputElement | null;
+      if (!input) return;
+      input.value = String(useGameStore.getState().auto.lossInc || '');
+      input.placeholder = '0';
+      input.dataset.field = 'lossInc';
+      showMobileAutoInput(input, olPctVal);
+    });
+    onLossCard.addChild(olPctHit);
+    olReset.container.on('pointerdown', () => {
+      if (useGameStore.getState().autoRunning) return;
+      useGameStore.getState().setAuto({ onLossMode: 'reset' });
+      setModeBtnActive(olReset, true, mbW, mbH);
+      setModeBtnActive(olIncrease, false, mbW + 10, mbH);
+    });
+    olIncrease.container.on('pointerdown', () => {
+      if (useGameStore.getState().autoRunning) return;
+      useGameStore.getState().setAuto({ onLossMode: 'increase' });
+      setModeBtnActive(olReset, false, mbW, mbH);
+      setModeBtnActive(olIncrease, true, mbW + 10, mbH);
+    });
+    advContent.addChild(onLossCard);
+    acY += AP_ADV_ROW_H + AP_GAP;
+
+    // ── Stop Profit / Stop Loss row ──
+    const stopW = (contentW - 8) / 2;
+    const stopCard = new PIXI.Container(); stopCard.y = acY;
+    // Stop Profit
+    const spCard = new PIXI.Container();
+    spCard.addChild(apCardBg(stopW, AP_STOP_H));
+    const spLbl = new PIXI.Text({ text: 'STOP PROFIT ($)', style: { ...apLblStyle, fontSize: 9, letterSpacing: 1 } });
+    spLbl.x = 10; spLbl.y = 10;
+    spCard.addChild(spLbl);
+    const spVal = new PIXI.Text({ text: '0', style: { ...apValStyle, fontSize: 14 } });
+    spVal.x = 10; spVal.y = 32;
+    spCard.addChild(spVal);
+    const spUpA = makeApArrow('▲', () => {
+      const a = useGameStore.getState().auto;
+      useGameStore.getState().setAuto({ stopProfit: (a.stopProfit || 0) + 1 });
+      updateAutoPanel();
+    });
+    spUpA.x = stopW - AP_ARR_W - 6; spUpA.y = 3;
+    spCard.addChild(spUpA);
+    const spDownA = makeApArrow('▼', () => {
+      const a = useGameStore.getState().auto;
+      useGameStore.getState().setAuto({ stopProfit: Math.max(0, (a.stopProfit || 0) - 1) });
+      updateAutoPanel();
+    });
+    spDownA.x = stopW - AP_ARR_W - 6; spDownA.y = AP_STOP_H - AP_ARR_H - 3;
+    spCard.addChild(spDownA);
+    const spHit = new PIXI.Graphics();
+    spHit.rect(0, 0, stopW - AP_ARR_W - 10, AP_STOP_H).fill({ color: 0, alpha: 0.001 });
+    spHit.eventMode = 'static'; spHit.cursor = 'pointer';
+    spHit.on('pointerdown', () => {
+      if (useGameStore.getState().autoRunning) return;
+      const input = document.getElementById('mobile-auto-input') as HTMLInputElement | null;
+      if (!input) return;
+      const v = useGameStore.getState().auto.stopProfit;
+      input.value = v === 0 ? '' : String(v);
+      input.placeholder = '0';
+      input.dataset.field = 'stopProfit';
+      showMobileAutoInput(input, spVal);
+    });
+    spCard.addChild(spHit);
+    stopCard.addChild(spCard);
+    // Stop Loss
+    const slCard = new PIXI.Container(); slCard.x = stopW + 8;
+    slCard.addChild(apCardBg(stopW, AP_STOP_H));
+    const slLbl = new PIXI.Text({ text: 'STOP LOSS ($)', style: { ...apLblStyle, fontSize: 9, letterSpacing: 1 } });
+    slLbl.x = 10; slLbl.y = 10;
+    slCard.addChild(slLbl);
+    const slVal = new PIXI.Text({ text: '0', style: { ...apValStyle, fontSize: 14 } });
+    slVal.x = 10; slVal.y = 32;
+    slCard.addChild(slVal);
+    const slUpA = makeApArrow('▲', () => {
+      const a = useGameStore.getState().auto;
+      useGameStore.getState().setAuto({ stopLoss: (a.stopLoss || 0) + 1 });
+      updateAutoPanel();
+    });
+    slUpA.x = stopW - AP_ARR_W - 6; slUpA.y = 3;
+    slCard.addChild(slUpA);
+    const slDownA = makeApArrow('▼', () => {
+      const a = useGameStore.getState().auto;
+      useGameStore.getState().setAuto({ stopLoss: Math.max(0, (a.stopLoss || 0) - 1) });
+      updateAutoPanel();
+    });
+    slDownA.x = stopW - AP_ARR_W - 6; slDownA.y = AP_STOP_H - AP_ARR_H - 3;
+    slCard.addChild(slDownA);
+    const slHit = new PIXI.Graphics();
+    slHit.rect(0, 0, stopW - AP_ARR_W - 10, AP_STOP_H).fill({ color: 0, alpha: 0.001 });
+    slHit.eventMode = 'static'; slHit.cursor = 'pointer';
+    slHit.on('pointerdown', () => {
+      if (useGameStore.getState().autoRunning) return;
+      const input = document.getElementById('mobile-auto-input') as HTMLInputElement | null;
+      if (!input) return;
+      const v = useGameStore.getState().auto.stopLoss;
+      input.value = v === 0 ? '' : String(v);
+      input.placeholder = '0';
+      input.dataset.field = 'stopLoss';
+      showMobileAutoInput(input, slVal);
+    });
+    slCard.addChild(slHit);
+    stopCard.addChild(slCard);
+    advContent.addChild(stopCard);
+    acY += AP_STOP_H + AP_GAP;
+
+    const advContentH = acY;
+
+    const startBtnY_base = apY; // base position for items below advanced
+
+    // ── Session Profit card ──
+    const sessionCard = new PIXI.Container();
+    sessionCard.addChild(apCardBg(contentW, AP_CARD_H));
+    const sessLbl = new PIXI.Text({ text: 'SESSION PROFIT', style: apLblStyle });
+    sessLbl.x = 12; sessLbl.y = AP_CARD_H / 2; sessLbl.anchor.set(0, 0.5);
+    sessionCard.addChild(sessLbl);
+    const sessVal = new PIXI.Text({ text: '+$0.00', style: { fontFamily: 'Poppins', fontSize: 14, fill: 0x38d080, fontWeight: '700' } });
+    sessVal.anchor.set(1, 0.5); sessVal.x = contentW - 12; sessVal.y = AP_CARD_H / 2;
+    sessionCard.addChild(sessVal);
+    sessionCard.visible = false;
+    autoPanel.addChild(sessionCard);
+
+    // ── No-pattern warning (disabled) ──
+    const noPatternLbl = new PIXI.Text({ text: '', style: { fontFamily: 'Poppins', fontSize: 10, fill: 0xc8a44a, fontWeight: '600' } });
+    noPatternLbl.visible = false;
+    autoPanel.addChild(noPatternLbl);
+
+    // Layout helper: positions sessionCard, noPatternLbl based on advanced state
+    const layoutAdvanced = (showAdv: boolean) => {
+      advContent.visible = showAdv;
+      let itemY = startBtnY_base;
+      if (showAdv) itemY += advContentH;
+      sessionCard.y = itemY;
+      noPatternLbl.y = itemY + AP_CARD_H + 6;
+      // Resize canvas
+      const totalAutoPanelH = itemY + AP_CARD_H + 20;
+      resizeMobileForAutoPanel(totalAutoPanelH);
+    };
+
+    // ── Resize canvas for auto panel ──
+    const resizeMobileForAutoPanel = (autoPanelH: number) => {
+      const app = appRef.current;
+      if (!app || !isMobileRef.current) return;
+      const canvasH = CH_MOBILE + autoPanelH;
+      app.renderer.resize(CW, canvasH);
+      // Keep width scaling the same as manual, just grow height proportionally
+      const wrap = canvasWrapRef.current;
+      if (!wrap) return;
+      const wrapW = wrap.clientWidth || window.innerWidth;
+      const scale = wrapW / CW;
+      const canvas = app.canvas as HTMLCanvasElement;
+      canvas.style.width = `${Math.round(CW * scale)}px`;
+      canvas.style.height = `${Math.round(canvasH * scale)}px`;
+      canvas.style.maxHeight = 'none';
+    };
+
+    // Initial layout
+    layoutAdvanced(useGameStore.getState().auto.autoAdvanced);
+    updateAdvToggle(useGameStore.getState().auto.autoAdvanced);
+    // Init mode buttons
+    setModeBtnActive(owReset, useGameStore.getState().auto.onWinMode === 'reset', mbW, mbH);
+    setModeBtnActive(owIncrease, useGameStore.getState().auto.onWinMode === 'increase', mbW + 10, mbH);
+    setModeBtnActive(olReset, useGameStore.getState().auto.onLossMode === 'reset', mbW, mbH);
+    setModeBtnActive(olIncrease, useGameStore.getState().auto.onLossMode === 'increase', mbW + 10, mbH);
+
+    // ── Shared HTML input for auto fields ──
+    const showMobileAutoInput = (input: HTMLInputElement, targetText: PIXI.Text) => {
+      const canvas = appRef.current?.canvas as HTMLCanvasElement | null;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const canvasH = appRef.current!.renderer.height / (appRef.current!.renderer.resolution || 1);
+      const scaleX = rect.width / CW;
+      const scaleY = rect.height / canvasH;
+      // Get world position of targetText
+      const worldPos = targetText.getGlobalPosition();
+      input.style.position = 'fixed';
+      input.style.left = `${rect.left + worldPos.x * scaleX - 20}px`;
+      input.style.top = `${rect.top + worldPos.y * scaleY - 15}px`;
+      input.style.width = `${80 * scaleX}px`;
+      input.style.height = `${30 * scaleY}px`;
+      input.style.opacity = '1';
+      input.style.pointerEvents = 'auto';
+      input.style.background = 'rgba(0,0,0,0.9)';
+      input.style.color = '#fff';
+      input.style.fontSize = '16px';
+      input.style.border = '1px solid rgba(255,255,255,0.3)';
+      input.style.borderRadius = '6px';
+      input.style.padding = '4px 8px';
+      input.style.zIndex = '9999';
+      input.style.outline = 'none';
+      input.style.fontFamily = 'Poppins, sans-serif';
+      input.style.fontWeight = '700';
+      input.focus();
+      input.select();
+    };
+
+    // Tab handlers: show/hide auto panel + resize canvas
+    const showAutoPanel = () => {
+      autoPanel.visible = true;
+      const gs = useGameStore.getState();
+      layoutAdvanced(gs.auto.autoAdvanced);
+      updateAutoPanel();
+    };
+    const hideAutoPanel = () => {
+      autoPanel.visible = false;
+      const app = appRef.current;
+      if (app && isMobileRef.current) {
+        app.renderer.resize(CW, CH_MOBILE);
+        scaleCanvas();
+      }
+    };
+
+    // Update auto panel values from store
+    const updateAutoPanel = () => {
+      const gs = useGameStore.getState();
+      const a = gs.auto;
+      // Num bets
+      numBetsVal.text = a.autoCount === 0 ? '∞ Infinite' : `${a.autoCount} rounds`;
+      numBetsVal.style.fill = a.autoCount === 0 ? 0xc8a44a : 0xffffff;
+      // Cashout row — commented out for later use
+      // const hasPattern = gs.autoPattern.some((c: number | null) => c !== null);
+      // const maxRow = DIFF[a.autoDiff]?.rows ?? 9;
+      // if (hasPattern) {
+      //   cashoutVal.text = 'Pattern active';
+      //   cashoutVal.style.fill = 0x4a7aaa;
+      //   cashoutCard.alpha = 0.4;
+      // } else if (a.autoCashoutRow === 0) {
+      //   cashoutVal.text = 'Disabled';
+      //   cashoutVal.style.fill = 0x4a7aaa;
+      //   cashoutCard.alpha = 1;
+      // } else {
+      //   cashoutVal.text = `Row ${a.autoCashoutRow} / ${maxRow}`;
+      //   cashoutVal.style.fill = 0xc8a44a;
+      //   cashoutCard.alpha = 1;
+      // }
+      // Advanced
+      updateAdvToggle(a.autoAdvanced);
+      // On Win
+      owPctVal.text = String(a.winInc || 0);
+      owPctVal.alpha = a.onWinMode === 'reset' ? 0.35 : 1;
+      setModeBtnActive(owReset, a.onWinMode === 'reset', mbW, mbH);
+      setModeBtnActive(owIncrease, a.onWinMode === 'increase', mbW + 10, mbH);
+      // On Loss
+      olPctVal.text = String(a.lossInc || 0);
+      olPctVal.alpha = a.onLossMode === 'reset' ? 0.35 : 1;
+      setModeBtnActive(olReset, a.onLossMode === 'reset', mbW, mbH);
+      setModeBtnActive(olIncrease, a.onLossMode === 'increase', mbW + 10, mbH);
+      // Stop values
+      spVal.text = a.stopProfit === 0 ? '0' : String(a.stopProfit);
+      slVal.text = a.stopLoss === 0 ? '0' : String(a.stopLoss);
+      const running = gs.autoRunning;
+      const hasP = gs.autoPattern.some((c: number | null) => c !== null);
+      // Session profit
+      sessionCard.visible = running;
+      if (running) {
+        const tp = gs.autoTotalProfit;
+        sessVal.text = (tp >= 0 ? '+$' : '-$') + Math.abs(tp).toFixed(2);
+        sessVal.style.fill = tp >= 0 ? 0x38d080 : 0xe84040;
+      }
+      // No pattern warning (disabled)
+      noPatternLbl.visible = false;
+      // Disable controls when running
+      numBetsCard.alpha = running ? 0.4 : 1;
+      advCard.alpha = running ? 0.4 : 1;
+      advContent.alpha = running ? 0.35 : 1;
+    };
+
+    // Wire tab handlers to show/hide auto panel
+    manualHit.removeAllListeners('pointerdown');
+    manualHit.on('pointerdown', () => {
+      tabHighlight.clear();
+      tabHighlight.roundRect(4, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+      manualLbl.style.fill = 0xffffff;
+      autoLbl.style.fill = 0x8899aa;
+      autoTabActiveRef.current = false;
+      useGameStore.getState().setMobileAutoTab(false);
+      hideAutoPanel();
+      const gs = useGameStore.getState();
+      refreshGrid(gs.diff, gs.gstate, gs.curRow, gs.revealed);
+    });
+    autoHit.removeAllListeners('pointerdown');
+    autoHit.on('pointerdown', () => {
+      tabHighlight.clear();
+      tabHighlight.roundRect(tabW / 2, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+      manualLbl.style.fill = 0x8899aa;
+      autoLbl.style.fill = 0xffffff;
+      autoTabActiveRef.current = true;
+      useGameStore.getState().setMobileAutoTab(true);
+      showAutoPanel();
+      const gs = useGameStore.getState();
+      refreshGrid(gs.diff, gs.gstate, gs.curRow, gs.revealed);
+    });
+
+    // Store refs for updateMobilePanel
+    panelTextsRef.current.autoPanel = autoPanel;
+    panelTextsRef.current.updateAutoPanel = updateAutoPanel;
+    panelTextsRef.current.showAutoPanel = showAutoPanel;
+    panelTextsRef.current.hideAutoPanel = hideAutoPanel;
+    panelTextsRef.current.onAutoToggle = onAutoToggleRef;
+
+    // ── Create shared HTML input for auto fields ──
+    if (!document.getElementById('mobile-auto-input')) {
+      const inp = document.createElement('input');
+      inp.id = 'mobile-auto-input';
+      inp.type = 'text';
+      inp.inputMode = 'numeric';
+      inp.style.opacity = '0';
+      inp.style.pointerEvents = 'none';
+      inp.style.position = 'fixed';
+      inp.style.width = '1px';
+      inp.style.height = '1px';
+      inp.style.zIndex = '9999';
+      document.body.appendChild(inp);
+      inp.addEventListener('input', () => {
+        const raw = inp.value;
+        const field = inp.dataset.field;
+        if (!field) return;
+        if (field === 'autoCount') {
+          const parsed = parseInt(raw, 10);
+          useGameStore.getState().setAuto({ autoCount: isNaN(parsed) || parsed < 0 ? 0 : parsed });
+        } else if (field === 'autoCashoutRow') {
+          const parsed = parseInt(raw, 10);
+          const maxRow = DIFF[useGameStore.getState().auto.autoDiff]?.rows ?? 9;
+          const clamped = isNaN(parsed) || parsed < 0 ? 0 : Math.min(parsed, maxRow);
+          useGameStore.getState().setAuto({ autoCashoutRow: clamped });
+        } else {
+          if (!/^\d*\.?\d*$/.test(raw)) { inp.value = raw.replace(/[^\d.]/g, ''); return; }
+          const parsed = parseFloat(raw) || 0;
+          useGameStore.getState().setAuto({ [field]: parsed });
+        }
+        updateAutoPanel();
+      });
+      inp.addEventListener('blur', () => {
+        inp.style.opacity = '0';
+        inp.style.pointerEvents = 'none';
+        inp.style.width = '1px';
+        inp.style.height = '1px';
+        updateAutoPanel();
+      });
+    }
 
     document.fonts.ready.then(() => {
       balText.text = balText.text;
@@ -2140,10 +2789,18 @@ export function usePixiGame(
     playCircle.x = playX; playCircle.y = playY;
     playCircle.eventMode = 'static'; playCircle.cursor = 'pointer';
     playCircle.on('pointerdown', () => {
-      if (panelCooldownRef.current) return;
       const gs = useGameStore.getState();
-      if (gs.gstate === 'playing') {
-        // During play, play button triggers random pick
+      if (autoTabActiveRef.current && gs.autoRunning) {
+        // Always allow stopping autobet — bypass cooldown
+        onAutoToggleRef.current?.();
+        return;
+      }
+      if (panelCooldownRef.current) return;
+      if (autoTabActiveRef.current) {
+        // Auto tab: play button starts autobet
+        if (gs.gstate === 'playing') return;
+        onAutoToggleRef.current?.();
+      } else if (gs.gstate === 'playing') {
         onRandomRef.current?.();
       } else {
         onPlayActionRef.current?.();
@@ -2292,6 +2949,8 @@ export function usePixiGame(
       diffCard: diffCard,
       profitCardW: botSideW,
       balanceCardW: midW,
+      autoHit: autoHit,
+      autoLbl: autoLbl,
     };
   }, []);
 
@@ -2413,6 +3072,17 @@ export function usePixiGame(
     const playing = state.gstate === 'playing';
     const canCash = playing && state.curMult > 1;
     const disabled = (playing && !canCash) || panelCooldownRef.current;
+    const autoRunning = useGameStore.getState().autoRunning;
+    const autoTab = autoTabActiveRef.current;
+    const manualPlaying = playing && !autoRunning;
+
+    // Disable Auto tab during manual play (not during autobet)
+    if (t.autoHit) {
+      t.autoHit.eventMode = manualPlaying ? 'none' : 'static';
+    }
+    if (t.autoLbl) {
+      t.autoLbl.alpha = manualPlaying ? 0.35 : 1;
+    }
 
     // Random Pick card: empty before play, "CASHOUT" during play
     if (t.rndLbl) {
@@ -2423,25 +3093,64 @@ export function usePixiGame(
       t.randomBtn.eventMode = playing ? 'static' : 'none';
     }
 
-    // Play button: play icon before play, "RANDOM PICK" during play
+    // Play button: adapt based on auto tab state
     const TEX = texRef.current;
     if (t.playCircle) {
-      if (playing) {
-        // During play: swap to empty button texture, full opacity
+      if (autoTab && autoRunning) {
+        // Auto running: stop — red tint, full opacity, always clickable
+        t.playCircle.alpha = 1;
+        t.playCircle.eventMode = 'static';
+        if (t.playCircle instanceof PIXI.Sprite && TEX.play_btn_empty) {
+          t.playCircle.texture = TEX.play_btn_empty;
+          t.playCircle.tint = 0xff4444;
+        }
+      } else if (autoTab) {
+        // Auto tab idle: use play_btn_empty (yellow/green glow), no tint
+        t.playCircle.alpha = disabled ? 0.45 : 1;
+        t.playCircle.eventMode = 'static';
+        if (t.playCircle instanceof PIXI.Sprite && TEX.play_btn_empty) {
+          t.playCircle.texture = TEX.play_btn_empty;
+          t.playCircle.tint = 0xffffff;
+        }
+      } else if (playing) {
         t.playCircle.alpha = 1;
         if (t.playCircle instanceof PIXI.Sprite && TEX.play_btn_empty) {
           t.playCircle.texture = TEX.play_btn_empty;
+          t.playCircle.tint = 0xffffff;
         }
       } else {
         t.playCircle.alpha = disabled ? 0.45 : 1;
         if (t.playCircle instanceof PIXI.Sprite && TEX.play_btn) {
           t.playCircle.texture = TEX.play_btn;
+          t.playCircle.tint = 0xffffff;
         }
       }
     }
     if (t.playTriangle && t.playCoin && t.playAmtText) {
-      if (playing) {
-        // During play: show "RANDOM PICK" on play button
+      if (autoTab && autoRunning) {
+        // Auto running: always show STOP, never disabled
+        t.playTriangle.visible = false;
+        t.playCoin.visible = false;
+        t.playAmtText.visible = true;
+        t.playAmtText.text = 'STOP';
+        t.playAmtText.style.fill = 0xff6666;
+        t.playAmtText.style.fontSize = 16;
+        t.playAmtText.style.fontWeight = '800';
+        t.playAmtText.style.align = 'center';
+        t.playAmtText.y = (t.playCircle?.y ?? 0);
+      } else if (autoTab && !playing) {
+        // Auto tab idle: show AUTO label
+        t.playTriangle.visible = false;
+        t.playCoin.visible = false;
+        t.playAmtText.visible = true;
+        t.playAmtText.text = 'AUTO';
+        t.playAmtText.style.fill = 0xffffff;
+        t.playAmtText.style.fontSize = 16;
+        t.playAmtText.style.fontWeight = '800';
+        t.playAmtText.style.align = 'center';
+        t.playAmtText.y = (t.playCircle?.y ?? 0);
+      } else if (playing) {
+        // Manual play: show RANDOM PICK
         t.playTriangle.visible = false;
         t.playCoin.visible = false;
         t.playAmtText.visible = true;
@@ -2463,6 +3172,11 @@ export function usePixiGame(
     if (t.downArrow) { t.downArrow.alpha = playing ? 0.35 : 1; t.downArrow.eventMode = playing ? 'none' : 'static'; }
     if (t.diffHit) { t.diffHit.eventMode = playing ? 'none' : 'static'; }
     if (t.diffCard) { t.diffCard.alpha = playing ? 0.45 : 1; }
+
+    // Sync auto panel values when auto tab is active
+    if (autoTabActiveRef.current && t.updateAutoPanel) {
+      t.updateAutoPanel();
+    }
   }, []);
 
   return {

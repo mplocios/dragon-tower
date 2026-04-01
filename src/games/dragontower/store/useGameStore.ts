@@ -56,6 +56,7 @@ export interface GameStore {
   autoCount: number;
   autoIsInfinite: boolean;
   autoPattern: (number | null)[];
+  mobileAutoTab: boolean;
 
   // ── actions ────────────────────────────────────────────────
   setTestMode: (v: boolean) => void;
@@ -84,6 +85,7 @@ export interface GameStore {
   setAutoIsInfinite: (v: boolean) => void;
   setAutoPattern: (row: number, col: number | null) => void;
   clearAutoPattern: () => void;
+  setMobileAutoTab: (v: boolean) => void;
   resetRound: () => void;
 }
 
@@ -134,6 +136,7 @@ export const useGameStore = create<GameStore>()((set) => ({
   autoCount: 10,
   autoIsInfinite: false,
   autoPattern: _savedSettings.autoPattern,
+  mobileAutoTab: false,
 
   // ── actions ────────────────────────────────────────────────
   setTestMode: (v) => set({ testMode: v }),
@@ -208,6 +211,8 @@ export const useGameStore = create<GameStore>()((set) => ({
       saveSettings({ autoPattern: newPattern });
       return { autoPattern: newPattern };
     }),
+
+  setMobileAutoTab: (v) => set({ mobileAutoTab: v }),
 
   clearAutoPattern: () => {
     set({ autoPattern: Array(9).fill(null) });
