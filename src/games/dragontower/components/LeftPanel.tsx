@@ -505,7 +505,10 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
   const autoPattern = useGameStore((s) => s.autoPattern);
   const clearAutoPattern = useGameStore((s) => s.clearAutoPattern);
 
-  const [activeTab, setActiveTab] = useState<"manual" | "auto">("manual");
+  const mobileAutoTab = useGameStore((s) => s.mobileAutoTab);
+  const setMobileAutoTab = useGameStore((s) => s.setMobileAutoTab);
+  const activeTab = mobileAutoTab ? "auto" : "manual";
+  const setActiveTab = (tab: "manual" | "auto") => setMobileAutoTab(tab === "auto");
   const [cooldown, setCooldown] = useState(false);
   const [betInputVal, setBetInputVal] = useState("0.00000000");
   const [betExceedsBalance, setBetExceedsBalance] = useState(false);

@@ -45,6 +45,8 @@ const DragonTower: React.FC = () => {
   const rgstate = useGameStore((s) => s.rgstate);
   const animationsEnabled = useGameStore((s) => s.animations);
   const autoRunning = useGameStore((s) => s.autoRunning);
+  const mobileAutoTab = useGameStore((s) => s.mobileAutoTab);
+  const autoSettings = useGameStore((s) => s.auto);
 
   // ── Remaining refs (non-state, timers, callbacks) ─────────
   const mountedRef = useRef(false);
@@ -1195,7 +1197,7 @@ const DragonTower: React.FC = () => {
       curMult,
       curWin,
     });
-  }, [balance, bet, diff, gstate, curMult, curWin, autoRunning, pixiGame]);
+  }, [balance, bet, diff, gstate, curMult, curWin, autoRunning, mobileAutoTab, autoSettings, pixiGame]);
 
   // ── Keyboard shortcuts ─────────────────────────────────
   useEffect(() => {
@@ -1292,7 +1294,30 @@ const DragonTower: React.FC = () => {
         onRandom={doRandom}
         onAutoToggle={toggleAutobet}
         onTabChange={(tab) => {
-          pixiGame.autoTabActiveRef.current = tab === "auto";
+          const isAuto = tab === "auto";
+          pixiGame.autoTabActiveRef.current = isAuto;
+          // Sync mobile panel tab visuals + auto panel visibility
+          const t = pixiGame.panelTextsRef?.current;
+          if (t) {
+            // Update tab highlight
+            if (t.tabHighlight && t.tabW) {
+              t.tabHighlight.clear();
+              if (isAuto) {
+                t.tabHighlight.roundRect(t.tabW / 2, 4, t.tabW / 2 - 4, 50 - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+              } else {
+                t.tabHighlight.roundRect(4, 4, t.tabW / 2 - 4, 50 - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+              }
+            }
+            // Update tab label colors
+            if (t.manualLbl) t.manualLbl.style.fill = isAuto ? 0x8899aa : 0xffffff;
+            if (t.autoLbl) t.autoLbl.style.fill = isAuto ? 0xffffff : 0x8899aa;
+            // Show/hide auto panel
+            if (isAuto) {
+              t.showAutoPanel?.();
+            } else {
+              t.hideAutoPanel?.();
+            }
+          }
           const s = gs();
           pixiGame.refreshGrid(s.diff, s.gstate, s.curRow, s.revealed);
         }}

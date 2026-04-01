@@ -18,7 +18,7 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, PAD_MOBILE, TGAP, RGAP, WALL_H, DIFF, 
   FLAME_BORDER_W, FLAME_BORDER_LEFT_OFFSET, FLAME_BORDER_RIGHT_OFFSET, FLAME_BORDER_Y_OFFSET,
   MOBILE_BREAKPOINT, PANEL_PX, PANEL_PY, PANEL_TAB_H, PANEL_TAB_W, PANEL_TAB_Y_OFFSET, PANEL_DIFF_H, PANEL_MID_H, PANEL_BOT_H,
   PANEL_ROW_GAP, PANEL_MID_GAP, PANEL_BOT_GAP, PANEL_Y_OFFSET,
-  PANEL_LBL_COLOR, PANEL_GOLD_COLOR, PLAY_R, PLAY_BTN_Y_OFFSET, PLAY_LABEL_FONT, PLAY_AMT_FONT, PLAY_COIN_SIZE,
+  PANEL_LBL_COLOR, PANEL_GOLD_COLOR, PLAY_R, PLAY_BTN_Y_OFFSET, PLAY_LABEL_FONT, PLAY_AMT_FONT, PLAY_AUTO_FONT, PLAY_COIN_SIZE,
   PANEL_LBL_FONT, PANEL_AMT_FONT, PANEL_INNER_PX, PANEL_CARD_RADIUS, PANEL_CARD_BG,
   PANEL_DIFF_RIGHT, PANEL_BAL_AMT_X, PANEL_COIN_SIZE, PANEL_COIN_GAP, PANEL_BAL_COIN_X_OFFSET, PANEL_PROFIT_COIN_X_OFFSET, PANEL_BAL_AMT_RIGHT,
   PANEL_BET_COIN_SIZE, PANEL_BET_COIN_X, PANEL_BET_AMT_X, PANEL_BET_AMT_FONT,
@@ -1417,6 +1417,7 @@ export function usePixiGame(
       top_lighting:    BASE+'/top-lighting.png',
       play_btn:        VBASE + '/assets/play_btn.png',
       play_btn_empty:  VBASE + '/assets/play_btn_empty.png',
+      stop_btn:        VBASE + '/assets/stop_btn.png',
     };
 
     const loadOne = async (key: string, path: string) => {
@@ -1735,6 +1736,11 @@ export function usePixiGame(
             const st = getStateRef.current();
             buildGrid(st.diff);
             refreshGrid(st.diff, st.gstate, st.curRow, st.revealed);
+            // If switching to mobile with auto tab active, apply auto panel resize
+            if (nowMobile && autoTabActiveRef.current) {
+              const sp = panelTextsRef.current.showAutoPanel;
+              if (sp) { sp(); return; }
+            }
             scaleCanvasAware();
           }
         }, 150);
@@ -2582,28 +2588,33 @@ export function usePixiGame(
     // ── Resize canvas for auto panel ──
     const resizeMobileForAutoPanel = (autoPanelH: number) => {
       const app = appRef.current;
-      if (!app || !isMobileRef.current) return;
+      if (!app) return;
       if (!autoTabActiveRef.current) return;
+      // Always store the reapply ref so mode-switch/resize can call it later
+      reapplyAutoPanelRef.current = () => resizeMobileForAutoPanel(autoPanelH);
+      // Only apply canvas CSS when actually on mobile
+      if (!isMobileRef.current) return;
       const canvasH = CH_MOBILE + autoPanelH;
       app.renderer.resize(CW, canvasH);
       const wrap = canvasWrapRef.current;
       if (!wrap) return;
+      // Use same scale as manual mode (fit CH_MOBILE portion to viewport)
       const wrapW = wrap.clientWidth || window.innerWidth;
-      const scale = wrapW / CW;
+      const maxH = window.innerHeight;
+      const aspect = CW / CH_MOBILE;
+      let manualW = wrapW;
+      let manualH = Math.round(manualW / aspect);
+      if (manualH > maxH) { manualH = maxH; manualW = Math.round(manualH * aspect); }
+      // Scale factor: how the manual portion maps to CSS pixels
+      const scale = manualW / CW;
       const canvas = app.canvas as HTMLCanvasElement;
-      // Set natural size — no CSS auto-scaling so PixiJS hit areas match visuals
-      canvas.style.width = `${Math.round(CW * scale)}px`;
+      canvas.style.width = `${manualW}px`;
       canvas.style.height = `${Math.round(canvasH * scale)}px`;
       canvas.style.maxHeight = 'none';
-      canvas.style.maxWidth = 'none';
-      canvas.style.objectFit = 'unset';
       // Let canvas-wrap grow beyond viewport and parent scroll
       wrap.style.flex = '0 0 auto';
-      wrap.style.alignItems = 'flex-start';
       const gamePanel = wrap.closest('#game-panel') as HTMLElement | null;
       if (gamePanel) gamePanel.style.overflowY = 'auto';
-      // Store so resize handler can re-apply
-      reapplyAutoPanelRef.current = () => resizeMobileForAutoPanel(autoPanelH);
     };
 
     // Initial layout
@@ -2661,15 +2672,12 @@ export function usePixiGame(
         app.renderer.resize(CW, CH_MOBILE);
         const wrap = canvasWrapRef.current;
         if (wrap) {
-          // Restore CSS auto-scaling constraints for manual mode
-          const canvas = app.canvas as HTMLCanvasElement;
-          canvas.style.maxHeight = '';
-          canvas.style.maxWidth = '';
-          canvas.style.objectFit = '';
           wrap.style.flex = '';
-          wrap.style.alignItems = '';
           const gamePanel = wrap.closest('#game-panel') as HTMLElement | null;
-          if (gamePanel) gamePanel.style.overflowY = '';
+          if (gamePanel) {
+            gamePanel.style.overflowY = '';
+            gamePanel.scrollTop = 0;
+          }
         }
         scaleCanvas();
       }
@@ -2698,8 +2706,11 @@ export function usePixiGame(
       //   cashoutVal.style.fill = 0xc8a44a;
       //   cashoutCard.alpha = 1;
       // }
-      // Advanced
+      // Advanced — sync layout if toggle changed
       updateAdvToggle(a.autoAdvanced);
+      if (advContent.visible !== a.autoAdvanced) {
+        layoutAdvanced(a.autoAdvanced);
+      }
       // On Win
       owPctVal.text = String(a.winInc || 0);
       owPctVal.alpha = a.onWinMode === 'reset' ? 0.35 : 1;
@@ -3014,6 +3025,9 @@ export function usePixiGame(
       balanceCardW: midW,
       autoHit: autoHit,
       autoLbl: autoLbl,
+      tabHighlight: tabHighlight,
+      manualLbl: manualLbl,
+      tabW: tabW,
     };
   }, []);
 
@@ -3136,6 +3150,21 @@ export function usePixiGame(
     const canCash = playing && state.curMult > 1;
     const disabled = (playing && !canCash) || panelCooldownRef.current;
     const autoRunning = useGameStore.getState().autoRunning;
+    // Sync mobile tab visual with store (handles LeftPanel → mobile sync)
+    const storeAutoTab = useGameStore.getState().mobileAutoTab;
+    if (storeAutoTab !== autoTabActiveRef.current) {
+      autoTabActiveRef.current = storeAutoTab;
+      if (t.tabHighlight && t.tabW) {
+        t.tabHighlight.clear();
+        if (storeAutoTab) {
+          t.tabHighlight.roundRect(t.tabW / 2, 4, t.tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+        } else {
+          t.tabHighlight.roundRect(4, 4, t.tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+        }
+      }
+      if (t.manualLbl) t.manualLbl.style.fill = storeAutoTab ? 0x8899aa : 0xffffff;
+      if (t.autoLbl) t.autoLbl.style.fill = storeAutoTab ? 0xffffff : 0x8899aa;
+    }
     const autoTab = autoTabActiveRef.current;
     const manualPlaying = playing && !autoRunning;
 
@@ -3160,12 +3189,12 @@ export function usePixiGame(
     const TEX = texRef.current;
     if (t.playCircle) {
       if (autoTab && autoRunning) {
-        // Auto running: stop — red tint, full opacity, always clickable
+        // Auto running: stop — use stop button image, full opacity, always clickable
         t.playCircle.alpha = 1;
         t.playCircle.eventMode = 'static';
         if (t.playCircle instanceof PIXI.Sprite && TEX.play_btn_empty) {
           t.playCircle.texture = TEX.play_btn_empty;
-          t.playCircle.tint = 0xff4444;
+          t.playCircle.tint = 0xff3333;
         }
       } else if (autoTab) {
         // Auto tab idle: use play_btn_empty
@@ -3191,13 +3220,13 @@ export function usePixiGame(
     }
     if (t.playTriangle && t.playCoin && t.playAmtText) {
       if (autoTab && autoRunning) {
-        // Auto running: always show STOP, never disabled
+        // Auto running: show STOP text
         t.playTriangle.visible = false;
         t.playCoin.visible = false;
         t.playAmtText.visible = true;
         t.playAmtText.text = 'STOP';
-        t.playAmtText.style.fill = 0xff6666;
-        t.playAmtText.style.fontSize = 16;
+        t.playAmtText.style.fill = 0xffffff;
+        t.playAmtText.style.fontSize = PLAY_AUTO_FONT;
         t.playAmtText.style.fontWeight = '800';
         t.playAmtText.style.align = 'center';
         t.playAmtText.y = (t.playCircle?.y ?? 0);
@@ -3208,7 +3237,7 @@ export function usePixiGame(
         t.playAmtText.visible = true;
         t.playAmtText.text = 'AUTO';
         t.playAmtText.style.fill = 0xffffff;
-        t.playAmtText.style.fontSize = 16;
+        t.playAmtText.style.fontSize = PLAY_AUTO_FONT;
         t.playAmtText.style.fontWeight = '800';
         t.playAmtText.style.align = 'center';
         t.playAmtText.y = (t.playCircle?.y ?? 0);
@@ -3236,9 +3265,15 @@ export function usePixiGame(
     if (t.diffHit) { t.diffHit.eventMode = playing ? 'none' : 'static'; }
     if (t.diffCard) { t.diffCard.alpha = playing ? 0.45 : 1; }
 
-    // Sync auto panel values when auto tab is active
-    if (autoTabActiveRef.current && t.updateAutoPanel) {
-      t.updateAutoPanel();
+    // Sync auto panel when auto tab is active
+    if (autoTabActiveRef.current) {
+      if (isMobileRef.current && t.showAutoPanel) {
+        // Always re-apply auto panel layout + canvas resize + overflow CSS
+        // Handles: LeftPanel→auto sync, reload, viewport changes
+        t.showAutoPanel();
+      } else if (t.updateAutoPanel) {
+        t.updateAutoPanel();
+      }
     }
   }, []);
 
@@ -3270,6 +3305,7 @@ export function usePixiGame(
     texRef,
     panelCooldownRef,
     autoTabActiveRef,
+    panelTextsRef,
     appReady: !!appRef.current,
   };
 }

@@ -305,6 +305,8 @@ export const PLAY_BTN_Y_OFFSET = 28;
 export const PLAY_LABEL_FONT = 14;
 /** Play button amount font size */
 export const PLAY_AMT_FONT = 18;
+/** Play button AUTO text font size */
+export const PLAY_AUTO_FONT = 22;
 /** Play button coin icon size */
 export const PLAY_COIN_SIZE = 22;
 
