@@ -55,6 +55,16 @@ export interface GameSettings {
   hotkeysEnabled: boolean;
   animations: boolean;
   autoPattern: (number | null)[];
+  bet: number;
+  mobileAutoTab: boolean;
+  autoCount: number;
+  autoAdvanced: boolean;
+  onWinMode: "reset" | "increase";
+  onLossMode: "reset" | "increase";
+  winInc: number;
+  lossInc: number;
+  stopProfit: number;
+  stopLoss: number;
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -64,6 +74,16 @@ const DEFAULT_SETTINGS: GameSettings = {
   hotkeysEnabled: false,
   animations: true,
   autoPattern: Array(9).fill(null),
+  bet: 5,
+  mobileAutoTab: false,
+  autoCount: 10,
+  autoAdvanced: false,
+  onWinMode: "reset",
+  onLossMode: "reset",
+  winInc: 0,
+  lossInc: 0,
+  stopProfit: 0,
+  stopLoss: 0,
 };
 
 export const saveSettings = (settings: Partial<GameSettings>) => {

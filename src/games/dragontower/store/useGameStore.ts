@@ -97,7 +97,7 @@ export const useGameStore = create<GameStore>()((set) => ({
   testMode: usePlayerStore.getState().mode === 'demo',
   mode: usePlayerStore.getState().mode,
   balance: usePlayerStore.getState().balance,
-  bet: INITIAL_BET,
+  bet: _savedSettings.bet ?? INITIAL_BET,
   diff: "Medium",
   gstate: "idle",
   rgstate: "newgame",
@@ -118,31 +118,31 @@ export const useGameStore = create<GameStore>()((set) => ({
   animations: _savedSettings.animations,
 
   auto: {
-    autoBet: 5,
-    autoCount: 10,
-    autoAdvanced: false,
-    onWinMode: "reset",
-    onLossMode: "reset",
-    winInc: 0,
-    lossInc: 0,
-    stopProfit: 0,
-    stopLoss: 0,
+    autoBet: _savedSettings.bet ?? 5,
+    autoCount: _savedSettings.autoCount ?? 10,
+    autoAdvanced: _savedSettings.autoAdvanced ?? false,
+    onWinMode: _savedSettings.onWinMode ?? "reset",
+    onLossMode: _savedSettings.onLossMode ?? "reset",
+    winInc: _savedSettings.winInc ?? 0,
+    lossInc: _savedSettings.lossInc ?? 0,
+    stopProfit: _savedSettings.stopProfit ?? 0,
+    stopLoss: _savedSettings.stopLoss ?? 0,
     autoDiff: "Medium",
-  autoCashoutRow: 0,
+    autoCashoutRow: 0,
   },
   autoRunning: false,
   autoLastRoundWon: false,
   autoTotalProfit: 0,
-  autoCount: 10,
+  autoCount: _savedSettings.autoCount ?? 10,
   autoIsInfinite: false,
   autoPattern: _savedSettings.autoPattern,
-  mobileAutoTab: false,
+  mobileAutoTab: _savedSettings.mobileAutoTab ?? false,
 
   // ── actions ────────────────────────────────────────────────
   setTestMode: (v) => set({ testMode: v }),
   setMode: (v) => set({ mode: v }),
   setBalance: (v) => set({ balance: v }),
-  setBet: (v) => set({ bet: parseFloat(v.toFixed(2)) }),
+  setBet: (v) => { const b = parseFloat(v.toFixed(2)); set({ bet: b }); saveSettings({ bet: b }); },
   setDiff: (v) => set({ diff: v }),
   setGstate: (v) => set({ gstate: v }),
   setRgstate: (v) => set({ rgstate: v }),
@@ -188,9 +188,20 @@ export const useGameStore = create<GameStore>()((set) => ({
     }),
 
   setAuto: (partial) =>
-    set((state) => ({
-      auto: { ...state.auto, ...partial },
-    })),
+    set((state) => {
+      const merged = { ...state.auto, ...partial };
+      saveSettings({
+        autoCount: merged.autoCount,
+        autoAdvanced: merged.autoAdvanced,
+        onWinMode: merged.onWinMode,
+        onLossMode: merged.onLossMode,
+        winInc: merged.winInc,
+        lossInc: merged.lossInc,
+        stopProfit: merged.stopProfit,
+        stopLoss: merged.stopLoss,
+      });
+      return { auto: merged };
+    }),
 
   setAutoRunning: (v) => set({ autoRunning: v }),
   setAutoLastRoundWon: (v) => set({ autoLastRoundWon: v }),
@@ -212,7 +223,7 @@ export const useGameStore = create<GameStore>()((set) => ({
       return { autoPattern: newPattern };
     }),
 
-  setMobileAutoTab: (v) => set({ mobileAutoTab: v }),
+  setMobileAutoTab: (v) => { set({ mobileAutoTab: v }); saveSettings({ mobileAutoTab: v }); },
 
   clearAutoPattern: () => {
     set({ autoPattern: Array(9).fill(null) });

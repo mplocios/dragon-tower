@@ -119,6 +119,7 @@ export function usePixiGame(
   const onRandomRef = useRef(options.onRandom);
   const onAutoToggleRef = useRef(options.onAutoToggle);
   const autoTabActiveRef = useRef(false);
+  const reapplyAutoPanelRef = useRef<(() => void) | null>(null);
   const poppinsLoadedRef = useRef(false);
   useEffect(() => { onTileClickRef.current = options.onTileClick; }, [options.onTileClick]);
   useEffect(() => { onPlayAgainRef.current = options.onPlayAgain; }, [options.onPlayAgain]);
@@ -1361,6 +1362,7 @@ export function usePixiGame(
       if (w <= 0 || h <= 0) return; // skip if layout not ready
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
+      canvas.style.maxHeight = '';
       wrap.style.width = '100%';
     } else {
       // Clear any mobile inline styles on wrap
@@ -1707,9 +1709,18 @@ export function usePixiGame(
       // Re-scale after layout settles (fixes stale size on refresh at tablet widths)
       requestAnimationFrame(() => scaleCanvas());
 
+      // Helper: scale then re-apply auto panel sizing if active
+      const scaleCanvasAware = () => {
+        if (autoTabActiveRef.current && reapplyAutoPanelRef.current) {
+          reapplyAutoPanelRef.current();
+        } else {
+          scaleCanvas();
+        }
+      };
+
       let resizeTimer: ReturnType<typeof setTimeout> | null = null;
       const onResize = () => {
-        scaleCanvas(); // always scale immediately
+        scaleCanvasAware();
 
         // Debounce the heavy work (grid rebuild on mode switch)
         if (resizeTimer) clearTimeout(resizeTimer);
@@ -1724,7 +1735,7 @@ export function usePixiGame(
             const st = getStateRef.current();
             buildGrid(st.diff);
             refreshGrid(st.diff, st.gstate, st.curRow, st.revealed);
-            scaleCanvas();
+            scaleCanvasAware();
           }
         }, 150);
       };
@@ -1736,7 +1747,7 @@ export function usePixiGame(
       if (wrap) {
         ro = new ResizeObserver(() => {
           if (roTimer) clearTimeout(roTimer);
-          roTimer = setTimeout(() => scaleCanvas(), 16);
+          roTimer = setTimeout(() => scaleCanvasAware(), 16);
         });
         ro.observe(wrap);
       }
@@ -1892,7 +1903,7 @@ export function usePixiGame(
     betCoin.x = PANEL_BET_COIN_X; betCoin.y = PANEL_BOT_H - PANEL_BET_BOT_OFFSET;
     betCard.addChild(betCoin);
 
-    const betText = new PIXI.Text({ text: '5', style: { ...amtStyle, fontSize: PANEL_BET_AMT_FONT } });
+    const betText = new PIXI.Text({ text: useGameStore.getState().bet.toFixed(2), style: { ...amtStyle, fontSize: PANEL_BET_AMT_FONT } });
     (betText as any)._baseFont = PANEL_BET_AMT_FONT;
     betText.x = PANEL_BET_AMT_X; betText.y = PANEL_BOT_H - PANEL_BET_BOT_OFFSET; betText.anchor.set(0, 0.5);
     betCard.addChild(betText);
@@ -1904,23 +1915,30 @@ export function usePixiGame(
       btn.x = arrowX; btn.y = yPos;
       if (label === '▲' && TEX.bet_up_bg) {
         const sp = new PIXI.Sprite(TEX.bet_up_bg);
-        sp.width = aw; sp.height = ah; btn.addChild(sp);
+        sp.width = aw; sp.height = ah;
+        sp.eventMode = 'none';
+        btn.addChild(sp);
       } else if (label === '▼' && TEX.bet_down_bg) {
         const sp = new PIXI.Sprite(TEX.bet_down_bg);
-        sp.width = aw; sp.height = ah; btn.addChild(sp);
+        sp.width = aw; sp.height = ah;
+        sp.eventMode = 'none';
+        btn.addChild(sp);
       } else {
         const bg = new PIXI.Graphics();
         bg.roundRect(0, 0, aw, ah, 4).fill({ color: 0x1a2a3a });
+        bg.eventMode = 'none';
         btn.addChild(bg);
         const txt = new PIXI.Text({ text: label, style: { fontFamily: 'Poppins', fontSize: PANEL_AMT_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' } });
         txt.anchor.set(0.5); txt.x = aw / 2; txt.y = ah / 2;
+        txt.eventMode = 'none';
         btn.addChild(txt);
       }
       const hit = new PIXI.Graphics();
       hit.rect(0, 0, aw, ah).fill({ color: 0x000000, alpha: 0.001 });
+      hit.eventMode = 'static';
       btn.addChild(hit);
       btn.eventMode = 'static'; btn.cursor = 'pointer';
-      btn.on('pointerdown', onTap);
+      hit.on('pointerdown', onTap);
       return btn;
     };
 
@@ -1933,20 +1951,14 @@ export function usePixiGame(
     const parseFmt = (s: string) => parseFloat(s.replace(/,/g, '')) || 0;
 
     const upArrow = makeArrowBtn(PANEL_ARROW_UP_Y, '▲', PANEL_ARROW_UP_W, PANEL_ARROW_UP_H, () => {
-      const cur = parseFmt(betText.text);
+      const cur = useGameStore.getState().bet;
       const bal = useGameStore.getState().balance;
-      const newBet = parseFloat((cur * 2).toFixed(2));
+      const newBet = parseFloat((cur + 1).toFixed(2));
 
-      // If doubling would exceed MAX_BET, clamp to MAX_BET instead of blocking
       if (newBet > MAX_BET) {
-        const clamped = Math.min(MAX_BET, bal);
-        if (cur >= clamped) {
-          insuffText.text = 'Max bet is ' + MAX_BET.toFixed(2) + '!';
-          insuffText.visible = true;
-          setTimeout(() => { insuffText.visible = false; }, 2000);
-          return;
-        }
-        onBetChangeRef.current?.(clamped);
+        insuffText.text = 'Max bet is ' + MAX_BET.toFixed(2) + '!';
+        insuffText.visible = true;
+        setTimeout(() => { insuffText.visible = false; }, 2000);
         return;
       }
 
@@ -1963,15 +1975,14 @@ export function usePixiGame(
     panelTextsRef.current.upArrow = upArrow;
 
     const downArrow = makeArrowBtn(PANEL_ARROW_DOWN_Y, '▼', PANEL_ARROW_DOWN_W, PANEL_ARROW_DOWN_H, () => {
-      const cur = parseFmt(betText.text);
+      const cur = useGameStore.getState().bet;
       if (cur <= MIN_BET) {
         insuffText.text = 'Min bet is ' + MIN_BET.toFixed(2) + '!';
         insuffText.visible = true;
         setTimeout(() => { insuffText.visible = false; }, 2000);
         return;
       }
-      const halved = parseFloat((cur * 0.5).toFixed(2));
-      const newBet = Math.max(halved, MIN_BET);
+      const newBet = Math.max(parseFloat((cur - 1).toFixed(2)), MIN_BET);
       onBetChangeRef.current?.(newBet);
     });
     betCard.addChild(downArrow);
@@ -2139,16 +2150,31 @@ export function usePixiGame(
 
     // Helper: small arrow button for auto fields
     const AP_ARR_W = 28; const AP_ARR_H = 18;
+    // Deferred so it always calls the latest updateAutoPanel
+    const updateAutoPanelRef = { fn: () => {} };
+
     const makeApArrow = (label: string, onClick: () => void) => {
       const c = new PIXI.Container();
       const bg = new PIXI.Graphics();
       bg.roundRect(0, 0, AP_ARR_W, AP_ARR_H, 4).fill({ color: 0x1a2a3a, alpha: 0.8 });
+      bg.eventMode = 'none';
       c.addChild(bg);
       const txt = new PIXI.Text({ text: label, style: { fontFamily: 'Poppins', fontSize: 10, fill: 0x8899aa, fontWeight: '700' } });
       txt.anchor.set(0.5); txt.x = AP_ARR_W / 2; txt.y = AP_ARR_H / 2;
+      txt.eventMode = 'none';
       c.addChild(txt);
+      // Hit rect on top so it reliably receives pointer events across the full area
+      const hit = new PIXI.Graphics();
+      hit.rect(0, 0, AP_ARR_W, AP_ARR_H).fill({ color: 0x000000, alpha: 0.001 });
+      hit.eventMode = 'static';
+      c.addChild(hit);
       c.eventMode = 'static'; c.cursor = 'pointer';
-      c.on('pointerdown', () => { if (!useGameStore.getState().autoRunning) onClick(); });
+      hit.on('pointerdown', () => {
+        if (!useGameStore.getState().autoRunning) {
+          onClick();
+          updateAutoPanelRef.fn();
+        }
+      });
       return c;
     };
 
@@ -2164,14 +2190,12 @@ export function usePixiGame(
     const nbUp = makeApArrow('▲', () => {
       const a = useGameStore.getState().auto;
       useGameStore.getState().setAuto({ autoCount: a.autoCount + 1 });
-      updateAutoPanel();
     });
     nbUp.x = contentW - AP_ARR_W - 6; nbUp.y = 3;
     numBetsCard.addChild(nbUp);
     const nbDown = makeApArrow('▼', () => {
       const a = useGameStore.getState().auto;
       useGameStore.getState().setAuto({ autoCount: Math.max(0, a.autoCount - 1) });
-      updateAutoPanel();
     });
     nbDown.x = contentW - AP_ARR_W - 6; nbDown.y = AP_CARD_H - AP_ARR_H - 3;
     numBetsCard.addChild(nbDown);
@@ -2283,14 +2307,21 @@ export function usePixiGame(
       const c = new PIXI.Container();
       const bg = new PIXI.Graphics();
       bg.roundRect(0, 0, w, h, 6).fill({ color: 0x0c1828, alpha: 0.5 });
+      bg.eventMode = 'none';
       c.addChild(bg);
       const txt = new PIXI.Text({ text: label, style: { fontFamily: 'Poppins', fontSize: 11, fill: 0x4a7aaa, fontWeight: '600' } });
       txt.anchor.set(0.5); txt.x = w / 2; txt.y = h / 2;
+      txt.eventMode = 'none';
       c.addChild(txt);
+      // Transparent hit rect on top for reliable full-area click
+      const hitRect = new PIXI.Graphics();
+      hitRect.rect(0, 0, w, h).fill({ color: 0x000000, alpha: 0.001 });
+      hitRect.eventMode = 'static';
+      c.addChild(hitRect);
       c.eventMode = 'static'; c.cursor = 'pointer';
-      return { container: c, bg, txt };
+      return { container: c, bg, txt, hitRect };
     };
-    const setModeBtnActive = (btn: { bg: PIXI.Graphics, txt: PIXI.Text }, active: boolean, w: number, h: number) => {
+    const setModeBtnActive = (btn: { container: PIXI.Container, bg: PIXI.Graphics, txt: PIXI.Text, hitRect: PIXI.Graphics }, active: boolean, w: number, h: number) => {
       btn.bg.clear();
       if (active) {
         btn.bg.roundRect(0, 0, w, h, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
@@ -2299,6 +2330,8 @@ export function usePixiGame(
         btn.bg.roundRect(0, 0, w, h, 6).fill({ color: 0x0c1828, alpha: 0.5 });
       }
       btn.txt.style.fill = active ? 0xc8d8e8 : 0x4a7aaa;
+      // Ensure hitRect stays on top so it captures pointer events
+      btn.container.setChildIndex(btn.hitRect, btn.container.children.length - 1);
     };
 
     // ── On Win card ──
@@ -2328,7 +2361,6 @@ export function usePixiGame(
       const a = useGameStore.getState().auto;
       if (a.onWinMode === 'reset') return;
       useGameStore.getState().setAuto({ winInc: (a.winInc || 0) + 1 });
-      updateAutoPanel();
     });
     owUp.x = contentW - AP_ARR_W - 6; owUp.y = 3;
     onWinCard.addChild(owUp);
@@ -2336,7 +2368,6 @@ export function usePixiGame(
       const a = useGameStore.getState().auto;
       if (a.onWinMode === 'reset') return;
       useGameStore.getState().setAuto({ winInc: Math.max(0, (a.winInc || 0) - 1) });
-      updateAutoPanel();
     });
     owDown.x = contentW - AP_ARR_W - 6; owDown.y = AP_ADV_ROW_H - AP_ARR_H - 3;
     onWinCard.addChild(owDown);
@@ -2354,17 +2385,19 @@ export function usePixiGame(
       showMobileAutoInput(input, owPctVal);
     });
     onWinCard.addChild(owPctHit);
-    owReset.container.on('pointerdown', () => {
+    owReset.hitRect.on('pointerdown', () => {
       if (useGameStore.getState().autoRunning) return;
       useGameStore.getState().setAuto({ onWinMode: 'reset' });
       setModeBtnActive(owReset, true, mbW, mbH);
       setModeBtnActive(owIncrease, false, mbW + 10, mbH);
+      updateAutoPanelRef.fn();
     });
-    owIncrease.container.on('pointerdown', () => {
+    owIncrease.hitRect.on('pointerdown', () => {
       if (useGameStore.getState().autoRunning) return;
       useGameStore.getState().setAuto({ onWinMode: 'increase' });
       setModeBtnActive(owReset, false, mbW, mbH);
       setModeBtnActive(owIncrease, true, mbW + 10, mbH);
+      updateAutoPanelRef.fn();
     });
     advContent.addChild(onWinCard);
     acY += AP_ADV_ROW_H + AP_GAP;
@@ -2395,7 +2428,6 @@ export function usePixiGame(
       const a = useGameStore.getState().auto;
       if (a.onLossMode === 'reset') return;
       useGameStore.getState().setAuto({ lossInc: (a.lossInc || 0) + 1 });
-      updateAutoPanel();
     });
     olUp.x = contentW - AP_ARR_W - 6; olUp.y = 3;
     onLossCard.addChild(olUp);
@@ -2403,7 +2435,6 @@ export function usePixiGame(
       const a = useGameStore.getState().auto;
       if (a.onLossMode === 'reset') return;
       useGameStore.getState().setAuto({ lossInc: Math.max(0, (a.lossInc || 0) - 1) });
-      updateAutoPanel();
     });
     olDown.x = contentW - AP_ARR_W - 6; olDown.y = AP_ADV_ROW_H - AP_ARR_H - 3;
     onLossCard.addChild(olDown);
@@ -2420,17 +2451,19 @@ export function usePixiGame(
       showMobileAutoInput(input, olPctVal);
     });
     onLossCard.addChild(olPctHit);
-    olReset.container.on('pointerdown', () => {
+    olReset.hitRect.on('pointerdown', () => {
       if (useGameStore.getState().autoRunning) return;
       useGameStore.getState().setAuto({ onLossMode: 'reset' });
       setModeBtnActive(olReset, true, mbW, mbH);
       setModeBtnActive(olIncrease, false, mbW + 10, mbH);
+      updateAutoPanelRef.fn();
     });
-    olIncrease.container.on('pointerdown', () => {
+    olIncrease.hitRect.on('pointerdown', () => {
       if (useGameStore.getState().autoRunning) return;
       useGameStore.getState().setAuto({ onLossMode: 'increase' });
       setModeBtnActive(olReset, false, mbW, mbH);
       setModeBtnActive(olIncrease, true, mbW + 10, mbH);
+      updateAutoPanelRef.fn();
     });
     advContent.addChild(onLossCard);
     acY += AP_ADV_ROW_H + AP_GAP;
@@ -2450,14 +2483,12 @@ export function usePixiGame(
     const spUpA = makeApArrow('▲', () => {
       const a = useGameStore.getState().auto;
       useGameStore.getState().setAuto({ stopProfit: (a.stopProfit || 0) + 1 });
-      updateAutoPanel();
     });
     spUpA.x = stopW - AP_ARR_W - 6; spUpA.y = 3;
     spCard.addChild(spUpA);
     const spDownA = makeApArrow('▼', () => {
       const a = useGameStore.getState().auto;
       useGameStore.getState().setAuto({ stopProfit: Math.max(0, (a.stopProfit || 0) - 1) });
-      updateAutoPanel();
     });
     spDownA.x = stopW - AP_ARR_W - 6; spDownA.y = AP_STOP_H - AP_ARR_H - 3;
     spCard.addChild(spDownA);
@@ -2488,14 +2519,12 @@ export function usePixiGame(
     const slUpA = makeApArrow('▲', () => {
       const a = useGameStore.getState().auto;
       useGameStore.getState().setAuto({ stopLoss: (a.stopLoss || 0) + 1 });
-      updateAutoPanel();
     });
     slUpA.x = stopW - AP_ARR_W - 6; slUpA.y = 3;
     slCard.addChild(slUpA);
     const slDownA = makeApArrow('▼', () => {
       const a = useGameStore.getState().auto;
       useGameStore.getState().setAuto({ stopLoss: Math.max(0, (a.stopLoss || 0) - 1) });
-      updateAutoPanel();
     });
     slDownA.x = stopW - AP_ARR_W - 6; slDownA.y = AP_STOP_H - AP_ARR_H - 3;
     slCard.addChild(slDownA);
@@ -2554,17 +2583,27 @@ export function usePixiGame(
     const resizeMobileForAutoPanel = (autoPanelH: number) => {
       const app = appRef.current;
       if (!app || !isMobileRef.current) return;
+      if (!autoTabActiveRef.current) return;
       const canvasH = CH_MOBILE + autoPanelH;
       app.renderer.resize(CW, canvasH);
-      // Keep width scaling the same as manual, just grow height proportionally
       const wrap = canvasWrapRef.current;
       if (!wrap) return;
       const wrapW = wrap.clientWidth || window.innerWidth;
       const scale = wrapW / CW;
       const canvas = app.canvas as HTMLCanvasElement;
+      // Set natural size — no CSS auto-scaling so PixiJS hit areas match visuals
       canvas.style.width = `${Math.round(CW * scale)}px`;
       canvas.style.height = `${Math.round(canvasH * scale)}px`;
       canvas.style.maxHeight = 'none';
+      canvas.style.maxWidth = 'none';
+      canvas.style.objectFit = 'unset';
+      // Let canvas-wrap grow beyond viewport and parent scroll
+      wrap.style.flex = '0 0 auto';
+      wrap.style.alignItems = 'flex-start';
+      const gamePanel = wrap.closest('#game-panel') as HTMLElement | null;
+      if (gamePanel) gamePanel.style.overflowY = 'auto';
+      // Store so resize handler can re-apply
+      reapplyAutoPanelRef.current = () => resizeMobileForAutoPanel(autoPanelH);
     };
 
     // Initial layout
@@ -2616,9 +2655,22 @@ export function usePixiGame(
     };
     const hideAutoPanel = () => {
       autoPanel.visible = false;
+      reapplyAutoPanelRef.current = null;
       const app = appRef.current;
       if (app && isMobileRef.current) {
         app.renderer.resize(CW, CH_MOBILE);
+        const wrap = canvasWrapRef.current;
+        if (wrap) {
+          // Restore CSS auto-scaling constraints for manual mode
+          const canvas = app.canvas as HTMLCanvasElement;
+          canvas.style.maxHeight = '';
+          canvas.style.maxWidth = '';
+          canvas.style.objectFit = '';
+          wrap.style.flex = '';
+          wrap.style.alignItems = '';
+          const gamePanel = wrap.closest('#game-panel') as HTMLElement | null;
+          if (gamePanel) gamePanel.style.overflowY = '';
+        }
         scaleCanvas();
       }
     };
@@ -2677,7 +2729,8 @@ export function usePixiGame(
       advCard.alpha = running ? 0.4 : 1;
       advContent.alpha = running ? 0.35 : 1;
     };
-
+    // Wire deferred ref NOW that updateAutoPanel is fully defined
+    updateAutoPanelRef.fn = updateAutoPanel;
     // Wire tab handlers to show/hide auto panel
     manualHit.removeAllListeners('pointerdown');
     manualHit.on('pointerdown', () => {
@@ -2710,6 +2763,16 @@ export function usePixiGame(
     panelTextsRef.current.showAutoPanel = showAutoPanel;
     panelTextsRef.current.hideAutoPanel = hideAutoPanel;
     panelTextsRef.current.onAutoToggle = onAutoToggleRef;
+
+    // Restore auto tab if it was active before reload
+    if (useGameStore.getState().mobileAutoTab) {
+      tabHighlight.clear();
+      tabHighlight.roundRect(tabW / 2, 4, tabW / 2 - 4, PANEL_TAB_H - 8, 6).fill({ color: 0x2a3a4a, alpha: 0.7 });
+      manualLbl.style.fill = 0x8899aa;
+      autoLbl.style.fill = 0xffffff;
+      autoTabActiveRef.current = true;
+      showAutoPanel();
+    }
 
     // ── Create shared HTML input for auto fields ──
     if (!document.getElementById('mobile-auto-input')) {
@@ -3105,7 +3168,7 @@ export function usePixiGame(
           t.playCircle.tint = 0xff4444;
         }
       } else if (autoTab) {
-        // Auto tab idle: use play_btn_empty (yellow/green glow), no tint
+        // Auto tab idle: use play_btn_empty
         t.playCircle.alpha = disabled ? 0.45 : 1;
         t.playCircle.eventMode = 'static';
         if (t.playCircle instanceof PIXI.Sprite && TEX.play_btn_empty) {
