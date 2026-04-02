@@ -65,6 +65,8 @@ export interface GameSettings {
   lossInc: number;
   stopProfit: number;
   stopLoss: number;
+  diff: string;
+  autoDiff: string;
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -84,6 +86,8 @@ const DEFAULT_SETTINGS: GameSettings = {
   lossInc: 0,
   stopProfit: 0,
   stopLoss: 0,
+  diff: "Medium",
+  autoDiff: "Medium",
 };
 
 export const saveSettings = (settings: Partial<GameSettings>) => {

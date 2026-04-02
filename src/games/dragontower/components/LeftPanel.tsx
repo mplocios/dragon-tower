@@ -84,6 +84,8 @@ const S = {
     boxSizing: "border-box" as const,
     overflowX: "hidden" as const,
     overflowY: "auto" as const,
+    userSelect: "none" as const,
+    WebkitUserSelect: "none" as const,
     scrollbarGutter: "stable" as const,
   },
 
@@ -103,12 +105,12 @@ const S = {
     fontFamily: "'Poppins', sans-serif",
     fontSize: 14,
     fontWeight: 700,
-    cursor: disabled ? "not-allowed" : "pointer",
+    cursor: disabled ? "default" : "pointer",
     transition: "all .18s",
     background: active ? C.tabActive : "transparent",
-    color: active ? C.accentDark : disabled ? "#555d6a" : C.tabInactive,
+    color: active ? C.accentDark : C.tabInactive,
     letterSpacing: 0.5,
-    opacity: disabled ? 0.4 : 1,
+    pointerEvents: disabled ? "none" as const : "auto" as const,
   }),
 
   // ── Generic ──
@@ -561,7 +563,22 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
     setAutoCountInput(auto.autoCount === 0 ? "" : String(auto.autoCount));
   }, [auto.autoCount]);
 
-  const onBetChange = (v: number) => setBet(v);
+  const onBetChange = (v: number) => {
+    setBet(v);
+    setAuto({ autoBet: v });
+    setAutoBetInputVal(v === 0 ? "0.00" : v.toFixed(2));
+    setAutoBetExceedsBalance(false);
+    setAutoBetExceedsMax(false);
+    setAutoBetInvalid(false);
+  };
+  const onAutoBetChange = (v: number) => {
+    setAuto({ autoBet: v });
+    setBet(v);
+    setBetInputVal(v === 0 ? "0.00" : v.toFixed(2));
+    setBetExceedsBalance(false);
+    setBetExceedsMax(false);
+    setBetInvalid(false);
+  };
   const onAutoSettingsChange = (s: Record<string, unknown>) =>
     setAuto(s as Record<string, never>);
 
@@ -647,7 +664,11 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                       setBetExceedsBalance(exceedsBalance);
                       setBetExceedsMax(exceedsMax);
                       setBetInvalid(false);
-                      if (!exceedsBalance && !exceedsMax) onBetChange(rounded);
+                      if (!exceedsBalance && !exceedsMax) {
+                        setBet(rounded);
+                        setAuto({ autoBet: rounded });
+                        setAutoBetInputVal(rounded.toFixed(2));
+                      }
                     } else {
                       setBetExceedsBalance(false);
                       setBetExceedsMax(false);
@@ -932,8 +953,11 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                       setAutoBetExceedsBalance(exceedsBalance);
                       setAutoBetExceedsMax(exceedsMax);
                       setAutoBetInvalid(false);
-                      if (!exceedsBalance && !exceedsMax)
+                      if (!exceedsBalance && !exceedsMax) {
                         setAuto({ autoBet: rounded });
+                        setBet(rounded);
+                        setBetInputVal(rounded.toFixed(2));
+                      }
                     } else {
                       setAutoBetExceedsBalance(false);
                       setAutoBetExceedsMax(false);
@@ -948,7 +972,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                       setAutoBetExceedsBalance(false);
                       setAutoBetExceedsMax(false);
                       setAutoBetInvalid(false);
-                      setAuto({ autoBet: 0 });
+                      onAutoBetChange(0);
                     } else {
                       const clamped = Math.min(
                         parseFloat(value.toFixed(2)) <=
@@ -961,7 +985,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                       setAutoBetExceedsBalance(false);
                       setAutoBetExceedsMax(false);
                       setAutoBetInvalid(false);
-                      setAuto({ autoBet: clamped });
+                      onAutoBetChange(clamped);
                     }
                   }}
                 />
@@ -974,8 +998,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   const next = parseFloat((auto.autoBet * 0.5).toFixed(2));
                   if (next < MIN_BET) return;
                   if (next > balance) return;
-                  setAuto({ autoBet: next });
-                  setAutoBetInputVal(next.toFixed(2));
+                  onAutoBetChange(next);
                   setAutoBetExceedsBalance(false);
                 }}
               >
@@ -991,8 +1014,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   setAutoBetExceedsBalance(exceedsBalance);
                   setAutoBetExceedsMax(exceedsMax);
                   if (!exceedsBalance && !exceedsMax) {
-                    setAuto({ autoBet: next });
-                    setAutoBetInputVal(next.toFixed(2));
+                    onAutoBetChange(next);
                   }
                 }}
               >
@@ -1004,8 +1026,7 @@ const LeftPanel: React.FC<LeftPanelProps> = ({
                   disabled={autoRunning}
                   onClick={() => {
                     const maxVal = Math.min(balance, MAX_BET);
-                    setAuto({ autoBet: maxVal });
-                    setAutoBetInputVal(maxVal.toFixed(2));
+                    onAutoBetChange(maxVal);
                     setAutoBetExceedsBalance(false);
                     setAutoBetExceedsMax(false);
                   }}

@@ -2368,14 +2368,14 @@ export function usePixiGame(
       if (a.onWinMode === 'reset') return;
       useGameStore.getState().setAuto({ winInc: (a.winInc || 0) + 1 });
     });
-    owUp.x = contentW - AP_ARR_W - 6; owUp.y = 3;
+    owUp.x = contentW - AP_ARR_W - 6; owUp.y = (AP_ADV_ROW_H - AP_ARR_H * 2 - 2) / 2;
     onWinCard.addChild(owUp);
     const owDown = makeApArrow('▼', () => {
       const a = useGameStore.getState().auto;
       if (a.onWinMode === 'reset') return;
       useGameStore.getState().setAuto({ winInc: Math.max(0, (a.winInc || 0) - 1) });
     });
-    owDown.x = contentW - AP_ARR_W - 6; owDown.y = AP_ADV_ROW_H - AP_ARR_H - 3;
+    owDown.x = contentW - AP_ARR_W - 6; owDown.y = (AP_ADV_ROW_H - AP_ARR_H * 2 - 2) / 2 + AP_ARR_H + 2;
     onWinCard.addChild(owDown);
     // Pct hit area
     const owPctHit = new PIXI.Graphics();
@@ -2435,14 +2435,14 @@ export function usePixiGame(
       if (a.onLossMode === 'reset') return;
       useGameStore.getState().setAuto({ lossInc: (a.lossInc || 0) + 1 });
     });
-    olUp.x = contentW - AP_ARR_W - 6; olUp.y = 3;
+    olUp.x = contentW - AP_ARR_W - 6; olUp.y = (AP_ADV_ROW_H - AP_ARR_H * 2 - 2) / 2;
     onLossCard.addChild(olUp);
     const olDown = makeApArrow('▼', () => {
       const a = useGameStore.getState().auto;
       if (a.onLossMode === 'reset') return;
       useGameStore.getState().setAuto({ lossInc: Math.max(0, (a.lossInc || 0) - 1) });
     });
-    olDown.x = contentW - AP_ARR_W - 6; olDown.y = AP_ADV_ROW_H - AP_ARR_H - 3;
+    olDown.x = contentW - AP_ARR_W - 6; olDown.y = (AP_ADV_ROW_H - AP_ARR_H * 2 - 2) / 2 + AP_ARR_H + 2;
     onLossCard.addChild(olDown);
     const olPctHit = new PIXI.Graphics();
     olPctHit.rect(olByLbl.x + 18, 24, 50, mbH).fill({ color: 0, alpha: 0.001 });
@@ -2484,19 +2484,19 @@ export function usePixiGame(
     spLbl.x = 10; spLbl.y = 10;
     spCard.addChild(spLbl);
     const spVal = new PIXI.Text({ text: '0', style: { ...apValStyle, fontSize: 14 } });
-    spVal.x = 10; spVal.y = 32;
+    spVal.x = 10; spVal.y = 26;
     spCard.addChild(spVal);
     const spUpA = makeApArrow('▲', () => {
       const a = useGameStore.getState().auto;
       useGameStore.getState().setAuto({ stopProfit: (a.stopProfit || 0) + 1 });
     });
-    spUpA.x = stopW - AP_ARR_W - 6; spUpA.y = 3;
+    spUpA.x = stopW - AP_ARR_W - 6; spUpA.y = (AP_STOP_H - AP_ARR_H * 2 - 2) / 2;
     spCard.addChild(spUpA);
     const spDownA = makeApArrow('▼', () => {
       const a = useGameStore.getState().auto;
       useGameStore.getState().setAuto({ stopProfit: Math.max(0, (a.stopProfit || 0) - 1) });
     });
-    spDownA.x = stopW - AP_ARR_W - 6; spDownA.y = AP_STOP_H - AP_ARR_H - 3;
+    spDownA.x = stopW - AP_ARR_W - 6; spDownA.y = (AP_STOP_H - AP_ARR_H * 2 - 2) / 2 + AP_ARR_H + 2;
     spCard.addChild(spDownA);
     const spHit = new PIXI.Graphics();
     spHit.rect(0, 0, stopW - AP_ARR_W - 10, AP_STOP_H).fill({ color: 0, alpha: 0.001 });
@@ -2520,19 +2520,19 @@ export function usePixiGame(
     slLbl.x = 10; slLbl.y = 10;
     slCard.addChild(slLbl);
     const slVal = new PIXI.Text({ text: '0', style: { ...apValStyle, fontSize: 14 } });
-    slVal.x = 10; slVal.y = 32;
+    slVal.x = 10; slVal.y = 26;
     slCard.addChild(slVal);
     const slUpA = makeApArrow('▲', () => {
       const a = useGameStore.getState().auto;
       useGameStore.getState().setAuto({ stopLoss: (a.stopLoss || 0) + 1 });
     });
-    slUpA.x = stopW - AP_ARR_W - 6; slUpA.y = 3;
+    slUpA.x = stopW - AP_ARR_W - 6; slUpA.y = (AP_STOP_H - AP_ARR_H * 2 - 2) / 2;
     slCard.addChild(slUpA);
     const slDownA = makeApArrow('▼', () => {
       const a = useGameStore.getState().auto;
       useGameStore.getState().setAuto({ stopLoss: Math.max(0, (a.stopLoss || 0) - 1) });
     });
-    slDownA.x = stopW - AP_ARR_W - 6; slDownA.y = AP_STOP_H - AP_ARR_H - 3;
+    slDownA.x = stopW - AP_ARR_W - 6; slDownA.y = (AP_STOP_H - AP_ARR_H * 2 - 2) / 2 + AP_ARR_H + 2;
     slCard.addChild(slDownA);
     const slHit = new PIXI.Graphics();
     slHit.rect(0, 0, stopW - AP_ARR_W - 10, AP_STOP_H).fill({ color: 0, alpha: 0.001 });
@@ -2611,10 +2611,15 @@ export function usePixiGame(
       canvas.style.width = `${manualW}px`;
       canvas.style.height = `${Math.round(canvasH * scale)}px`;
       canvas.style.maxHeight = 'none';
+      // Allow native vertical scrolling on touch devices
+      canvas.style.touchAction = 'pan-y';
       // Let canvas-wrap grow beyond viewport and parent scroll
       wrap.style.flex = '0 0 auto';
       const gamePanel = wrap.closest('#game-panel') as HTMLElement | null;
-      if (gamePanel) gamePanel.style.overflowY = 'auto';
+      if (gamePanel) {
+        gamePanel.style.overflowY = 'auto';
+        gamePanel.style.webkitOverflowScrolling = 'touch';
+      }
     };
 
     // Initial layout
@@ -2670,6 +2675,8 @@ export function usePixiGame(
       const app = appRef.current;
       if (app && isMobileRef.current) {
         app.renderer.resize(CW, CH_MOBILE);
+        const canvas = app.canvas as HTMLCanvasElement;
+        canvas.style.touchAction = '';
         const wrap = canvasWrapRef.current;
         if (wrap) {
           wrap.style.flex = '';
@@ -2774,6 +2781,12 @@ export function usePixiGame(
     panelTextsRef.current.showAutoPanel = showAutoPanel;
     panelTextsRef.current.hideAutoPanel = hideAutoPanel;
     panelTextsRef.current.onAutoToggle = onAutoToggleRef;
+    panelTextsRef.current.manualHit = manualHit;
+    panelTextsRef.current.autoHit = autoHit;
+    panelTextsRef.current.manualLbl = manualLbl;
+    panelTextsRef.current.autoLbl = autoLbl;
+    panelTextsRef.current.tabHighlight = tabHighlight;
+    panelTextsRef.current.tabW = tabW;
 
     // Restore auto tab if it was active before reload
     if (useGameStore.getState().mobileAutoTab) {
@@ -2865,7 +2878,8 @@ export function usePixiGame(
     playCircle.on('pointerdown', () => {
       const gs = useGameStore.getState();
       if (autoTabActiveRef.current && gs.autoRunning) {
-        // Always allow stopping autobet — bypass cooldown
+        // Only allow stopping between rounds (not mid-play)
+        if (gs.gstate === 'playing') return;
         onAutoToggleRef.current?.();
         return;
       }
@@ -3167,13 +3181,20 @@ export function usePixiGame(
     }
     const autoTab = autoTabActiveRef.current;
     const manualPlaying = playing && !autoRunning;
+    const autoPlaying = playing || autoRunning;
 
-    // Disable Auto tab during manual play (not during autobet)
+    // Disable tab switching while playing (manual or auto)
     if (t.autoHit) {
       t.autoHit.eventMode = manualPlaying ? 'none' : 'static';
     }
     if (t.autoLbl) {
       t.autoLbl.alpha = manualPlaying ? 0.35 : 1;
+    }
+    if (t.manualHit) {
+      t.manualHit.eventMode = autoPlaying ? 'none' : 'static';
+    }
+    if (t.manualLbl) {
+      t.manualLbl.alpha = autoPlaying ? 0.35 : 1;
     }
 
     // Random Pick card: empty before play, "CASHOUT" during play
@@ -3189,8 +3210,8 @@ export function usePixiGame(
     const TEX = texRef.current;
     if (t.playCircle) {
       if (autoTab && autoRunning) {
-        // Auto running: stop — use stop button image, full opacity, always clickable
-        t.playCircle.alpha = 1;
+        // Auto running: stop — disable during active play, enable between rounds
+        t.playCircle.alpha = playing ? 0.45 : 1;
         t.playCircle.eventMode = 'static';
         if (t.playCircle instanceof PIXI.Sprite && TEX.play_btn_empty) {
           t.playCircle.texture = TEX.play_btn_empty;
@@ -3259,11 +3280,12 @@ export function usePixiGame(
         t.playAmtText.visible = false;
       }
     }
-    // Disable arrows and diff during play
-    if (t.upArrow) { t.upArrow.alpha = playing ? 0.35 : 1; t.upArrow.eventMode = playing ? 'none' : 'static'; }
-    if (t.downArrow) { t.downArrow.alpha = playing ? 0.35 : 1; t.downArrow.eventMode = playing ? 'none' : 'static'; }
-    if (t.diffHit) { t.diffHit.eventMode = playing ? 'none' : 'static'; }
-    if (t.diffCard) { t.diffCard.alpha = playing ? 0.45 : 1; }
+    // Disable arrows and diff during play or autobet
+    const disableBet = playing || autoRunning;
+    if (t.upArrow) { t.upArrow.alpha = disableBet ? 0.35 : 1; t.upArrow.eventMode = disableBet ? 'none' : 'static'; }
+    if (t.downArrow) { t.downArrow.alpha = disableBet ? 0.35 : 1; t.downArrow.eventMode = disableBet ? 'none' : 'static'; }
+    if (t.diffHit) { t.diffHit.eventMode = disableBet ? 'none' : 'static'; }
+    if (t.diffCard) { t.diffCard.alpha = disableBet ? 0.45 : 1; }
 
     // Sync auto panel when auto tab is active
     if (autoTabActiveRef.current) {

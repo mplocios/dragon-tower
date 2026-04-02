@@ -662,6 +662,7 @@ const DragonTower: React.FC = () => {
       });
 
       gs().setDiff(v);
+      gs().setAuto({ autoDiff: v });
       gs().clearAutoPattern();
       pixiGame.buildGrid(v);
       pixiGame.refreshGrid(v, "idle", 0, {});
