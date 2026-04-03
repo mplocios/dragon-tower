@@ -20,7 +20,7 @@ import { CW, CH, CH_MOBILE, PANEL_H, PAD, PAD_MOBILE, TGAP, RGAP, WALL_H, DIFF, 
   PANEL_ROW_GAP, PANEL_MID_GAP, PANEL_BOT_GAP, PANEL_Y_OFFSET,
   PANEL_LBL_COLOR, PANEL_GOLD_COLOR, PLAY_R, PLAY_BTN_Y_OFFSET, PLAY_LABEL_FONT, PLAY_AMT_FONT, PLAY_AUTO_FONT, PLAY_COIN_SIZE,
   PANEL_LBL_FONT, PANEL_AMT_FONT, PANEL_INNER_PX, PANEL_CARD_RADIUS, PANEL_CARD_BG,
-  PANEL_DIFF_RIGHT, PANEL_BAL_AMT_X, PANEL_COIN_SIZE, PANEL_COIN_GAP, PANEL_BAL_COIN_X_OFFSET, PANEL_PROFIT_COIN_X_OFFSET, PANEL_BAL_AMT_RIGHT,
+  PANEL_DIFF_RIGHT, PANEL_DIFF_TEXT_X_OFFSET, PANEL_BAL_AMT_X, PANEL_COIN_SIZE, PANEL_COIN_GAP, PANEL_BAL_COIN_X_OFFSET, PANEL_PROFIT_COIN_X_OFFSET, PANEL_BAL_AMT_RIGHT,
   PANEL_BET_COIN_SIZE, PANEL_BET_COIN_X, PANEL_BET_AMT_X, PANEL_BET_AMT_FONT,
   PANEL_BET_LBL_Y, PANEL_BET_BOT_OFFSET, PANEL_BET_WARN_FONT, PANEL_BET_WARN_X, PANEL_BET_WARN_Y,
   PANEL_ARROW_UP_W, PANEL_ARROW_UP_H, PANEL_ARROW_DOWN_W, PANEL_ARROW_DOWN_H, PANEL_ARROW_RIGHT, PANEL_ARROW_UP_Y, PANEL_ARROW_DOWN_Y,
@@ -2049,8 +2049,8 @@ export function usePixiGame(
 
     const diffText = new PIXI.Text({ text: 'Medium', style: { fontFamily: 'Poppins', fontSize: PANEL_AMT_FONT, fill: 0xffffff, fontWeight: '700' } });
     const diffArrow = new PIXI.Text({ text: ' ▼', style: { fontFamily: 'Poppins', fontSize: PANEL_LBL_FONT, fill: PANEL_LBL_COLOR, fontWeight: '700' } });
-    diffText.anchor.set(1, 0.5); diffText.x = contentW - PANEL_DIFF_RIGHT; diffText.y = PANEL_DIFF_H / 2;
-    diffArrow.anchor.set(0, 0.5); diffArrow.x = contentW - PANEL_DIFF_RIGHT + 2; diffArrow.y = PANEL_DIFF_H / 2;
+    diffText.anchor.set(1, 0.5); diffText.x = contentW - PANEL_DIFF_RIGHT + PANEL_DIFF_TEXT_X_OFFSET; diffText.y = PANEL_DIFF_H / 2;
+    diffArrow.anchor.set(0, 0.5); diffArrow.x = contentW - PANEL_DIFF_RIGHT + PANEL_DIFF_TEXT_X_OFFSET + 2; diffArrow.y = PANEL_DIFF_H / 2;
     diffCard.addChild(diffText); diffCard.addChild(diffArrow);
 
     const diffHit = new PIXI.Container();

@@ -223,6 +223,8 @@ export const PANEL_AMT_FONT = 16;
 // ─── Mobile Panel — Difficulty Card ─────────────────────────────────
 /** Difficulty text right margin from card edge */
 export const PANEL_DIFF_RIGHT = 28;
+/** Extra X offset for the difficulty value text (e.g. "Medium"). Negative = move left, positive = move right */
+export const PANEL_DIFF_TEXT_X_OFFSET = 0;
 /** Card inner left padding (text x offset) */
 export const PANEL_INNER_PX = 15;
 
